@@ -6,6 +6,60 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight } from "lucide-react"
 import { CodePreview } from "@/components/code-preview"
+import { useState } from "react"
+import { Copy, Check } from "lucide-react"
+
+export function InstallCommand() {
+  const command = "winget install novocy.hsemulator"
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(command)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="mt-8 flex flex-col items-center gap-1">
+      <p className="text-sm font-medium text-muted-foreground">
+        Get started locally
+      </p>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={handleCopy}
+        aria-label="Copy winget install command"
+        className="
+          group
+          flex items-center gap-3
+          px-4 py-2
+          font-mono text-sm
+          text-foreground/80
+          transition
+          hover:bg-muted/60
+          focus-visible:ring-2
+          focus-visible:ring-ring
+        "
+      >
+        <span className="whitespace-nowrap text-xs">~ {command}</span>
+
+        {copied ? (
+          <Check
+            className="h-4 w-4 text-green-500 transition"
+            aria-hidden="true"
+          />
+        ) : (
+          <Copy
+            className="h-4 w-4 text-muted-foreground transition group-hover:text-foreground"
+            aria-hidden="true"
+          />
+        )}
+      </Button>
+    </div>
+  )
+}
+
 
 export default function LandingPage() {
   return (
@@ -68,6 +122,7 @@ export default function LandingPage() {
               <Link href="/login">Sign in</Link>
             </Button>
           </motion.div>
+          <InstallCommand />
         </div>
       </section>
 

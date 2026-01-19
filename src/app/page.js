@@ -1,17 +1,102 @@
-import { GalleryVerticalEnd } from "lucide-react"
-import { LoginForm } from "@/components/login-form"
-export default function LoginPage() {
+"use client"
+
+import Link from "next/link"
+import { motion } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { ArrowRight } from "lucide-react"
+import { CodePreview } from "@/components/code-preview"
+
+export default function LandingPage() {
   return (
-    <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
-      <div className="flex w-full max-w-sm flex-col gap-6">
-        <a href="#" className="flex items-center gap-2 self-center font-medium">
-          <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
-            <GalleryVerticalEnd className="size-4" />
-          </div>
-          Acme Inc.
-        </a>
-        <LoginForm />
-      </div>
-    </div>
+    <main className="relative min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <span className="text-sm font-semibold tracking-tight">
+            HSEmulator
+          </span>
+          <Button size="sm" asChild>
+            <Link href="/get-started">Get started</Link>
+          </Button>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="mx-auto max-w-6xl px-6 pt-32 pb-24">
+        <div className="mx-auto max-w-3xl text-center">
+          <Badge variant="secondary" className="mb-6">
+            Hosted • Production-ready • Developer-first
+          </Badge>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl"
+          >
+            Ship HubSpot custom code
+            <span className="block bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              without guesswork
+            </span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.6 }}
+            className="mb-10 text-lg text-muted-foreground"
+          >
+            A hosted runtime for executing, validating, and promoting
+            HubSpot custom code actions with confidence.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex justify-center gap-4"
+          >
+            <Button size="lg" asChild>
+              <Link href="/get-started">
+                Get started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/login">Sign in</Link>
+            </Button>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Code Preview (self-contained) */}
+      <motion.section
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.6 }}
+      >
+        <CodePreview />
+      </motion.section>
+
+      {/* Final CTA */}
+      <section className="border-t bg-muted/30 py-20 mt-28">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <h2 className="mb-4 text-2xl font-semibold">
+            Ready to ship with confidence?
+          </h2>
+          <p className="mb-6 text-muted-foreground">
+            Create an account and start running your actions today.
+          </p>
+          <Button size="lg" asChild>
+            <Link href="/get-started">
+              Create your account
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </section>
+    </main>
   )
 }

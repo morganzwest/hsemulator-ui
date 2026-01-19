@@ -37,11 +37,15 @@ function CopyButton({
   );
 }
 
-
 function CodeEditor({
   children: code,
   lang,
-  themes = { light: "github-light", dark: "github-dark" },
+
+  themes = {
+    light: "github-light",
+    dark: "github-dark",
+  },
+
   duration = 5,
   delay = 0,
   className,
@@ -55,127 +59,166 @@ function CodeEditor({
   copyButton = false,
   writing = true,
   title,
-  onDone,          // ✅ add back
+  onDone,
   onCopy,
   ...props
 }) {
   const { resolvedTheme } = useTheme()
 
-  const containerRef = React.useRef(null) // ✅ observe the container
   const editorRef = React.useRef(null)
-
-  const hasStartedRef = React.useRef(false)
-  const intervalRef = React.useRef(null)
-  const timeoutRef = React.useRef(null)
-
   const [visibleCode, setVisibleCode] = React.useState("")
   const [highlightedCode, setHighlightedCode] = React.useState("")
   const [isDone, setIsDone] = React.useState(false)
 
-  const inViewResult = useInView(containerRef, {
+  const inViewResult = useInView(editorRef, {
     once: inViewOnce,
     margin: inViewMargin,
   })
   const isInView = !inView || inViewResult
 
-  // ✅ reset start flag whenever code changes or when we can start again
   React.useEffect(() => {
-    hasStartedRef.current = false
-    setVisibleCode("")
-    setHighlightedCode("")
-    setIsDone(false)
+    if (!(visibleCode.length && isInView)) {
+      return
+    }
 
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    if (intervalRef.current) clearInterval(intervalRef.current)
-  }, [code, writing])
+    const loadHighlightedCode = async () => {
+      try {
+        const { codeToHtml } = await import("shiki")
+
+        const highlighted = await codeToHtml(visibleCode, {
+          lang,
+          themes: {
+            light: themes.light,
+            dark: themes.dark,
+          },
+          defaultColor: resolvedTheme === "dark" ? "dark" : "light",
+        })
+
+        setHighlightedCode(highlighted)
+      } catch (e) {
+        console.error(`Language "${lang}" could not be loaded.`, e)
+      }
+    }
+
+    loadHighlightedCode()
+  }, [lang, themes, writing, isInView, duration, delay, visibleCode, resolvedTheme])
 
   React.useEffect(() => {
-    if (!isInView) return
-    if (!code?.length) return
-
-    // If writing disabled: show full code immediately
     if (!writing) {
       setVisibleCode(code)
-      setIsDone(true)
       onDone?.()
       return
     }
 
-    if (hasStartedRef.current) return
-    hasStartedRef.current = true
+    if (!(code.length && isInView)) {
+      return
+    }
 
     const characters = Array.from(code)
     let index = 0
-    const intervalMs = (duration * 1000) / Math.max(characters.length, 1)
+    const totalDuration = duration * 1000
+    const interval = totalDuration / characters.length
+    let intervalId
 
-    timeoutRef.current = setTimeout(() => {
-      intervalRef.current = setInterval(() => {
+    const timeout = setTimeout(() => {
+      intervalId = setInterval(() => {
         if (index < characters.length) {
-          setVisibleCode(prev => prev + characters[index++])
+          setVisibleCode(prev => {
+            const currentIndex = index
+            index += 1
+            return prev + characters[currentIndex]
+          })
           editorRef.current?.scrollTo({
-            top: editorRef.current.scrollHeight,
+            top: editorRef.current?.scrollHeight,
+            behavior: "smooth",
           })
         } else {
-          clearInterval(intervalRef.current)
-          intervalRef.current = null
+          clearInterval(intervalId)
           setIsDone(true)
           onDone?.()
         }
-      }, intervalMs)
+      }, interval)
     }, delay * 1000)
 
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [isInView, code, writing, duration, delay, onDone])
-
-  React.useEffect(() => {
-    if (!isDone) return
-
-    const highlight = async () => {
-      const { codeToHtml } = await import("shiki")
-      const html = await codeToHtml(code, {
-        lang,
-        themes,
-        defaultColor: resolvedTheme === "dark" ? "dark" : "light",
-      })
-      setHighlightedCode(html)
-    }
-
-    highlight()
-  }, [isDone, code, lang, themes, resolvedTheme])
+      clearTimeout(timeout)
+      clearInterval(intervalId)
+    };
+  }, [code, duration, delay, isInView, writing, onDone])
 
   return (
     <div
-      ref={containerRef}  // ✅ move inView ref here
       className={cn(
         "relative bg-muted/50 w-[600px] h-[400px] border border-border overflow-hidden flex flex-col rounded-xl",
         className
       )}
-      {...props}
-    >
-      {/* header unchanged... */}
+      data-slot="code-editor"
+      {...(props)}>
+      {header ? (
+        <div
+          className="bg-muted border-b border-border/75 dark:border-border/50 relative flex flex-row items-center justify-between gap-y-2 h-10 px-4">
+          {dots && (
+            <div className="flex flex-row gap-x-2">
+              <div className="size-2 rounded-full bg-red-500" />
+              <div className="size-2 rounded-full bg-yellow-500" />
+              <div className="size-2 rounded-full bg-green-500" />
+            </div>
+          )}
 
+          {title && (
+            <div
+              className={cn(
+                "flex flex-row items-center gap-2",
+                dots && "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+              )}>
+              {icon ? (
+                typeof icon === "string" ? (
+                  <div
+                    className="text-muted-foreground [&_svg]:size-3.5"
+                    dangerouslySetInnerHTML={{ __html: icon }} />
+                ) : (
+                  <div className="text-muted-foreground [&_svg]:size-3.5">{icon}</div>
+                )
+              ) : null}
+              <figcaption className="flex-1 truncate text-muted-foreground text-[13px]">
+                {title}
+              </figcaption>
+            </div>
+          )}
+
+          {copyButton ? (
+            <CopyButton
+              className="-me-2 bg-transparent hover:bg-black/5 dark:hover:bg-white/10"
+              content={code}
+              onCopy={onCopy}
+              size="sm"
+              variant="ghost" />
+          ) : null}
+        </div>
+      ) : (
+        copyButton && (
+          <CopyButton
+            className="absolute right-2 top-2 z-[2] backdrop-blur-md bg-transparent hover:bg-black/5 dark:hover:bg-white/10"
+            content={code}
+            onCopy={onCopy}
+            size="sm"
+            variant="ghost" />
+        )
+      )}
       <div
-        ref={editorRef}
-        className="flex-1 overflow-auto p-4 font-mono text-sm"
-      >
-        {!isDone ? (
-          <pre className="whitespace-pre-wrap text-[13px] font-mono [font-variant-ligatures:none]">
-            {visibleCode}
-            {cursor && <span className="animate-pulse">|</span>}
-          </pre>
-        ) : (
-          <div
-            className="[&>pre,_&_code]:!bg-transparent"
-            dangerouslySetInnerHTML={{ __html: highlightedCode }}
-          />
-        )}
+        className="h-[calc(100%-2.75rem)] w-full text-sm p-4 font-mono relative overflow-auto flex-1"
+        ref={editorRef}>
+        <div
+          className={cn(
+            "[&>pre,_&_code]:!bg-transparent [&>pre,_&_code]:[background:transparent_!important] [&>pre,_&_code]:border-none [&_code]:!text-[13px]",
+            cursor &&
+              !isDone &&
+              "[&_.line:last-of-type::after]:content-['|'] [&_.line:last-of-type::after]:animate-pulse [&_.line:last-of-type::after]:inline-block [&_.line:last-of-type::after]:w-[1ch] [&_.line:last-of-type::after]:-translate-px"
+          )}
+          dangerouslySetInnerHTML={{ __html: highlightedCode }} />
       </div>
     </div>
-  )
+  );
 }
 
-
-export { CodeEditor, CopyButton }
+export { CodeEditor, CopyButton };

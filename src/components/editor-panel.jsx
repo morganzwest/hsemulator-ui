@@ -21,6 +21,31 @@ const INITIAL_FILES = {
   },
 }
 
+function RuntimeStatus({ healthy, checking }) {
+  let color = 'bg-muted'
+  let label = 'Checking runtime'
+
+  if (!checking) {
+    if (healthy) {
+      color = 'bg-emerald-500'
+      label = 'Runtime Ready'
+    } else {
+      color = 'bg-red-500'
+      label = 'Runtime offline'
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <span
+        className={`h-2 w-2 rounded-full ${color}`}
+        title={label}
+      />
+      <span>{label}</span>
+    </div>
+  )
+}
+
 export function EditorPanel() {
   const editorRef = useRef(null)
 
@@ -85,29 +110,31 @@ export function EditorPanel() {
     <div className="flex h-full flex-col gap-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Tabs value={activeFile} onValueChange={setActiveFile}>
-          <TabsList>
-            {Object.keys(files).map((file) => (
-              <TabsTrigger key={file} value={file}>
-                {file}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+  <div className="flex items-center gap-4">
+    <Tabs value={activeFile} onValueChange={setActiveFile}>
+      <TabsList>
+        {Object.keys(files).map((file) => (
+          <TabsTrigger key={file} value={file}>
+            {file}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
 
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            Save
-          </Button>
+  </div>
 
-          <Button size="sm" onClick={handleRun} disabled={runDisabled}>
-            {(loading || checkingHealth) && (
-              <Spinner className="mr-2" />
-            )}
-            Run
-          </Button>
-        </div>
-      </div>
+  <div className="flex items-center gap-3">
+    <Button variant="outline" size="sm">
+      Save
+    </Button>
+
+    <Button size="sm" onClick={handleRun} disabled={runDisabled}>
+      {(loading || checkingHealth) && <Spinner className="mr-2" />}
+      Run
+    </Button>
+  </div>
+</div>
+
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden rounded-md border bg-background">

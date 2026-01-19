@@ -10,13 +10,14 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from '@/components/ui/breadcrumb';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { EditorPanel } from '@/components/editor-panel';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Separator } from '@/components/ui/separator';
 
 /* -------------------------------------
    Runtime status indicator (inline)
@@ -72,7 +73,7 @@ export default function Page() {
     <SidebarProvider>
       <SidebarLeft />
 
-      <SidebarInset>
+      <SidebarInset className="min-w-0 flex flex-col">
         {/* Header */}
         <header className='sticky top-0 z-10 flex h-14 items-center bg-background'>
           <div className='flex w-full items-center justify-between px-4'>
@@ -80,6 +81,12 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
+                
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
                   <BreadcrumbPage className='line-clamp-1'>
                     Code Action Editor
                   </BreadcrumbPage>
@@ -105,7 +112,7 @@ export default function Page() {
         </header>
 
         {/* Main content */}
-        <div className='flex flex-1 flex-col p-4'>
+        <div className="flex flex-1 min-w-0 flex-col p-4">
           <EditorPanel />
         </div>
       </SidebarInset>

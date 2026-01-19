@@ -1,28 +1,60 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Editor from '@monaco-editor/react'
 
-// if code length is > 80 lines, show minimap
-function shouldShowMinimap(value) {
-  const lineCount = value.split('\n').length
-  return lineCount > 80
-}
-
 export function MonacoEditor({ value, language, onChange, onMount }) {
+  const containerRef = useRef(null)
+  const editorRef = useRef(null)
+
+  const layout = () => {
+    if (editorRef.current) editorRef.current.layout()
+  }
+
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    // 1) Observe container changes
+    const ro = new ResizeObserver(() => layout())
+    ro.observe(containerRef.current)
+
+    // 2) Also respond to window resizes (sidebar toggles can behave like this)
+    window.addEventListener('resize', layout)
+
+    // 3) Force a layout after first paint (important for collapsible sidebars)
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => layout())
+      // nested raf gives layout a beat to settle
+      ;(layout._raf2 = raf2)
+    })
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', layout)
+      cancelAnimationFrame(raf1)
+      if (layout._raf2) cancelAnimationFrame(layout._raf2)
+    }
+  }, [])
+
   return (
-    <div className="h-full w-full rounded-md border bg-background">
+    <div ref={containerRef} className="h-full w-full min-w-0 overflow-hidden">
       <Editor
         height="100%"
         value={value}
         language={language}
         theme="vs-dark"
-        onMount={onMount}
-        onChange={(v) => onChange(v ?? '')}
+        onMount={(editor) => {
+          editorRef.current = editor
+          onMount?.(editor)
+          layout()
+        }}
+        onChange={(v) => onChange?.(v ?? '')}
         options={{
-          fontSize: 14,
-          minimap: { enabled: shouldShowMinimap(value) },
+          minimap: { enabled: false },
           scrollBeyondLastLine: false,
-          automaticLayout: true,
+          fontSize: 14,
+          // this can help with some flex layouts
+          automaticLayout: false,
         }}
       />
     </div>

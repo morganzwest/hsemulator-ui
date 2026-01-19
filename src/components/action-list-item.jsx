@@ -1,14 +1,25 @@
 import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export function ActionListItem({ action, active }) {
   const isJs = action.type === 'JavaScript'
 
   return (
-    <button
+    <Tooltip>
+    <TooltipTrigger>
+        <button
+      type="button"
+      aria-current={active ? 'true' : undefined}
       className={`
-        group relative w-full px-4 py-2.5 text-left
+        group relative w-full rounded-md px-4 py-2.5 text-left
         transition-colors
         hover:bg-muted
+        focus-visible:outline-none
+        focus-visible:ring-2 focus-visible:ring-primary
         ${active ? 'bg-muted' : ''}
       `}
     >
@@ -16,13 +27,11 @@ export function ActionListItem({ action, active }) {
         {/* Language Icon */}
         <div
           className={`
-            mt-0.5 flex h-6 w-6 items-center justify-center rounded
-            ${
-              isJs
-                ? 'text-yellow-400'
-                : 'text-blue-400'
-            }
+            mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center
+            ${isJs ? 'text-yellow-400' : 'text-blue-400'}
+            ${!active ? 'opacity-80 group-hover:opacity-100' : ''}
           `}
+          title={isJs ? 'JavaScript action' : 'Python action'}
         >
           {isJs ? (
             <IoLogoJavascript className="h-5 w-5" />
@@ -34,7 +43,7 @@ export function ActionListItem({ action, active }) {
         {/* Content */}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           {/* Title */}
-          <span className="truncate text-sm font-medium">
+          <span className="truncate text-sm font-medium leading-tight">
             {action.title}
           </span>
 
@@ -52,8 +61,16 @@ export function ActionListItem({ action, active }) {
 
       {/* Active indicator */}
       {active && (
-        <span className="absolute left-0 top-2 h-[calc(100%-16px)] w-0.5 rounded-r bg-primary" />
+        <span
+          aria-hidden
+          className="absolute left-0 top-2 h-[calc(100%-16px)] w-0.5 rounded-r bg-primary"
+        />
       )}
     </button>
+    </TooltipTrigger>
+    <TooltipContent>
+        <p>Add to library</p>
+    </TooltipContent>
+    </Tooltip>
   )
 }

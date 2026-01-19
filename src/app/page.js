@@ -122,7 +122,13 @@ export default function LandingPage() {
               <Link href="/login">Sign in</Link>
             </Button>
           </motion.div>
-          <InstallCommand />
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9, duration: 0.4, ease: "easeOut" }}
+          >
+            <InstallCommand />
+          </motion.div>
         </div>
       </section>
 

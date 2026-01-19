@@ -18,22 +18,14 @@ import {
 // This is sample data.
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
+    name: "Demo User",
+    email: "demo@novocy.com",
     avatar: "/avatars/shadcn.jpg",
   },
   calendars: [
     {
-      name: "My Calendars",
-      items: ["Personal", "Work", "Family"],
-    },
-    {
-      name: "Favorites",
-      items: ["Holidays", "Birthdays"],
-    },
-    {
-      name: "Other",
-      items: ["Travel", "Reminders", "Deadlines"],
+      name: "Options",
+      items: ["Snapshots", "Assertions", "Other"],
     },
   ],
 }

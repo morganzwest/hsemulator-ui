@@ -9,9 +9,7 @@ export function ActionListItem({ action, active }) {
   const isJs = action.type === 'JavaScript'
 
   return (
-    <Tooltip>
-    <TooltipTrigger>
-        <button
+    <button
       type="button"
       aria-current={active ? 'true' : undefined}
       className={`
@@ -67,10 +65,5 @@ export function ActionListItem({ action, active }) {
         />
       )}
     </button>
-    </TooltipTrigger>
-    <TooltipContent>
-        <p>Add to library</p>
-    </TooltipContent>
-    </Tooltip>
   )
 }

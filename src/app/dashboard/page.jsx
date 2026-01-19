@@ -23,28 +23,25 @@ import { Separator } from '@/components/ui/separator';
    Runtime status indicator (inline)
 ------------------------------------- */
 function RuntimeStatus({ healthy, checking }) {
-  let color = 'bg-muted';
-  let label = 'Checking runtime';
+  let label = 'Checking'
+  let color = 'bg-muted'
 
   if (!checking) {
     if (healthy) {
-      color = 'bg-emerald-500';
-      label = 'Runtime healthy';
+      label = 'Ready'
+      color = 'bg-emerald-500'
     } else {
-      color = 'bg-red-500';
-      label = 'Runtime offline';
+      label = 'Offline'
+      color = 'bg-red-500'
     }
   }
 
   return (
-    <div
-      className='flex items-center gap-2 text-xs text-muted-foreground'
-      title={label}
-    >
+    <div className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground">
       <span className={`h-2 w-2 rounded-full ${color}`} />
       <span>{label}</span>
     </div>
-  );
+  )
 }
 
 export default function Page() {
@@ -113,7 +110,7 @@ export default function Page() {
 
         {/* Main content */}
         <div className="flex flex-1 min-w-0 flex-col p-4">
-          <EditorPanel />
+          <EditorPanel runtimeHealthy={healthy} />
         </div>
       </SidebarInset>
 

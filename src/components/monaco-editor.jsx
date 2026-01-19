@@ -3,58 +3,110 @@
 import { useEffect, useRef } from 'react'
 import Editor from '@monaco-editor/react'
 
-export function MonacoEditor({ value, language, onChange, onMount }) {
+export function MonacoEditor({
+  value,
+  language,
+  onChange,
+  onMount,
+}) {
   const containerRef = useRef(null)
   const editorRef = useRef(null)
-
-  const layout = () => {
-    if (editorRef.current) editorRef.current.layout()
-  }
+  const viewStateRef = useRef(null)
 
   useEffect(() => {
     if (!containerRef.current) return
 
-    // 1) Observe container changes
-    const ro = new ResizeObserver(() => layout())
-    ro.observe(containerRef.current)
-
-    // 2) Also respond to window resizes (sidebar toggles can behave like this)
-    window.addEventListener('resize', layout)
-
-    // 3) Force a layout after first paint (important for collapsible sidebars)
-    const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(() => layout())
-      // nested raf gives layout a beat to settle
-      ;(layout._raf2 = raf2)
+    const observer = new ResizeObserver(() => {
+      editorRef.current?.layout()
     })
 
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', layout)
-      cancelAnimationFrame(raf1)
-      if (layout._raf2) cancelAnimationFrame(layout._raf2)
-    }
+    observer.observe(containerRef.current)
+    return () => observer.disconnect()
   }, [])
 
   return (
-    <div ref={containerRef} className="h-full w-full min-w-0 overflow-hidden">
+    <div ref={containerRef} className="h-full w-full overflow-hidden">
       <Editor
         height="100%"
         value={value}
         language={language}
         theme="vs-dark"
-        onMount={(editor) => {
+        onMount={(editor, monaco) => {
           editorRef.current = editor
           onMount?.(editor)
-          layout()
+
+          // Restore cursor + scroll position
+          if (viewStateRef.current) {
+            editor.restoreViewState(viewStateRef.current)
+            editor.focus()
+          }
+
+          // Better JS defaults
+          if (language === 'javascript') {
+            monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+              allowNonTsExtensions: true,
+              target: monaco.languages.typescript.ScriptTarget.ES2020,
+            })
+          }
+
+          // Save shortcut
+          editor.addCommand(
+            monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+            () => editor.getAction('editor.action.formatDocument')?.run()
+          )
+
+          // Run shortcut
+          editor.addCommand(
+            monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+            () => document.dispatchEvent(new CustomEvent('editor:run'))
+          )
+
+          // Word wrap toggle
+          editor.addCommand(
+            monaco.KeyMod.Alt | monaco.KeyCode.KeyZ,
+            () => {
+              const current = editor.getOption(
+                monaco.editor.EditorOption.wordWrap
+              )
+              editor.updateOptions({
+                wordWrap: current === 'on' ? 'off' : 'on',
+              })
+            }
+          )
         }}
         onChange={(v) => onChange?.(v ?? '')}
+        onBlur={() => {
+          viewStateRef.current = editorRef.current?.saveViewState()
+        }}
         options={{
           minimap: { enabled: false },
           scrollBeyondLastLine: false,
           fontSize: 14,
-          // this can help with some flex layouts
-          automaticLayout: false,
+
+          // UX
+          smoothScrolling: true,
+          cursorSmoothCaretAnimation: 'on',
+          renderLineHighlight: 'all',
+
+          // Editing
+          wordWrap: 'on',
+          wrappingIndent: 'indent',
+          tabSize: 2,
+          insertSpaces: true,
+
+          // Structure
+          autoClosingBrackets: 'always',
+          autoClosingQuotes: 'always',
+          matchBrackets: 'always',
+          bracketPairColorization: { enabled: true },
+
+          // Formatting
+          formatOnPaste: true,
+          formatOnType: true,
+
+          // Discoverability
+          suggestOnTriggerCharacters: true,
+          quickSuggestions: true,
         }}
       />
     </div>

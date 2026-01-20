@@ -1,22 +1,22 @@
-'use client';
+'use client'
 
-import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MonacoEditor } from '@/components/monaco-editor';
-import { Play, Save, Trash2, Columns, Rows } from 'lucide-react';
-import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5';
-import { SiYaml } from 'react-icons/si';
+import { useEffect, useRef, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { MonacoEditor } from '@/components/monaco-editor'
+import { Play, Save, Columns, Rows, Trash2 } from 'lucide-react'
+import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5'
+import { SiYaml } from 'react-icons/si'
+import { TbJson } from 'react-icons/tb'
+import { FaRegFile } from 'react-icons/fa'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { TbJson } from 'react-icons/tb';
-import { FaRegFile } from 'react-icons/fa';
+} from '@/components/ui/tooltip'
 
-import { useActionEditor } from '@/lib/editor/use-action-editor';
+import { useActionEditor } from '@/lib/editor/use-action-editor'
 
 /* -----------------------------
    Language icon
@@ -26,17 +26,17 @@ function LanguageIcon({ language }) {
   switch (language) {
     case 'javascript':
     case 'js':
-      return <IoLogoJavascript className="h-4 w-4 text-yellow-400" />;
+      return <IoLogoJavascript className="h-4 w-4 text-yellow-400" />
     case 'python':
     case 'py':
-      return <IoLogoPython className="h-4 w-4 text-blue-400" />;
+      return <IoLogoPython className="h-4 w-4 text-blue-400" />
     case 'yaml':
     case 'yml':
-      return <SiYaml className="h-4 w-4 text-orange-400" />;
+      return <SiYaml className="h-4 w-4 text-orange-400" />
     case 'json':
-      return <TbJson className="h-4 w-4 text-emerald-400" />;
+      return <TbJson className="h-4 w-4 text-emerald-400" />
     default:
-      return <FaRegFile className="h-4 w-4 text-muted-foreground" />;
+      return <FaRegFile className="h-4 w-4 text-muted-foreground" />
   }
 }
 
@@ -45,35 +45,22 @@ function LanguageIcon({ language }) {
 ----------------------------- */
 
 export function EditorPanel({ runtimeHealthy, activeAction }) {
-  const editorRef = useRef(null);
-  const outputEndRef = useRef(null);
-  const containerRef = useRef(null);
+  const editorRef = useRef(null)
+  const outputEndRef = useRef(null)
+  const containerRef = useRef(null)
 
-  const [files, setFiles] = useState({});
-  const [activeFile, setActiveFile] = useState(null);
-  const [loadingFiles, setLoadingFiles] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [logs, setLogs] = useState([]);
+  const [files, setFiles] = useState({})
+  const [activeFile, setActiveFile] = useState(null)
+  const [loadingFiles, setLoadingFiles] = useState(false)
+  const [running, setRunning] = useState(false)
+  const [logs, setLogs] = useState([])
 
-  const [split, setSplit] = useState('horizontal');
-  const [splitSize, setSplitSize] = useState(70);
+  const [split, setSplit] = useState('horizontal')
+  const [splitSize, setSplitSize] = useState(70)
 
-  const active = activeFile ? files[activeFile] : null;
-  const hasDirtyFiles = Object.values(files).some(f => f.dirty);
-  const canRun = runtimeHealthy && !running;
-
-  function resolveEntryFile(files) {
-  return (
-    Object.keys(files).find(f => f.endsWith('.js')) ||
-    Object.keys(files).find(f => f.endsWith('.py')) ||
-    null
-  );
-}
-
-
-  /* -----------------------------
-     External logic
-  ----------------------------- */
+  const active = activeFile ? files[activeFile] : null
+  const hasDirtyFiles = Object.values(files).some(f => f.dirty)
+  const canRun = runtimeHealthy && !running
 
   const { loadFiles, saveAllFiles, runFile } = useActionEditor({
     activeAction,
@@ -83,47 +70,20 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
     setLoadingFiles,
     setLogs,
     setRunning,
-  });
-
-  /* -----------------------------
-     Load files when action changes
-  ----------------------------- */
+  })
 
   useEffect(() => {
     if (!activeAction) {
-      setFiles({});
-      setActiveFile(null);
-      return;
+      setFiles({})
+      setActiveFile(null)
+      return
     }
-
-    loadFiles();
-  }, [activeAction]);
-
-  /* -----------------------------
-     Reflect state → URL (no navigation)
-  ----------------------------- */
+    loadFiles()
+  }, [activeAction])
 
   useEffect(() => {
-    if (!activeAction) return;
-
-    window.history.replaceState(
-      window.history.state,
-      '',
-      `/dashboard/a/${activeAction.id}`
-    );
-  }, [activeAction]);
-
-  /* -----------------------------
-     Output autoscroll
-  ----------------------------- */
-
-  useEffect(() => {
-    outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
-
-  /* -----------------------------
-     Editor actions
-  ----------------------------- */
+    outputEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs])
 
   function updateFile(value) {
     setFiles(prev => ({
@@ -133,58 +93,40 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
         value,
         dirty: true,
       },
-    }));
+    }))
   }
 
   async function handleSave() {
-    await saveAllFiles(editorRef);
+    await saveAllFiles(editorRef)
   }
 
   async function handleRun() {
-  if (!canRun) return;
-
-  const entryFile = resolveEntryFile(files);
-  if (!entryFile) {
-    setLogs(l => [...l, '✖ No runnable action file found (.js or .py)']);
-    return;
+    if (!canRun) return
+    await saveAllFiles(editorRef)
+    await runFile()
   }
 
-  await saveAllFiles(editorRef);
-  await runFile({ activeFile: entryFile });
-}
-
-
-  /* -----------------------------
-     Resize handling
-  ----------------------------- */
-
   function handleResize(e) {
-    if (!containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
     const percentage =
       split === 'horizontal'
         ? ((e.clientY - rect.top) / rect.height) * 100
-        : ((e.clientX - rect.left) / rect.width) * 100;
-
-    setSplitSize(Math.min(90, Math.max(10, percentage)));
+        : ((e.clientX - rect.left) / rect.width) * 100
+    setSplitSize(Math.min(90, Math.max(10, percentage)))
   }
 
   const gridStyle =
     split === 'horizontal'
       ? { gridTemplateRows: `${splitSize}% 4px 1fr` }
-      : { gridTemplateColumns: `${splitSize}% 4px 1fr` };
-
-  /* -----------------------------
-     Empty states
-  ----------------------------- */
+      : { gridTemplateColumns: `${splitSize}% 4px 1fr` }
 
   if (!activeAction) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         Select an action to view its files
       </div>
-    );
+    )
   }
 
   if (loadingFiles) {
@@ -192,7 +134,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
       <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
         <Spinner /> Loading files…
       </div>
-    );
+    )
   }
 
   if (!active) {
@@ -200,12 +142,8 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
         No files found for this action
       </div>
-    );
+    )
   }
-
-  /* -----------------------------
-     Render
-  ----------------------------- */
 
   return (
     <div className="flex h-full min-w-0 flex-col gap-3">
@@ -233,9 +171,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
               setSplit(split === 'horizontal' ? 'vertical' : 'horizontal')
             }
           >
-            {split === 'horizontal'
-              ? <Columns className="h-4 w-4" />
-              : <Rows className="h-4 w-4" />}
+            {split === 'horizontal' ? <Columns /> : <Rows />}
           </Button>
 
           <Button
@@ -251,13 +187,14 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="sm" onClick={handleRun} disabled={!canRun}>
-                {running
-                  ? <Spinner className="mr-2" />
-                  : <Play className="mr-1 h-4 w-4" />}
+                {running ? (
+                  <Spinner className="mr-2" />
+                ) : (
+                  <Play className="mr-1 h-4 w-4" />
+                )}
                 Run
               </Button>
             </TooltipTrigger>
-
             {!canRun && (
               <TooltipContent>
                 {!runtimeHealthy
@@ -286,13 +223,13 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
 
         <div
           onMouseDown={e => {
-            e.preventDefault();
+            e.preventDefault()
             const up = () => {
-              document.removeEventListener('mousemove', handleResize);
-              document.removeEventListener('mouseup', up);
-            };
-            document.addEventListener('mousemove', handleResize);
-            document.addEventListener('mouseup', up);
+              document.removeEventListener('mousemove', handleResize)
+              document.removeEventListener('mouseup', up)
+            }
+            document.addEventListener('mousemove', handleResize)
+            document.addEventListener('mouseup', up)
           }}
           className={`bg-border ${
             split === 'horizontal'
@@ -301,7 +238,8 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           }`}
         />
 
-        <div className="flex min-w-0 flex-col bg-muted/30">
+        {/* Output */}
+        <div className="relative flex min-w-0 flex-col bg-muted/30">
           <div className="flex items-center justify-between border-b px-3 py-1 text-xs text-muted-foreground">
             <span>Output</span>
             <Button variant="ghost" size="icon" onClick={() => setLogs([])}>
@@ -309,14 +247,16 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
             </Button>
           </div>
 
-          <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs">
-            {logs.length === 0
-              ? <div className="text-muted-foreground">No output yet</div>
-              : logs.map((line, i) => <div key={i}>{line}</div>)}
+          <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs whitespace-pre-wrap break-words">
+            {logs.length === 0 ? (
+              <div className="text-muted-foreground">No output yet</div>
+            ) : (
+              logs.map((line, i) => <div key={i}>{line}</div>)
+            )}
             <div ref={outputEndRef} />
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }

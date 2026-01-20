@@ -1,23 +1,30 @@
-import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { inferLanguage } from '@/lib/editor/infer-language';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
+import { inferLanguage } from '@/lib/editor/infer-language'
+import YAML from 'yaml'
 
 /* -----------------------------
    Helpers
 ----------------------------- */
 
 function formatTimestamp(ts) {
-  if (!ts) return '';
+  if (!ts) return ''
   const ms =
     ts.secs_since_epoch * 1000 +
-    Math.floor((ts.nanos_since_epoch || 0) / 1e6);
-  return new Date(ms).toISOString();
+    Math.floor((ts.nanos_since_epoch || 0) / 1e6)
+  return new Date(ms).toISOString()
 }
 
 function formatEvent(event) {
-  const ts = formatTimestamp(event.timestamp);
-  return ts
-    ? `[${ts}] ${event.kind}`
-    : `${event.kind}`;
+  const ts = formatTimestamp(event.timestamp)
+  return ts ? `[${ts}] ${event.kind}` : event.kind
+}
+
+function resolveEntryFile(files) {
+  return (
+    Object.keys(files).find(f => f.endsWith('.js')) ||
+    Object.keys(files).find(f => f.endsWith('.py')) ||
+    null
+  )
 }
 
 /* -----------------------------
@@ -33,43 +40,43 @@ export function useActionEditor({
   setLogs,
   setRunning,
 }) {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = createSupabaseBrowserClient()
 
   /* -----------------------------
      Load files
   ----------------------------- */
 
   async function loadFiles() {
-    if (!activeAction) return;
+    if (!activeAction) return
 
-    const { id, owner_id } = activeAction;
-    const basePath = `${owner_id}/${id}`;
+    const { id, owner_id } = activeAction
+    const basePath = `${owner_id}/${id}`
 
-    setLoadingFiles(true);
-    setLogs([]);
+    setLoadingFiles(true)
+    setLogs([])
 
-    const { data: objects, error } = await supabase
+    const { data, error } = await supabase
       .storage
       .from('actions')
-      .list(basePath);
+      .list(basePath)
 
     if (error) {
-      setLogs([`✖ Failed to load files: ${error.message}`]);
-      setLoadingFiles(false);
-      return;
+      setLogs([`✖ Failed to load files: ${error.message}`])
+      setLoadingFiles(false)
+      return
     }
 
     const entries = await Promise.all(
-      (objects ?? [])
+      (data ?? [])
         .filter(o => o.name && !o.name.endsWith('/'))
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(async obj => {
           const { data, error } = await supabase
             .storage
             .from('actions')
-            .download(`${basePath}/${obj.name}`);
+            .download(`${basePath}/${obj.name}`)
 
-          if (error) return null;
+          if (error) return null
 
           return [
             obj.name,
@@ -78,16 +85,16 @@ export function useActionEditor({
               value: await data.text(),
               dirty: false,
             },
-          ];
+          ]
         })
-    );
+    )
 
-    const loaded = Object.fromEntries(entries.filter(Boolean));
-    const filenames = Object.keys(loaded);
+    const loaded = Object.fromEntries(entries.filter(Boolean))
+    const filenames = Object.keys(loaded)
 
-    setFiles(loaded);
-    setActiveFile(filenames[0] ?? null);
-    setLoadingFiles(false);
+    setFiles(loaded)
+    setActiveFile(filenames[0] ?? null)
+    setLoadingFiles(false)
   }
 
   /* -----------------------------
@@ -95,20 +102,20 @@ export function useActionEditor({
   ----------------------------- */
 
   async function saveAllFiles(editorRef) {
-    if (!activeAction) return;
+    if (!activeAction) return
 
-    const { id, owner_id } = activeAction;
-    const basePath = `${owner_id}/${id}`;
+    const { id, owner_id } = activeAction
+    const basePath = `${owner_id}/${id}`
 
     await editorRef?.current
       ?.getAction('editor.action.formatDocument')
-      ?.run();
+      ?.run()
 
     const dirtyFiles = Object.entries(files).filter(
       ([, f]) => f.dirty
-    );
+    )
 
-    if (dirtyFiles.length === 0) return;
+    if (!dirtyFiles.length) return
 
     try {
       await Promise.all(
@@ -127,12 +134,12 @@ export function useActionEditor({
               }
             )
         )
-      );
+      )
 
       await supabase
         .from('actions')
         .update({ updated_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id)
 
       setFiles(prev =>
         Object.fromEntries(
@@ -141,33 +148,89 @@ export function useActionEditor({
             { ...v, dirty: false },
           ])
         )
-      );
+      )
 
-      setLogs(l => [...l, '✔ Files saved']);
+      setLogs(l => [...l, '✔ Files saved'])
     } catch (err) {
-      setLogs(l => [...l, `✖ Save failed: ${err.message}`]);
+      setLogs(l => [...l, `✖ Save failed: ${err.message}`])
     }
   }
 
   /* -----------------------------
-     Run action
+     Run action (INLINE execution)
   ----------------------------- */
 
-  async function runFile({ activeFile }) {
-    if (!activeAction || !activeFile) return;
+  async function runFile() {
+    if (!activeAction) return
 
-    const actionFile = files[activeFile];
-    if (!actionFile) return;
+    const entryFile = resolveEntryFile(files)
+    if (!entryFile) {
+      setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
+      return
+    }
 
-    setRunning(true);
-    setLogs(prev => [
-  ...prev,
-  '',
-  `▶ Running ${activeFile}`,
-]);
+    const actionFile = files[entryFile]
 
+    setRunning(true)
+    setLogs(l => [...l, '', `▶ Running ${entryFile}`])
 
     try {
+      const { owner_id, id } = activeAction
+      const basePath = `${owner_id}/${id}`
+
+      const [eventRes, assertionsRes, configRes] =
+        await Promise.allSettled([
+          supabase.storage.from('actions').download(`${basePath}/event.json`),
+          supabase.storage.from('actions').download(`${basePath}/assertions.json`),
+          supabase.storage.from('actions').download(`${basePath}/config.yaml`),
+        ])
+
+      if (eventRes.status !== 'fulfilled' || !eventRes.value.data) {
+        throw new Error('event.json is required')
+      }
+
+      const eventSource = await eventRes.value.data.text()
+
+      let assertions
+      if (assertionsRes.status === 'fulfilled' && assertionsRes.value.data) {
+        assertions = JSON.parse(await assertionsRes.value.data.text())
+      }
+
+      let yamlConfig = {}
+      if (configRes.status === 'fulfilled' && configRes.value.data) {
+        yamlConfig = YAML.parse(await configRes.value.data.text()) ?? {}
+      }
+
+      const language = entryFile.endsWith('.py') ? 'python' : 'js'
+
+      const body = {
+        mode: 'execute',
+        config: {
+          version: 1,
+          action: {
+            language,
+            entry: entryFile,
+            source: actionFile.value,
+          },
+          fixtures: [
+            {
+              name: 'fixtures/event.json',
+              source: eventSource,
+            },
+          ],
+          env: yamlConfig.env ?? {},
+          runtime: {
+            node: yamlConfig.runtime?.node ?? 'node',
+            python: yamlConfig.runtime?.python ?? 'python',
+          },
+          snapshots: {
+            enabled: yamlConfig.snapshots?.enabled ?? true,
+          },
+          repeat: yamlConfig.repeat ?? 1,
+          assertions,
+        },
+      }
+
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
         {
@@ -176,72 +239,38 @@ export function useActionEditor({
             'Content-Type': 'application/json',
             Authorization: 'Bearer dev_secret_key',
           },
-          body: JSON.stringify({
-            mode: 'execute',
-            config: {
-              version: 1,
-              action: {
-                language:
-                  actionFile.language === 'python'
-                    ? 'python'
-                    : 'js',
-                entry: `actions/${activeFile}`,
-                source: actionFile.value,
-              },
-              fixtures: [
-                {
-                  name: 'fixtures/event.json',
-                  source: '{ "input": "hello" }',
-                },
-              ],
-              env: {
-                HUBSPOT_TOKEN: 'pat-test-token',
-                HUBSPOT_BASE_URL: 'https://api.hubapi.com',
-              },
-              runtime: {
-                node: 'node',
-                python: 'python',
-              },
-              snapshots: { enabled: true },
-              repeat: 1,
-            },
-          }),
+          body: JSON.stringify(body),
         }
-      );
+      )
 
-      const payload = await res.json();
-
+      const payload = await res.json()
       if (!res.ok) {
-        throw new Error(payload?.error || `Execution failed (${res.status})`);
+        throw new Error(payload?.error || 'Execution failed')
       }
 
-      const lines = [];
+      const lines = []
 
-      /* ---- Summary ---- */
       if (payload?.summary?.result) {
-        const r = payload.summary.result;
-        lines.push('✔ Execution completed');
-        lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`);
-        lines.push(`Runs: ${r.runs}`);
-        lines.push(`Max duration: ${r.max_duration_ms}ms`);
-        lines.push(`Max memory: ${r.max_memory_kb} KB`);
-        lines.push(`Snapshots OK: ${r.snapshots_ok}`);
+        const r = payload.summary.result
+        lines.push('✔ Execution completed')
+        lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
+        lines.push(`Runs: ${r.runs}`)
+        lines.push(`Duration: ${r.max_duration_ms} ms`)
+        lines.push(`Memory: ${(r.max_memory_kb / 1024).toFixed(1)} MB`)
+        lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
       }
 
-      /* ---- Events ---- */
       if (Array.isArray(payload?.events)) {
-        lines.push('');
-        lines.push('--- Execution events ---');
-        payload.events.forEach(e => {
-          lines.push(formatEvent(e));
-        });
+        lines.push('')
+        lines.push('--- Events ---')
+        payload.events.forEach(e => lines.push(formatEvent(e)))
       }
 
-      setLogs(l => [...l, ...lines]);
+      setLogs(l => [...l, ...lines])
     } catch (err) {
-      setLogs(l => [...l, `✖ ${err.message}`]);
+      setLogs(l => [...l, `✖ ${err.message}`])
     } finally {
-      setRunning(false);
+      setRunning(false)
     }
   }
 
@@ -249,5 +278,5 @@ export function useActionEditor({
     loadFiles,
     saveAllFiles,
     runFile,
-  };
+  }
 }

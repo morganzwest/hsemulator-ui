@@ -192,7 +192,7 @@ useEffect(() => {
         </div>
       </SidebarInset>
 
-      <SidebarRight />
+      <SidebarRight activeAction={activeAction} />
     </SidebarProvider>
   );
 }

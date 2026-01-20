@@ -59,8 +59,17 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   const [splitSize, setSplitSize] = useState(70);
 
   const active = activeFile ? files[activeFile] : null;
-  const hasDirtyFiles = Object.values(files).some((f) => f.dirty);
+  const hasDirtyFiles = Object.values(files).some(f => f.dirty);
   const canRun = runtimeHealthy && !running;
+
+  function resolveEntryFile(files) {
+  return (
+    Object.keys(files).find(f => f.endsWith('.js')) ||
+    Object.keys(files).find(f => f.endsWith('.py')) ||
+    null
+  );
+}
+
 
   /* -----------------------------
      External logic
@@ -91,18 +100,16 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   }, [activeAction]);
 
   /* -----------------------------
-     Reflect state → URL (NO navigation)
+     Reflect state → URL (no navigation)
   ----------------------------- */
 
   useEffect(() => {
     if (!activeAction) return;
 
-    const url = `/dashboard/a/${activeAction.id}`;
-
     window.history.replaceState(
       window.history.state,
       '',
-      url
+      `/dashboard/a/${activeAction.id}`
     );
   }, [activeAction]);
 
@@ -119,7 +126,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   ----------------------------- */
 
   function updateFile(value) {
-    setFiles((prev) => ({
+    setFiles(prev => ({
       ...prev,
       [activeFile]: {
         ...prev[activeFile],
@@ -134,15 +141,18 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   }
 
   async function handleRun() {
-    if (!canRun || !active) return;
+  if (!canRun) return;
 
-    await runFile({
-      activeFile,
-      source: active.value,
-    });
-
-    await saveAllFiles(editorRef);
+  const entryFile = resolveEntryFile(files);
+  if (!entryFile) {
+    setLogs(l => [...l, '✖ No runnable action file found (.js or .py)']);
+    return;
   }
+
+  await saveAllFiles(editorRef);
+  await runFile({ activeFile: entryFile });
+}
+
 
   /* -----------------------------
      Resize handling
@@ -152,13 +162,10 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
     if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    let percentage;
-
-    if (split === 'horizontal') {
-      percentage = ((e.clientY - rect.top) / rect.height) * 100;
-    } else {
-      percentage = ((e.clientX - rect.left) / rect.width) * 100;
-    }
+    const percentage =
+      split === 'horizontal'
+        ? ((e.clientY - rect.top) / rect.height) * 100
+        : ((e.clientX - rect.left) / rect.width) * 100;
 
     setSplitSize(Math.min(90, Math.max(10, percentage)));
   }
@@ -226,11 +233,9 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
               setSplit(split === 'horizontal' ? 'vertical' : 'horizontal')
             }
           >
-            {split === 'horizontal' ? (
-              <Columns className="h-4 w-4" />
-            ) : (
-              <Rows className="h-4 w-4" />
-            )}
+            {split === 'horizontal'
+              ? <Columns className="h-4 w-4" />
+              : <Rows className="h-4 w-4" />}
           </Button>
 
           <Button
@@ -246,11 +251,9 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button size="sm" onClick={handleRun} disabled={!canRun}>
-                {running ? (
-                  <Spinner className="mr-2" />
-                ) : (
-                  <Play className="mr-1 h-4 w-4" />
-                )}
+                {running
+                  ? <Spinner className="mr-2" />
+                  : <Play className="mr-1 h-4 w-4" />}
                 Run
               </Button>
             </TooltipTrigger>
@@ -278,11 +281,11 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           value={active.value}
           language={active.language}
           onChange={updateFile}
-          onMount={(editor) => (editorRef.current = editor)}
+          onMount={editor => (editorRef.current = editor)}
         />
 
         <div
-          onMouseDown={(e) => {
+          onMouseDown={e => {
             e.preventDefault();
             const up = () => {
               document.removeEventListener('mousemove', handleResize);
@@ -309,7 +312,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs">
             {logs.length === 0
               ? <div className="text-muted-foreground">No output yet</div>
-              : logs.map((l, i) => <div key={i}>{l}</div>)}
+              : logs.map((line, i) => <div key={i}>{line}</div>)}
             <div ref={outputEndRef} />
           </div>
         </div>

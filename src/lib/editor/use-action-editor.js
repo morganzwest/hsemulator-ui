@@ -31,6 +31,45 @@ function resolveEntryFile(files) {
    Hook
 ----------------------------- */
 
+function compileInlineConfig({
+  yamlConfig,
+  files,
+  fixtures,
+}) {
+  return {
+    version: yamlConfig.version,
+
+    action: {
+      language:
+        yamlConfig.action?.type === 'python' ? 'python' : 'js',
+      entry: yamlConfig.action.entry,
+      source: files[yamlConfig.action.entry].value,
+    },
+
+    fixtures: fixtures.map(f => ({
+      name: f.name,
+      source: f.source,
+    })),
+
+    env: yamlConfig.env ?? {},
+
+    runtime: {
+      node: yamlConfig.runtime?.node ?? 'node',
+      python: yamlConfig.runtime?.python ?? 'python',
+    },
+
+    output: yamlConfig.output,
+
+    snapshots: {
+      enabled: yamlConfig.snapshots?.enabled ?? true,
+      ignore: yamlConfig.snapshots?.ignore ?? [],
+    },
+
+    repeat: yamlConfig.repeat ?? 1,
+  }
+}
+
+
 export function useActionEditor({
   activeAction,
   files,
@@ -159,120 +198,156 @@ export function useActionEditor({
   /* -----------------------------
      Run action (INLINE execution)
   ----------------------------- */
-
   async function runFile() {
-    if (!activeAction) return
+  if (!activeAction) return
 
-    const entryFile = resolveEntryFile(files)
-    if (!entryFile) {
-      setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
-      return
-    }
-
-    const actionFile = files[entryFile]
-
-    setRunning(true)
-    setLogs(l => [...l, '', `▶ Running ${entryFile}`])
-
-    try {
-      const { owner_id, id } = activeAction
-      const basePath = `${owner_id}/${id}`
-
-      const [eventRes, assertionsRes, configRes] =
-        await Promise.allSettled([
-          supabase.storage.from('actions').download(`${basePath}/event.json`),
-          supabase.storage.from('actions').download(`${basePath}/assertions.json`),
-          supabase.storage.from('actions').download(`${basePath}/config.yaml`),
-        ])
-
-      if (eventRes.status !== 'fulfilled' || !eventRes.value.data) {
-        throw new Error('event.json is required')
-      }
-
-      const eventSource = await eventRes.value.data.text()
-
-      let assertions
-      if (assertionsRes.status === 'fulfilled' && assertionsRes.value.data) {
-        assertions = JSON.parse(await assertionsRes.value.data.text())
-      }
-
-      let yamlConfig = {}
-      if (configRes.status === 'fulfilled' && configRes.value.data) {
-        yamlConfig = YAML.parse(await configRes.value.data.text()) ?? {}
-      }
-
-      const language = entryFile.endsWith('.py') ? 'python' : 'js'
-
-      const body = {
-        mode: 'execute',
-        config: {
-          version: 1,
-          action: {
-            language,
-            entry: entryFile,
-            source: actionFile.value,
-          },
-          fixtures: [
-            {
-              name: 'fixtures/event.json',
-              source: eventSource,
-            },
-          ],
-          env: yamlConfig.env ?? {},
-          runtime: {
-            node: yamlConfig.runtime?.node ?? 'node',
-            python: yamlConfig.runtime?.python ?? 'python',
-          },
-          snapshots: {
-            enabled: yamlConfig.snapshots?.enabled ?? true,
-          },
-          repeat: yamlConfig.repeat ?? 1,
-          assertions,
-        },
-      }
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer dev_secret_key',
-          },
-          body: JSON.stringify(body),
-        }
-      )
-
-      const payload = await res.json()
-      if (!res.ok) {
-        throw new Error(payload?.error || 'Execution failed')
-      }
-
-      const lines = []
-
-      if (payload?.summary?.result) {
-        const r = payload.summary.result
-        lines.push('✔ Execution completed')
-        lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
-        lines.push(`Runs: ${r.runs}`)
-        lines.push(`Duration: ${r.max_duration_ms} ms`)
-        lines.push(`Memory: ${(r.max_memory_kb / 1024).toFixed(1)} MB`)
-        lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
-      }
-
-      if (Array.isArray(payload?.events)) {
-        lines.push('')
-        lines.push('--- Events ---')
-        payload.events.forEach(e => lines.push(formatEvent(e)))
-      }
-
-      setLogs(l => [...l, ...lines])
-    } catch (err) {
-      setLogs(l => [...l, `✖ ${err.message}`])
-    } finally {
-      setRunning(false)
-    }
+  const entryFile = resolveEntryFile(files)
+  if (!entryFile) {
+    setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
+    return
   }
+
+  const actionFile = files[entryFile]
+
+  setRunning(true)
+  setLogs(l => [...l, '', `▶ Running ${entryFile}`])
+
+  try {
+    const { owner_id, id } = activeAction
+    const basePath = `${owner_id}/${id}`
+
+    /* -----------------------------
+       Load config.yaml
+    ----------------------------- */
+
+    const { data: configBlob, error: configErr } =
+      await supabase.storage
+        .from('actions')
+        .download(`${basePath}/config.yaml`)
+
+    if (configErr || !configBlob) {
+      throw new Error('config.yaml is required')
+    }
+
+    let yamlConfig
+    try {
+      yamlConfig = YAML.parse(await configBlob.text()) ?? {}
+    } catch (e) {
+      throw new Error(`Invalid config.yaml: ${e.message}`)
+    }
+
+    /* -----------------------------
+       Resolve fixtures (INLINE)
+    ----------------------------- */
+
+    const fixtureFiles = await Promise.all(
+      (yamlConfig.fixtures ?? []).map(async path => {
+        const { data, error } = await supabase.storage
+          .from('actions')
+          .download(`${basePath}/${path}`)
+
+        if (error || !data) {
+          throw new Error(`Missing fixture: ${path}`)
+        }
+
+        return {
+          name: path.startsWith('/') ? path.slice(1) : path,
+          source: await data.text(),
+        }
+      })
+    )
+
+    /* -----------------------------
+       Compile inline config
+    ----------------------------- */
+
+    const inlineConfig = {
+      version: yamlConfig.version ?? 1,
+
+      action: {
+        language:
+          yamlConfig.action?.type === 'python' ||
+          entryFile.endsWith('.py')
+            ? 'python'
+            : 'js',
+        entry: yamlConfig.action?.entry ?? entryFile,
+        source: actionFile.value,
+      },
+
+      fixtures: fixtureFiles,
+
+      env: yamlConfig.env ?? {},
+
+      runtime: {
+        node: yamlConfig.runtime?.node ?? 'node',
+        python: yamlConfig.runtime?.python ?? 'python',
+      },
+
+      output: yamlConfig.output,
+
+      snapshots: {
+        enabled: yamlConfig.snapshots?.enabled ?? true,
+        ignore: yamlConfig.snapshots?.ignore ?? [],
+      },
+
+      repeat: yamlConfig.repeat ?? 1,
+    }
+
+    /* -----------------------------
+       Execute
+    ----------------------------- */
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer dev_secret_key',
+        },
+        body: JSON.stringify({
+          mode: 'execute',
+          config: inlineConfig,
+        }),
+      }
+    )
+
+    const payload = await res.json()
+    if (!res.ok) {
+      throw new Error(payload?.error || 'Execution failed')
+    }
+
+    /* -----------------------------
+       Render output
+    ----------------------------- */
+
+    const lines = []
+
+    if (payload?.summary?.result) {
+      const r = payload.summary.result
+      lines.push('✔ Execution completed')
+      lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
+      lines.push(`Runs: ${r.runs}`)
+      lines.push(`Duration: ${r.max_duration_ms} ms`)
+      lines.push(`Memory: ${(r.max_memory_kb / 1024).toFixed(1)} MB`)
+      lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
+    }
+
+    if (Array.isArray(payload?.events)) {
+      lines.push('')
+      lines.push('--- Events ---')
+      payload.events.forEach(e => lines.push(formatEvent(e)))
+    }
+
+    setLogs(l => [...l, ...lines])
+  } catch (err) {
+    setLogs(l => [...l, `✖ ${err.message}`])
+  } finally {
+    setRunning(false)
+  }
+}
+
+
 
   return {
     loadFiles,

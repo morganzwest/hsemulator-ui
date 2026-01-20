@@ -195,157 +195,223 @@ export function useActionEditor({
     }
   }
 
+  function resolveLevel(event) {
+    switch (event.kind) {
+      case 'Stderr':
+        return 'ERROR' // for now; later you can split info/error
+      case 'ExecutionCreated':
+      case 'ValidationStarted':
+      case 'ExecutionStarted':
+      case 'ExecutionFinished':
+        return 'EVENT'
+      default:
+        return 'INFO'
+    }
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '--:--:--'
+    const ms =
+      ts.secs_since_epoch * 1000 +
+      Math.floor((ts.nanos_since_epoch || 0) / 1e6)
+
+    const d = new Date(ms)
+    return d.toLocaleTimeString('en-GB', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+  }
+
+  function formatEventLine(event) {
+    const time = formatTime(event.timestamp)
+    const level = resolveLevel(event).padEnd(5, ' ') // fixed width
+    const prefix = `${time} [${level}]`
+
+    if (event.message) {
+      return `${prefix} ${event.message}`
+    }
+
+    return `${prefix} ${event.kind}`
+  }
+
+  function formatEvents(events) {
+    const lines = []
+
+    let bufferingErrorBlock = false
+
+    for (const e of events) {
+      if (e.kind === 'Stderr') {
+        if (!bufferingErrorBlock) {
+          bufferingErrorBlock = true
+        }
+        lines.push(formatEventLine(e))
+        continue
+      }
+
+      bufferingErrorBlock = false
+      lines.push(formatEventLine(e))
+    }
+
+    return lines
+  }
+
+
   /* -----------------------------
      Run action (INLINE execution)
   ----------------------------- */
   async function runFile() {
-  if (!activeAction) return
+    if (!activeAction) return
 
-  const entryFile = resolveEntryFile(files)
-  if (!entryFile) {
-    setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
-    return
-  }
-
-  const actionFile = files[entryFile]
-
-  setRunning(true)
-  setLogs(l => [...l, '', `▶ Running ${entryFile}`])
-
-  try {
-    const { owner_id, id } = activeAction
-    const basePath = `${owner_id}/${id}`
-
-    /* -----------------------------
-       Load config.yaml
-    ----------------------------- */
-
-    const { data: configBlob, error: configErr } =
-      await supabase.storage
-        .from('actions')
-        .download(`${basePath}/config.yaml`)
-
-    if (configErr || !configBlob) {
-      throw new Error('config.yaml is required')
+    const entryFile = resolveEntryFile(files)
+    if (!entryFile) {
+      setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
+      return
     }
 
-    let yamlConfig
+    const actionFile = files[entryFile]
+
+    setRunning(true)
+    setLogs(l => [...l, '', `▶ Running ${entryFile}`])
+
     try {
-      yamlConfig = YAML.parse(await configBlob.text()) ?? {}
-    } catch (e) {
-      throw new Error(`Invalid config.yaml: ${e.message}`)
-    }
+      const { owner_id, id } = activeAction
+      const basePath = `${owner_id}/${id}`
 
-    /* -----------------------------
-       Resolve fixtures (INLINE)
-    ----------------------------- */
+      /* -----------------------------
+         Load config.yaml
+      ----------------------------- */
 
-    const fixtureFiles = await Promise.all(
-      (yamlConfig.fixtures ?? []).map(async path => {
-        const { data, error } = await supabase.storage
+      const { data: configBlob, error: configErr } =
+        await supabase.storage
           .from('actions')
-          .download(`${basePath}/${path}`)
+          .download(`${basePath}/config.yaml`)
 
-        if (error || !data) {
-          throw new Error(`Missing fixture: ${path}`)
-        }
-
-        return {
-          name: path.startsWith('/') ? path.slice(1) : path,
-          source: await data.text(),
-        }
-      })
-    )
-
-    /* -----------------------------
-       Compile inline config
-    ----------------------------- */
-
-    const inlineConfig = {
-      version: yamlConfig.version ?? 1,
-
-      action: {
-        language:
-          yamlConfig.action?.type === 'python' ||
-          entryFile.endsWith('.py')
-            ? 'python'
-            : 'js',
-        entry: yamlConfig.action?.entry ?? entryFile,
-        source: actionFile.value,
-      },
-
-      fixtures: fixtureFiles,
-
-      env: yamlConfig.env ?? {},
-
-      runtime: {
-        node: yamlConfig.runtime?.node ?? 'node',
-        python: yamlConfig.runtime?.python ?? 'python',
-      },
-
-      output: yamlConfig.output,
-
-      snapshots: {
-        enabled: yamlConfig.snapshots?.enabled ?? true,
-        ignore: yamlConfig.snapshots?.ignore ?? [],
-      },
-
-      repeat: yamlConfig.repeat ?? 1,
-    }
-
-    /* -----------------------------
-       Execute
-    ----------------------------- */
-
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer dev_secret_key',
-        },
-        body: JSON.stringify({
-          mode: 'execute',
-          config: inlineConfig,
-        }),
+      if (configErr || !configBlob) {
+        throw new Error('config.yaml is required')
       }
-    )
 
-    const payload = await res.json()
-    if (!res.ok) {
-      throw new Error(payload?.error || 'Execution failed')
+      let yamlConfig
+      try {
+        yamlConfig = YAML.parse(await configBlob.text()) ?? {}
+      } catch (e) {
+        throw new Error(`Invalid config.yaml: ${e.message}`)
+      }
+
+      /* -----------------------------
+         Resolve fixtures (INLINE)
+      ----------------------------- */
+
+      const fixtureFiles = await Promise.all(
+        (yamlConfig.fixtures ?? []).map(async path => {
+          const { data, error } = await supabase.storage
+            .from('actions')
+            .download(`${basePath}/${path}`)
+
+          if (error || !data) {
+            throw new Error(`Missing fixture: ${path}`)
+          }
+
+          return {
+            name: path.startsWith('/') ? path.slice(1) : path,
+            source: await data.text(),
+          }
+        })
+      )
+
+      /* -----------------------------
+         Compile inline config
+      ----------------------------- */
+
+      const inlineConfig = {
+        version: yamlConfig.version ?? 1,
+
+        action: {
+          language:
+            yamlConfig.action?.type === 'python' ||
+              entryFile.endsWith('.py')
+              ? 'python'
+              : 'js',
+          entry: yamlConfig.action?.entry ?? entryFile,
+          source: actionFile.value,
+        },
+
+        fixtures: fixtureFiles,
+
+        env: yamlConfig.env ?? {},
+
+        runtime: {
+          node: yamlConfig.runtime?.node ?? 'node',
+          python: yamlConfig.runtime?.python ?? 'python',
+        },
+
+        output: yamlConfig.output,
+
+        snapshots: {
+          enabled: yamlConfig.snapshots?.enabled ?? true,
+          ignore: yamlConfig.snapshots?.ignore ?? [],
+        },
+
+        repeat: yamlConfig.repeat ?? 1,
+      }
+
+      /* -----------------------------
+         Execute
+      ----------------------------- */
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer dev_secret_key',
+          },
+          body: JSON.stringify({
+            mode: 'execute',
+            config: inlineConfig,
+          }),
+        }
+      )
+
+      const payload = await res.json()
+      if (!res.ok) {
+        throw new Error(payload?.error || 'Execution failed')
+      }
+
+      /* -----------------------------
+         Render output
+      ----------------------------- */
+
+      const lines = []
+
+      if (payload?.summary?.result) {
+        const r = payload.summary.result
+        lines.push('✔ Execution completed')
+        lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
+        lines.push(`Runs: ${r.runs}`)
+        lines.push(`Duration: ${r.max_duration_ms} ms`)
+        // lines.push(`Memory: ${(r.max_memory_kb / 1024).toFixed(1)} MB`)
+        lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
+      }
+
+      if (Array.isArray(payload?.events)) {
+        lines.push('')
+        lines.push('--- Events ---')
+
+        const formatted = formatEvents(payload.events)
+        lines.push(...formatted)
+
+      }
+
+      setLogs(l => [...l, ...lines])
+    } catch (err) {
+      setLogs(l => [...l, `✖ ${err.message}`])
+    } finally {
+      setRunning(false)
     }
-
-    /* -----------------------------
-       Render output
-    ----------------------------- */
-
-    const lines = []
-
-    if (payload?.summary?.result) {
-      const r = payload.summary.result
-      lines.push('✔ Execution completed')
-      lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
-      lines.push(`Runs: ${r.runs}`)
-      lines.push(`Duration: ${r.max_duration_ms} ms`)
-      lines.push(`Memory: ${(r.max_memory_kb / 1024).toFixed(1)} MB`)
-      lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
-    }
-
-    if (Array.isArray(payload?.events)) {
-      lines.push('')
-      lines.push('--- Events ---')
-      payload.events.forEach(e => lines.push(formatEvent(e)))
-    }
-
-    setLogs(l => [...l, ...lines])
-  } catch (err) {
-    setLogs(l => [...l, `✖ ${err.message}`])
-  } finally {
-    setRunning(false)
   }
-}
 
 
 

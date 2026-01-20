@@ -30,9 +30,9 @@ export function ActionListItem({ action, active, onClick }) {
       className={`
         group relative w-full rounded-md px-4 py-2.5 text-left
         transition-colors
-        hover:bg-muted
+        hover:bg-muted/50
         focus-visible:outline-none
-        focus-visible:ring-2 focus-visible:ring-primary
+        focus-visible:ring-2 focus-visible:ring-primary cursor-pointer
         ${active ? 'bg-muted' : ''}
       `}
       onClick={handleClick}
@@ -64,19 +64,11 @@ export function ActionListItem({ action, active, onClick }) {
             {action.description}
           </span>
 
-          <span className="text-[10px] text-muted-foreground">
+          {/* <span className="text-[10px] text-muted-foreground">
             Updated {action.updatedAt}
-          </span>
+          </span> */}
         </div>
       </div>
-
-      {/* Active indicator */}
-      {active && (
-        <span
-          aria-hidden
-          className="absolute left-0 top-2 h-[calc(100%-16px)] w-0.5 rounded-r bg-primary"
-        />
-      )}
     </button>
   )
 }

@@ -14,8 +14,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { TbJson } from "react-icons/tb";
-import { FaRegFile } from "react-icons/fa";
+import { TbJson } from 'react-icons/tb';
+import { FaRegFile } from 'react-icons/fa';
 
 /* -----------------------------
    Helpers
@@ -33,24 +33,23 @@ function LanguageIcon({ language }) {
   switch (language) {
     case 'javascript':
     case 'js':
-      return <IoLogoJavascript className="h-4 w-4 text-yellow-400" />;
+      return <IoLogoJavascript className='h-4 w-4 text-yellow-400' />;
 
     case 'python':
     case 'py':
-      return <IoLogoPython className="h-4 w-4 text-blue-400" />;
+      return <IoLogoPython className='h-4 w-4 text-blue-400' />;
 
     case 'yaml':
     case 'yml':
-      return <SiYaml className="h-4 w-4 text-orange-400" />;
+      return <SiYaml className='h-4 w-4 text-orange-400' />;
 
     case 'json':
-      return <TbJson  className="h-4 w-4 text-emerald-400" />;
+      return <TbJson className='h-4 w-4 text-emerald-400' />;
 
     default:
-      return <FaRegFile  className="h-4 w-4 text-muted-foreground" />;
+      return <FaRegFile className='h-4 w-4 text-muted-foreground' />;
   }
 }
-
 
 /* -----------------------------
    Editor Panel
@@ -74,8 +73,8 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   const [splitSize, setSplitSize] = useState(70);
 
   const active = activeFile ? files[activeFile] : null;
-  const isDirty = active?.dirty;
-  const canRun = isDirty && runtimeHealthy && !running;
+  const hasDirtyFiles = Object.values(files).some((f) => f.dirty);
+  const canRun = runtimeHealthy && !running;
 
   /* -----------------------------
      Render visibility
@@ -124,9 +123,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
 
       console.log('[EditorPanel] list()', objects);
 
-
       console.log('Storage list:', { objects, error });
-
 
       if (error) {
         console.error('[EditorPanel] Storage list failed:', error);
@@ -139,27 +136,26 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
 
       const loadedFiles = {};
 
-for (const obj of objects ?? []) {
-  const fullPath = `${actionPath}/${obj.name}`;
+      for (const obj of objects ?? []) {
+        const fullPath = `${actionPath}/${obj.name}`;
 
-  console.log('[EditorPanel] Downloading:', fullPath);
+        console.log('[EditorPanel] Downloading:', fullPath);
 
-  const { data, error } = await supabase.storage
-    .from('actions')
-    .download(fullPath);
+        const { data, error } = await supabase.storage
+          .from('actions')
+          .download(fullPath);
 
-  if (error) {
-    console.error('Download failed:', fullPath, error);
-    continue;
-  }
+        if (error) {
+          console.error('Download failed:', fullPath, error);
+          continue;
+        }
 
-  loadedFiles[obj.name] = {
-    language: inferLanguage(obj.name),
-    value: await data.text(),
-    dirty: false,
-  };
-}
-
+        loadedFiles[obj.name] = {
+          language: inferLanguage(obj.name),
+          value: await data.text(),
+          dirty: false,
+        };
+      }
 
       const filenames = Object.keys(loadedFiles);
       const firstFile = filenames[0] ?? null;
@@ -196,17 +192,65 @@ for (const obj of objects ?? []) {
     }));
   }
 
-  function handleSave() {
-    console.debug('[EditorPanel] saveFile', { activeFile });
-    editorRef.current
-      ?.getAction('editor.action.formatDocument')
-      ?.run();
+  async function handleSave() {
+  if (!activeAction) return;
 
-    setFiles((prev) => ({
-      ...prev,
-      [activeFile]: { ...prev[activeFile], dirty: false },
-    }));
+  const { id, owner_id } = activeAction;
+  const basePath = `${owner_id}/${id}`;
+
+  console.debug('[EditorPanel] Saving all files');
+
+  // Format active editor only (Monaco limitation)
+  editorRef.current
+    ?.getAction('editor.action.formatDocument')
+    ?.run();
+
+  // Upload all dirty files
+  const uploads = Object.entries(files).map(async ([filename, file]) => {
+    if (!file.dirty) return;
+
+    const path = `${basePath}/${filename}`;
+
+    const { error } = await supabase.storage
+      .from('actions')
+      .upload(path, new Blob([file.value]), {
+        upsert: true,
+        contentType: 'text/plain',
+      });
+
+    if (error) {
+      console.error('Save failed:', filename, error);
+      throw error;
+    }
+  });
+
+  await Promise.all(uploads);
+
+  // 🔁 Touch the action row so updated_at is refreshed
+  const { error: updateError } = await supabase
+    .from('actions')
+    .update({}) // empty update — trigger handles updated_at
+    .eq('id', id);
+
+  if (updateError) {
+    console.error('[EditorPanel] Failed to update action timestamp', updateError);
+    throw updateError;
   }
+
+  // Clear dirty flags
+  setFiles((prev) =>
+    Object.fromEntries(
+      Object.entries(prev).map(([name, file]) => [
+        name,
+        { ...file, dirty: false },
+      ])
+    )
+  );
+
+  console.debug('[EditorPanel] Save complete');
+}
+
+
 
   async function handleRun() {
     if (!canRun) {
@@ -249,7 +293,7 @@ for (const obj of objects ?? []) {
 
   if (!activeAction) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className='flex h-full items-center justify-center text-sm text-muted-foreground'>
         Select an action to view its files
       </div>
     );
@@ -257,7 +301,7 @@ for (const obj of objects ?? []) {
 
   if (loadingFiles) {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+      <div className='flex h-full items-center justify-center gap-2 text-sm text-muted-foreground'>
         <Spinner /> Loading files…
       </div>
     );
@@ -265,17 +309,16 @@ for (const obj of objects ?? []) {
 
   if (!active) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className='flex h-full items-center justify-center text-sm text-muted-foreground'>
         No files found for this action
       </div>
     );
   }
 
   const gridStyle =
-  split === 'horizontal'
-    ? { gridTemplateRows: `${splitSize}% 4px 1fr` }
-    : { gridTemplateColumns: `${splitSize}% 4px 1fr` };
-
+    split === 'horizontal'
+      ? { gridTemplateRows: `${splitSize}% 4px 1fr` }
+      : { gridTemplateColumns: `${splitSize}% 4px 1fr` };
 
   function handleResize(e) {
     if (!containerRef.current) return;
@@ -296,67 +339,61 @@ for (const obj of objects ?? []) {
     percentage = Math.min(90, Math.max(10, percentage));
 
     setSplitSize(percentage);
-}
-
-
+  }
 
   /* -----------------------------
      Render
   ----------------------------- */
   return (
-    <div className="flex h-full min-w-0 flex-col gap-3">
+    <div className='flex h-full min-w-0 flex-col gap-3'>
       {/* Toolbar */}
-      <div className="flex items-center justify-between border-b pb-2">
+      <div className='flex items-center justify-between border-b pb-2'>
         <Tabs value={activeFile} onValueChange={setActiveFile}>
           <TabsList>
             {Object.entries(files).map(([file, meta]) => (
               <TabsTrigger key={file} value={file}>
-                <div className="flex items-center gap-2">
+                <div className='flex items-center gap-2'>
                   <LanguageIcon language={meta.language} />
                   <span>{file}</span>
-                  {meta.dirty && <span className="text-primary">●</span>}
+                  {meta.dirty && <span className='text-primary'>●</span>}
                 </div>
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
 
-        <div className="flex items-center gap-2">
+        <div className='flex items-center gap-2'>
           <Button
-            variant="ghost"
-            size="icon"
+            variant='ghost'
+            size='icon'
             onClick={() =>
               setSplit(split === 'horizontal' ? 'vertical' : 'horizontal')
             }
           >
             {split === 'horizontal' ? (
-              <Columns className="h-4 w-4" />
+              <Columns className='h-4 w-4' />
             ) : (
-              <Rows className="h-4 w-4" />
+              <Rows className='h-4 w-4' />
             )}
           </Button>
 
           <Button
-            variant="outline"
-            size="sm"
+            variant='outline'
+            size='sm'
             onClick={handleSave}
-            disabled={!active.dirty}
+            disabled={!hasDirtyFiles}
           >
-            <Save className="mr-1 h-4 w-4" />
+            <Save className='mr-1 h-4 w-4' />
             Save
           </Button>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                onClick={handleRun}
-                disabled={!canRun}
-              >
+              <Button size='sm' onClick={handleRun} disabled={!canRun}>
                 {running ? (
-                  <Spinner className="mr-2" />
+                  <Spinner className='mr-2' />
                 ) : (
-                  <Play className="mr-1 h-4 w-4" />
+                  <Play className='mr-1 h-4 w-4' />
                 )}
                 Run
               </Button>
@@ -366,11 +403,12 @@ for (const obj of objects ?? []) {
               <TooltipContent>
                 {!runtimeHealthy
                   ? 'Runtime is offline'
-                  : !isDirty
-                  ? 'No changes since last run'
-                  : 'Action is currently running'}
+                  : running
+                  ? 'Action is currently running'
+                  : 'Unable to run'}
               </TooltipContent>
             )}
+
           </Tooltip>
         </div>
       </div>
@@ -378,10 +416,10 @@ for (const obj of objects ?? []) {
       {/* Split View */}
       <div
         ref={containerRef}
-        className="grid flex-1 min-w-0 overflow-hidden rounded-md border bg-background"
+        className='grid flex-1 min-w-0 overflow-hidden rounded-md border bg-background'
         style={gridStyle}
       >
-        <div className="min-w-0 -mb-1 overflow-hidden">
+        <div className='min-w-0 -mb-1 overflow-hidden'>
           <MonacoEditor
             value={active.value}
             language={active.language}
@@ -392,16 +430,16 @@ for (const obj of objects ?? []) {
 
         <div
           onMouseDown={(e) => {
-  e.preventDefault();
+            e.preventDefault();
 
-  const onMouseUp = () => {
-    document.removeEventListener('mousemove', handleResize);
-    document.removeEventListener('mouseup', onMouseUp);
-  };
+            const onMouseUp = () => {
+              document.removeEventListener('mousemove', handleResize);
+              document.removeEventListener('mouseup', onMouseUp);
+            };
 
-  document.addEventListener('mousemove', handleResize);
-  document.addEventListener('mouseup', onMouseUp);
-}}
+            document.addEventListener('mousemove', handleResize);
+            document.addEventListener('mouseup', onMouseUp);
+          }}
           className={`z-10 bg-border ${
             split === 'horizontal'
               ? 'h-1 cursor-row-resize'
@@ -409,17 +447,17 @@ for (const obj of objects ?? []) {
           }`}
         />
 
-        <div className="flex min-w-0 flex-col bg-muted/30">
-          <div className="flex items-center justify-between border-b px-3 py-1 text-xs text-muted-foreground">
+        <div className='flex min-w-0 flex-col bg-muted/30'>
+          <div className='flex items-center justify-between border-b px-3 py-1 text-xs text-muted-foreground'>
             <span>Output</span>
-            <Button variant="ghost" size="icon" onClick={() => setLogs([])}>
-              <Trash2 className="h-4 w-4" />
+            <Button variant='ghost' size='icon' onClick={() => setLogs([])}>
+              <Trash2 className='h-4 w-4' />
             </Button>
           </div>
 
-          <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs">
+          <div className='flex-1 overflow-auto px-3 py-2 font-mono text-xs'>
             {logs.length === 0 ? (
-              <div className="text-muted-foreground">No output yet</div>
+              <div className='text-muted-foreground'>No output yet</div>
             ) : (
               logs.map((line, i) => <div key={i}>{line}</div>)
             )}

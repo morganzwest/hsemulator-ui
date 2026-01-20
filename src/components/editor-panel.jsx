@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -277,6 +277,29 @@ for (const obj of objects ?? []) {
     : { gridTemplateColumns: `${splitSize}% 4px 1fr` };
 
 
+  function handleResize(e) {
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+
+    let percentage;
+
+    if (split === 'horizontal') {
+      const offsetY = e.clientY - rect.top;
+      percentage = (offsetY / rect.height) * 100;
+    } else {
+      const offsetX = e.clientX - rect.left;
+      percentage = (offsetX / rect.width) * 100;
+    }
+
+    // Clamp to sensible bounds
+    percentage = Math.min(90, Math.max(10, percentage));
+
+    setSplitSize(percentage);
+}
+
+
+
   /* -----------------------------
      Render
   ----------------------------- */
@@ -369,12 +392,16 @@ for (const obj of objects ?? []) {
 
         <div
           onMouseDown={(e) => {
-            e.preventDefault();
-            document.addEventListener('mousemove', handleResize);
-            document.addEventListener('mouseup', () =>
-              document.removeEventListener('mousemove', handleResize),
-            );
-          }}
+  e.preventDefault();
+
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', handleResize);
+    document.removeEventListener('mouseup', onMouseUp);
+  };
+
+  document.addEventListener('mousemove', handleResize);
+  document.addEventListener('mouseup', onMouseUp);
+}}
           className={`z-10 bg-border ${
             split === 'horizontal'
               ? 'h-1 cursor-row-resize'

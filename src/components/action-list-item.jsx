@@ -5,8 +5,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-export function ActionListItem({ action, active }) {
+export function ActionListItem({ action, active, onClick }) {
   const isJs = action.type === 'JavaScript'
+
+  // Log when active state changes (selection highlight)
+  if (active) {
+    console.log('[ActionListItem] Active:', action.id)
+  }
+
+  function handleClick() {
+    console.log('[ActionListItem] Clicked:', {
+      id: action.id,
+      title: action.title,
+      type: action.type,
+    })
+
+    onClick?.()
+  }
 
   return (
     <button
@@ -20,6 +35,7 @@ export function ActionListItem({ action, active }) {
         focus-visible:ring-2 focus-visible:ring-primary
         ${active ? 'bg-muted' : ''}
       `}
+      onClick={handleClick}
     >
       <div className="flex items-start gap-3">
         {/* Language Icon */}
@@ -40,17 +56,14 @@ export function ActionListItem({ action, active }) {
 
         {/* Content */}
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          {/* Title */}
           <span className="truncate text-sm font-medium leading-tight">
             {action.title}
           </span>
 
-          {/* Description */}
           <span className="line-clamp-2 text-xs text-muted-foreground">
             {action.description}
           </span>
 
-          {/* Meta */}
           <span className="text-[10px] text-muted-foreground">
             Updated {action.updatedAt}
           </span>

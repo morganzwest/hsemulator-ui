@@ -45,8 +45,21 @@ function RuntimeStatus({ healthy, checking }) {
 }
 
 export default function Page() {
+  const [activeAction, setActiveAction] = useState(null)
   const [healthy, setHealthy] = useState(false);
   const [checkingHealth, setCheckingHealth] = useState(true);
+
+  useEffect(() => {
+  if (activeAction) {
+    console.log('[Page] activeAction received:', {
+      id: activeAction.id,
+      owner_id: activeAction.owner_id,
+      name: activeAction.name,
+    })
+  } else {
+    console.log('[Page] activeAction is null')
+  }
+}, [activeAction])
 
   // Health check (header-level, single source of truth)
   useEffect(() => {
@@ -68,7 +81,9 @@ export default function Page() {
 
   return (
     <SidebarProvider>
-      <SidebarLeft />
+      
+      <SidebarLeft onSelectAction={setActiveAction} />
+      
 
       <SidebarInset className="min-w-0 flex flex-col">
         {/* Header */}
@@ -110,7 +125,11 @@ export default function Page() {
 
         {/* Main content */}
         <div className="flex flex-1 min-w-0 flex-col p-4">
-          <EditorPanel runtimeHealthy={healthy} />
+          <EditorPanel
+            runtimeHealthy={healthy}
+            activeAction={activeAction}
+          />
+
         </div>
       </SidebarInset>
 

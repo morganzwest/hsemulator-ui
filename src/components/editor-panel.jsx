@@ -13,108 +13,183 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { TbJson } from "react-icons/tb";
+import { FaRegFile } from "react-icons/fa";
 
 /* -----------------------------
-   File setup
+   Helpers
 ----------------------------- */
 
-const INITIAL_FILES = {
-  'action.py': {
-    language: 'python',
-    value: `def main(event):\n    return {"ok": True}`,
-    dirty: false,
-  },
-  'action.js': {
-    language: 'javascript',
-    value: `exports.main = async (event) => {\n  return { ok: true }\n}`,
-    dirty: false,
-  },
-  'config.yaml': {
-    language: 'yaml',
-    value: `runtime: python\nversion: 3.11`,
-    dirty: false,
-  },
-};
+function inferLanguage(filename) {
+  if (filename.endsWith('.js')) return 'javascript';
+  if (filename.endsWith('.py')) return 'python';
+  if (filename.endsWith('.yaml') || filename.endsWith('.yml')) return 'yaml';
+  if (filename.endsWith('.json')) return 'json';
+  return 'plaintext';
+}
 
 function LanguageIcon({ language }) {
-  if (language === 'javascript') {
-    return <IoLogoJavascript className='h-4 w-4 text-yellow-400' />;
+  switch (language) {
+    case 'javascript':
+    case 'js':
+      return <IoLogoJavascript className="h-4 w-4 text-yellow-400" />;
+
+    case 'python':
+    case 'py':
+      return <IoLogoPython className="h-4 w-4 text-blue-400" />;
+
+    case 'yaml':
+    case 'yml':
+      return <SiYaml className="h-4 w-4 text-orange-400" />;
+
+    case 'json':
+      return <TbJson  className="h-4 w-4 text-emerald-400" />;
+
+    default:
+      return <FaRegFile  className="h-4 w-4 text-muted-foreground" />;
   }
-  if (language === 'python') {
-    return <IoLogoPython className='h-4 w-4 text-blue-400' />;
-  }
-  return <SiYaml className='h-4 w-4 text-orange-400' />;
 }
 
-/* -----------------------------
-   Resize handle
------------------------------ */
-
-function ResizeHandle({ direction, onResize }) {
-  const dragging = useRef(false);
-
-  function start(e) {
-    e.preventDefault();
-    dragging.current = true;
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', stop);
-  }
-
-  function move(e) {
-    if (!dragging.current) return;
-    onResize(e);
-  }
-
-  function stop() {
-    dragging.current = false;
-    document.removeEventListener('mousemove', move);
-    document.removeEventListener('mouseup', stop);
-  }
-
-  return (
-    <div
-      onMouseDown={start}
-      className={`
-        z-10 bg-border
-        ${
-          direction === 'horizontal'
-            ? 'h-1 cursor-row-resize'
-            : 'w-1 cursor-col-resize'
-        }
-        hover:bg-primary/60
-      `}
-    />
-  );
-}
 
 /* -----------------------------
    Editor Panel
 ----------------------------- */
 
-export function EditorPanel({ runtimeHealthy}) {
-  const editorRef = useRef(null)
-  const outputEndRef = useRef(null)
-  const containerRef = useRef(null)
+export function EditorPanel({ runtimeHealthy, activeAction }) {
+  const supabase = createSupabaseBrowserClient();
 
-  const [files, setFiles] = useState(INITIAL_FILES)
-  const [activeFile, setActiveFile] = useState('action.py')
-  const [running, setRunning] = useState(false)
-  const [logs, setLogs] = useState([])
+  const editorRef = useRef(null);
+  const outputEndRef = useRef(null);
+  const containerRef = useRef(null);
 
-  const [split, setSplit] = useState('horizontal')
-  const [splitSize, setSplitSize] = useState(70)
+  const [files, setFiles] = useState({});
+  const [activeFile, setActiveFile] = useState(null);
+  const [loadingFiles, setLoadingFiles] = useState(false);
 
-  const active = files[activeFile]
+  const [running, setRunning] = useState(false);
+  const [logs, setLogs] = useState([]);
 
-  const isDirty = active.dirty
-  const canRun = isDirty && runtimeHealthy && !running
+  const [split, setSplit] = useState('horizontal');
+  const [splitSize, setSplitSize] = useState(70);
 
+  const active = activeFile ? files[activeFile] : null;
+  const isDirty = active?.dirty;
+  const canRun = isDirty && runtimeHealthy && !running;
+
+  /* -----------------------------
+     Render visibility
+  ----------------------------- */
+
+  console.debug('[EditorPanel] render', {
+    runtimeHealthy,
+    hasActiveAction: Boolean(activeAction),
+    activeFile,
+    fileCount: Object.keys(files).length,
+  });
+
+  /* -----------------------------
+     Load files when action changes
+  ----------------------------- */
+
+  useEffect(() => {
+    console.group('[EditorPanel] loadFiles');
+
+    if (!activeAction) {
+      console.warn('[EditorPanel] No activeAction — clearing state');
+      setFiles({});
+      setActiveFile(null);
+      console.groupEnd();
+      return;
+    }
+
+    const { id, owner_id } = activeAction;
+    const bucket = 'actions';
+    const prefix = `${owner_id}/${id}/`;
+
+    console.log('Action:', { id, owner_id });
+    console.log('Bucket:', bucket);
+    console.log('Prefix:', prefix);
+
+    async function loadFiles() {
+      setLoadingFiles(true);
+      setLogs([]);
+
+      // path = bucket/owner_id/action_id/
+      const actionPath = `${owner_id}/${id}`;
+
+      const { data: objects, error } = await supabase.storage
+        .from('actions')
+        .list(actionPath);
+
+      console.log('[EditorPanel] list()', objects);
+
+
+      console.log('Storage list:', { objects, error });
+
+
+      if (error) {
+        console.error('[EditorPanel] Storage list failed:', error);
+        setLoadingFiles(false);
+        console.groupEnd();
+        return;
+      }
+
+      console.log('Total objects returned:', objects.length);
+
+      const loadedFiles = {};
+
+for (const obj of objects ?? []) {
+  const fullPath = `${actionPath}/${obj.name}`;
+
+  console.log('[EditorPanel] Downloading:', fullPath);
+
+  const { data, error } = await supabase.storage
+    .from('actions')
+    .download(fullPath);
+
+  if (error) {
+    console.error('Download failed:', fullPath, error);
+    continue;
+  }
+
+  loadedFiles[obj.name] = {
+    language: inferLanguage(obj.name),
+    value: await data.text(),
+    dirty: false,
+  };
+}
+
+
+      const filenames = Object.keys(loadedFiles);
+      const firstFile = filenames[0] ?? null;
+
+      console.log('Loaded files:', filenames);
+      console.log('Initial activeFile:', firstFile);
+
+      setFiles(loadedFiles);
+      setActiveFile(firstFile);
+      setLoadingFiles(false);
+      console.groupEnd();
+    }
+
+    loadFiles();
+  }, [activeAction, supabase]);
+
+  /* -----------------------------
+     Output scroll
+  ----------------------------- */
 
   useEffect(() => {
     outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
+  /* -----------------------------
+     Editor actions
+  ----------------------------- */
+
   function updateFile(value) {
+    console.debug('[EditorPanel] updateFile', { activeFile });
     setFiles((prev) => ({
       ...prev,
       [activeFile]: { ...prev[activeFile], value, dirty: true },
@@ -122,7 +197,11 @@ export function EditorPanel({ runtimeHealthy}) {
   }
 
   function handleSave() {
-    editorRef.current?.getAction('editor.action.formatDocument')?.run();
+    console.debug('[EditorPanel] saveFile', { activeFile });
+    editorRef.current
+      ?.getAction('editor.action.formatDocument')
+      ?.run();
+
     setFiles((prev) => ({
       ...prev,
       [activeFile]: { ...prev[activeFile], dirty: false },
@@ -130,8 +209,16 @@ export function EditorPanel({ runtimeHealthy}) {
   }
 
   async function handleRun() {
-    if (!active.dirty || running) return;
+    if (!canRun) {
+      console.warn('[EditorPanel] Run blocked', {
+        dirty: isDirty,
+        runtimeHealthy,
+        running,
+      });
+      return;
+    }
 
+    console.log('[EditorPanel] Running:', activeFile);
     setRunning(true);
     setLogs((l) => [...l, `▶ Running ${activeFile}`]);
 
@@ -145,119 +232,133 @@ export function EditorPanel({ runtimeHealthy}) {
         }),
       });
 
+      console.log('[EditorPanel] Run completed');
       setLogs((l) => [...l, '✔ Execution completed']);
       handleSave();
-    } catch {
+    } catch (err) {
+      console.error('[EditorPanel] Run failed:', err);
       setLogs((l) => [...l, '✖ Execution failed']);
     } finally {
       setRunning(false);
     }
   }
 
-  function handleResize(e) {
-    const rect = containerRef.current.getBoundingClientRect();
+  /* -----------------------------
+     Empty states
+  ----------------------------- */
 
-    if (split === 'horizontal') {
-      const y = e.clientY - rect.top;
-      setSplitSize(Math.min(85, Math.max(15, (y / rect.height) * 100)));
-    } else {
-      const x = e.clientX - rect.left;
-      setSplitSize(Math.min(85, Math.max(15, (x / rect.width) * 100)));
-    }
+  if (!activeAction) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        Select an action to view its files
+      </div>
+    );
+  }
+
+  if (loadingFiles) {
+    return (
+      <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Spinner /> Loading files…
+      </div>
+    );
+  }
+
+  if (!active) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        No files found for this action
+      </div>
+    );
   }
 
   const gridStyle =
-    split === 'horizontal'
-      ? {
-          gridTemplateRows: `${splitSize}% 4px 1fr`,
-        }
-      : {
-          gridTemplateColumns: `${splitSize}% 4px 1fr`,
-        };
+  split === 'horizontal'
+    ? { gridTemplateRows: `${splitSize}% 4px 1fr` }
+    : { gridTemplateColumns: `${splitSize}% 4px 1fr` };
 
+
+  /* -----------------------------
+     Render
+  ----------------------------- */
   return (
-    <div className='flex h-full min-w-0 flex-col gap-3'>
+    <div className="flex h-full min-w-0 flex-col gap-3">
       {/* Toolbar */}
-      <div className='flex items-center justify-between border-b pb-2'>
+      <div className="flex items-center justify-between border-b pb-2">
         <Tabs value={activeFile} onValueChange={setActiveFile}>
           <TabsList>
             {Object.entries(files).map(([file, meta]) => (
               <TabsTrigger key={file} value={file}>
-                <div className='flex items-center gap-2'>
+                <div className="flex items-center gap-2">
                   <LanguageIcon language={meta.language} />
                   <span>{file}</span>
-                  {meta.dirty && <span className='text-primary'>●</span>}
+                  {meta.dirty && <span className="text-primary">●</span>}
                 </div>
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
 
-        <div className='flex items-center gap-2'>
+        <div className="flex items-center gap-2">
           <Button
-            variant='ghost'
-            size='icon'
+            variant="ghost"
+            size="icon"
             onClick={() =>
               setSplit(split === 'horizontal' ? 'vertical' : 'horizontal')
             }
-            title='Toggle split direction'
           >
             {split === 'horizontal' ? (
-              <Columns className='h-4 w-4' />
+              <Columns className="h-4 w-4" />
             ) : (
-              <Rows className='h-4 w-4' />
+              <Rows className="h-4 w-4" />
             )}
           </Button>
 
           <Button
-            variant='outline'
-            size='sm'
+            variant="outline"
+            size="sm"
             onClick={handleSave}
             disabled={!active.dirty}
           >
-            <Save className='mr-1 h-4 w-4' />
+            <Save className="mr-1 h-4 w-4" />
             Save
           </Button>
 
           <Tooltip>
-  <TooltipTrigger asChild>
-    <Button
-      size="sm"
-      onClick={handleRun}
-      disabled={!canRun}
-      className={!canRun ? 'opacity-50' : ''}
-    >
-      {running ? (
-        <Spinner className="mr-2" />
-      ) : (
-        <Play className="mr-1 h-4 w-4" />
-      )}
-      Run
-    </Button>
-  </TooltipTrigger>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                onClick={handleRun}
+                disabled={!canRun}
+              >
+                {running ? (
+                  <Spinner className="mr-2" />
+                ) : (
+                  <Play className="mr-1 h-4 w-4" />
+                )}
+                Run
+              </Button>
+            </TooltipTrigger>
 
-  {!canRun && (
-    <TooltipContent>
-      {!runtimeHealthy
-        ? 'Runtime is offline'
-        : !isDirty
-        ? 'No changes since last run'
-        : 'Action is currently running'}
-    </TooltipContent>
-  )}
-</Tooltip>
-
+            {!canRun && (
+              <TooltipContent>
+                {!runtimeHealthy
+                  ? 'Runtime is offline'
+                  : !isDirty
+                  ? 'No changes since last run'
+                  : 'Action is currently running'}
+              </TooltipContent>
+            )}
+          </Tooltip>
         </div>
       </div>
 
       {/* Split View */}
       <div
         ref={containerRef}
-        className='grid flex-1 min-w-0 overflow-hidden rounded-md border bg-background'
+        className="grid flex-1 min-w-0 overflow-hidden rounded-md border bg-background"
         style={gridStyle}
       >
-        {/* Editor */}
-        <div className='min-w-0 -mb-1 overflow-hidden'>
+        <div className="min-w-0 -mb-1 overflow-hidden">
           <MonacoEditor
             value={active.value}
             language={active.language}
@@ -266,20 +367,32 @@ export function EditorPanel({ runtimeHealthy}) {
           />
         </div>
 
-        <ResizeHandle direction={split} onResize={handleResize} />
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            document.addEventListener('mousemove', handleResize);
+            document.addEventListener('mouseup', () =>
+              document.removeEventListener('mousemove', handleResize),
+            );
+          }}
+          className={`z-10 bg-border ${
+            split === 'horizontal'
+              ? 'h-1 cursor-row-resize'
+              : 'w-1 cursor-col-resize'
+          }`}
+        />
 
-        {/* Output */}
-        <div className='flex min-w-0 - flex-col bg-muted/30'>
-          <div className='flex items-center justify-between border-b px-3 py-1 text-xs text-muted-foreground'>
+        <div className="flex min-w-0 flex-col bg-muted/30">
+          <div className="flex items-center justify-between border-b px-3 py-1 text-xs text-muted-foreground">
             <span>Output</span>
-            <Button variant='ghost' size='icon' onClick={() => setLogs([])}>
-              <Trash2 className='h-4 w-4' />
+            <Button variant="ghost" size="icon" onClick={() => setLogs([])}>
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
 
-          <div className='flex-1 overflow-auto px-3 py-2 font-mono text-xs'>
+          <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs">
             {logs.length === 0 ? (
-              <div className='text-muted-foreground'>No output yet</div>
+              <div className="text-muted-foreground">No output yet</div>
             ) : (
               logs.map((line, i) => <div key={i}>{line}</div>)
             )}

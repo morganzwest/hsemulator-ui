@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Blocks,
   MessageCircleQuestion,
   Settings2,
   Plus,
   Search,
+  AudioWaveform,
+  GalleryVerticalEnd,
+  Command,
 } from 'lucide-react'
 
 import {
@@ -19,12 +22,9 @@ import { TeamSwitcher } from '@/components/team-switcher'
 import { ActionListItem } from '@/components/action-list-item'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { formatDistanceToNowStrict } from 'date-fns'
 
-import {
-  AudioWaveform,
-  GalleryVerticalEnd,
-  Command,
-} from 'lucide-react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 
 const data = {
   projects: [
@@ -34,35 +34,38 @@ const data = {
   ],
 }
 
-const actions = [
-  {
-    id: 'action-1',
-    title: 'Create Ticket',
-    description: 'Creates a HubSpot ticket when a form is submitted',
-    updatedAt: '2 hours ago',
-    type: 'JavaScript',
-  },
-  {
-    id: 'action-2',
-    title: 'Enrich Contact',
-    description: 'Adds enrichment data to contacts from Clearbit',
-    updatedAt: 'Yesterday',
-    type: 'Python',
-  },
-  {
-    id: 'action-3',
-    title: 'Sync Deal',
-    description: 'Synchronises deal stages across pipelines',
-    updatedAt: '3 days ago',
-    type: 'JavaScript',
-  },
-]
+export function SidebarLeft({ onSelectAction, ...props }) {
+  const supabase = createSupabaseBrowserClient()
+  const [activeActionId, setActiveActionId] = useState(null)
 
-export function SidebarLeft(props) {
   const [query, setQuery] = useState('')
+  const [actions, setActions] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+  async function loadActions() {
+    setLoading(true)
+
+    const { data, error } = await supabase
+      .from('actions')
+      .select('id, owner_id, name, description, language, updated_at')
+      .order('updated_at', { ascending: false })
+
+    if (error) {
+      console.error('[SidebarLeft] Failed to load actions:', error)
+    } else {
+      console.log('[SidebarLeft] Actions loaded:', data)
+      setActions(data ?? [])
+    }
+
+    setLoading(false)
+  }
+
+  loadActions()
+}, [supabase])
 
   const filteredActions = actions.filter((action) =>
-    action.title.toLowerCase().includes(query.toLowerCase())
+    action.name.toLowerCase().includes(query.toLowerCase())
   )
 
   return (
@@ -104,10 +107,44 @@ export function SidebarLeft(props) {
       {/* Content */}
       <SidebarContent className="flex flex-col">
         <div className="flex-1 overflow-auto px-1">
-          {filteredActions.length > 0 ? (
+          {loading ? (
+            <div className="px-4 py-6 text-xs text-muted-foreground">
+              Loading actions…
+            </div>
+          ) : filteredActions.length > 0 ? (
             filteredActions.map((action) => (
-              <ActionListItem key={action.id} action={action} />
-            ))
+  <ActionListItem
+    key={action.id}
+    action={{
+      id: action.id,
+      title: action.name,
+      description: action.description,
+      updatedAt: formatDistanceToNowStrict(
+        new Date(action.updated_at),
+        { addSuffix: true }
+      ),
+      type:
+        action.language === 'javascript'
+          ? 'JavaScript'
+          : 'Python',
+    }}
+    active={action.id === activeActionId}
+    onClick={() => {
+  console.log('[SidebarLeft] Action clicked:', {
+    id: action.id,
+    owner_id: action.owner_id,
+    name: action.name,
+  })
+
+  setActiveActionId(action.id)
+
+  console.log('[SidebarLeft] Passing action up to parent')
+  onSelectAction?.(action)
+}}
+  />
+))
+
+
           ) : (
             <div className="px-4 py-6 text-xs text-muted-foreground">
               No actions found

@@ -55,8 +55,8 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   const [running, setRunning] = useState(false)
   const [logs, setLogs] = useState([])
 
-  const [split, setSplit] = useState('horizontal')
-  const [splitSize, setSplitSize] = useState(70)
+  const [split, setSplit] = useState('verticalS')
+  const [splitSize, setSplitSize] = useState(60)
 
   const active = activeFile ? files[activeFile] : null
   const hasDirtyFiles = Object.values(files).some(f => f.dirty)
@@ -146,7 +146,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   }
 
   return (
-    <div className="flex h-full max-h-[94vh] min-w-0 flex-col gap-3">
+    <div className="flex h-[93vh] min-w-0 flex-col gap-3 overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b pb-2">
         <Tabs value={activeFile} onValueChange={setActiveFile}>
@@ -239,7 +239,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
         />
 
         {/* Output */}
-        <div className="relative flex min-w-0 flex-col bg-muted/30">
+        <div className="relative flex min-w-0 flex-col bg-muted/30 max-h-full overflow-hidden">
           <div className="flex items-center justify-between border-b px-3 py-1 text-xs text-muted-foreground">
             <span>Output</span>
             <Button variant="ghost" size="icon" onClick={() => setLogs([])}>

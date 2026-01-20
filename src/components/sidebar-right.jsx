@@ -62,16 +62,6 @@ export function SidebarRight(props) {
       </SidebarHeader>
 
       <SidebarContent>
-        <DatePicker />
-        <SidebarSeparator className="mx-0" />
-        <Calendars
-          calendars={[
-            {
-              name: 'Options',
-              items: ['Snapshots', 'Assertions', 'Other'],
-            },
-          ]}
-        />
       </SidebarContent>
 
       <SidebarFooter>

@@ -257,161 +257,246 @@ export function useActionEditor({
     return lines
   }
 
+  function eventTimestampToISO(ts) {
+  if (!ts) return null
+  const ms =
+    ts.secs_since_epoch * 1000 +
+    Math.floor((ts.nanos_since_epoch || 0) / 1e6)
+  return new Date(ms).toISOString()
+}
+
+
 
   /* -----------------------------
      Run action (INLINE execution)
   ----------------------------- */
+
   async function runFile() {
-    if (!activeAction) return
+  if (!activeAction) return
 
-    const entryFile = resolveEntryFile(files)
-    if (!entryFile) {
-      setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
-      return
-    }
-
-    const actionFile = files[entryFile]
-
-    setRunning(true)
-    setLogs(l => [...l, '', `▶ Running ${entryFile}`])
-
-    try {
-      const { owner_id, id } = activeAction
-      const basePath = `${owner_id}/${id}`
-
-      /* -----------------------------
-         Load config.yaml
-      ----------------------------- */
-
-      const { data: configBlob, error: configErr } =
-        await supabase.storage
-          .from('actions')
-          .download(`${basePath}/config.yaml`)
-
-      if (configErr || !configBlob) {
-        throw new Error('config.yaml is required')
-      }
-
-      let yamlConfig
-      try {
-        yamlConfig = YAML.parse(await configBlob.text()) ?? {}
-      } catch (e) {
-        throw new Error(`Invalid config.yaml: ${e.message}`)
-      }
-
-      /* -----------------------------
-         Resolve fixtures (INLINE)
-      ----------------------------- */
-
-      const fixtureFiles = await Promise.all(
-        (yamlConfig.fixtures ?? []).map(async path => {
-          const { data, error } = await supabase.storage
-            .from('actions')
-            .download(`${basePath}/${path}`)
-
-          if (error || !data) {
-            throw new Error(`Missing fixture: ${path}`)
-          }
-
-          return {
-            name: path.startsWith('/') ? path.slice(1) : path,
-            source: await data.text(),
-          }
-        })
-      )
-
-      /* -----------------------------
-         Compile inline config
-      ----------------------------- */
-
-      const inlineConfig = {
-        version: yamlConfig.version ?? 1,
-
-        action: {
-          language:
-            yamlConfig.action?.type === 'python' ||
-              entryFile.endsWith('.py')
-              ? 'python'
-              : 'js',
-          entry: yamlConfig.action?.entry ?? entryFile,
-          source: actionFile.value,
-        },
-
-        fixtures: fixtureFiles,
-
-        env: yamlConfig.env ?? {},
-
-        runtime: {
-          node: yamlConfig.runtime?.node ?? 'node',
-          python: yamlConfig.runtime?.python ?? 'python',
-        },
-
-        output: yamlConfig.output,
-
-        snapshots: {
-          enabled: yamlConfig.snapshots?.enabled ?? true,
-          ignore: yamlConfig.snapshots?.ignore ?? [],
-        },
-
-        repeat: yamlConfig.repeat ?? 1,
-      }
-
-      /* -----------------------------
-         Execute
-      ----------------------------- */
-
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer dev_secret_key',
-          },
-          body: JSON.stringify({
-            mode: 'execute',
-            config: inlineConfig,
-          }),
-        }
-      )
-
-      const payload = await res.json()
-      if (!res.ok) {
-        throw new Error(payload?.error || 'Execution failed')
-      }
-
-      /* -----------------------------
-         Render output
-      ----------------------------- */
-
-      const lines = []
-
-      if (payload?.summary?.result) {
-        const r = payload.summary.result
-        lines.push('✔ Execution completed')
-        lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
-        lines.push(`Runs: ${r.runs}`)
-        lines.push(`Duration: ${r.max_duration_ms} ms`)
-        // lines.push(`Memory: ${(r.max_memory_kb / 1024).toFixed(1)} MB`)
-        lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
-      }
-
-      if (Array.isArray(payload?.events)) {
-        lines.push('')
-        lines.push('--- Events ---')
-
-        const formatted = formatEvents(payload.events)
-        lines.push(...formatted)
-
-      }
-
-      setLogs(l => [...l, ...lines])
-    } catch (err) {
-      setLogs(l => [...l, `✖ ${err.message}`])
-    } finally {
-      setRunning(false)
-    }
+  const entryFile = resolveEntryFile(files)
+  if (!entryFile) {
+    setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
+    return
   }
+
+  const actionFile = files[entryFile]
+
+  setRunning(true)
+  setLogs(l => [...l, '', `▶ Running ${entryFile}`])
+
+  let executionRow = null
+  let executionId = null
+
+  try {
+    const { owner_id, id: action_id } = activeAction
+    const basePath = `${owner_id}/${action_id}`
+
+    /* -----------------------------
+       Load config.yaml
+    ----------------------------- */
+
+    const { data: configBlob, error: configErr } =
+      await supabase.storage
+        .from('actions')
+        .download(`${basePath}/config.yaml`)
+
+    if (configErr || !configBlob) {
+      throw new Error('config.yaml is required')
+    }
+
+    let yamlConfig
+    try {
+      yamlConfig = YAML.parse(await configBlob.text()) ?? {}
+    } catch (e) {
+      throw new Error(`Invalid config.yaml: ${e.message}`)
+    }
+
+    /* -----------------------------
+       Resolve fixtures
+    ----------------------------- */
+
+    const fixtureFiles = await Promise.all(
+      (yamlConfig.fixtures ?? []).map(async path => {
+        const { data, error } = await supabase.storage
+          .from('actions')
+          .download(`${basePath}/${path}`)
+
+        if (error || !data) {
+          throw new Error(`Missing fixture: ${path}`)
+        }
+
+        return {
+          name: path.startsWith('/') ? path.slice(1) : path,
+          source: await data.text(),
+        }
+      })
+    )
+
+    /* -----------------------------
+       Compile inline config
+    ----------------------------- */
+
+    const inlineConfig = {
+      version: yamlConfig.version ?? 1,
+      action: {
+        language:
+          yamlConfig.action?.type === 'python' ||
+          entryFile.endsWith('.py')
+            ? 'python'
+            : 'js',
+        entry: yamlConfig.action?.entry ?? entryFile,
+        source: actionFile.value,
+      },
+      fixtures: fixtureFiles,
+      env: yamlConfig.env ?? {},
+      runtime: {
+        node: yamlConfig.runtime?.node ?? 'node',
+        python: yamlConfig.runtime?.python ?? 'python',
+      },
+      output: yamlConfig.output,
+      snapshots: {
+        enabled: yamlConfig.snapshots?.enabled ?? true,
+        ignore: yamlConfig.snapshots?.ignore ?? [],
+      },
+      repeat: yamlConfig.repeat ?? 1,
+    }
+
+    /* -----------------------------
+       Create execution row (START)
+    ----------------------------- */
+
+    const { data: execInsert, error: execErr } = await supabase
+      .from('action_executions')
+      .insert({
+        action_id,
+        owner_id,
+        status: 'running',
+        started_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    if (execErr) throw execErr
+
+    executionRow = execInsert
+
+    /* -----------------------------
+       Execute
+    ----------------------------- */
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer dev_secret_key',
+        },
+        body: JSON.stringify({
+          mode: 'execute',
+          config: inlineConfig,
+        }),
+      }
+    )
+
+    const payload = await res.json()
+    if (!res.ok) {
+      throw new Error(payload?.error || 'Execution failed')
+    }
+
+    executionId = payload?.summary?.execution_id
+
+    /* -----------------------------
+       Persist events (append-only)
+    ----------------------------- */
+
+    if (Array.isArray(payload?.events)) {
+      const rows = payload.events.map(e => ({
+        execution_fk: executionRow.id,
+        execution_id: executionId,
+        kind: e.kind,
+        event_time: eventTimestampToISO(e.timestamp),
+        message: e.message ?? null,
+      }))
+
+      const { error } = await supabase
+        .from('action_execution_events')
+        .insert(rows)
+
+      if (error) console.error('Event insert failed', error)
+    }
+
+    /* -----------------------------
+       Update execution (SUCCESS)
+    ----------------------------- */
+
+    if (payload?.summary?.result) {
+      const r = payload.summary.result
+
+      await supabase
+        .from('action_executions')
+        .update({
+          execution_id: executionId,
+          status: r.ok ? 'executed' : 'failed',
+          finished_at: new Date().toISOString(),
+          duration_ms: r.max_duration_ms,
+          max_duration_ms: r.max_duration_ms,
+          max_memory_kb: r.max_memory_kb,
+          runs: r.runs,
+          failures_count: r.failures?.length ?? 0,
+          ok: r.ok,
+          snapshots_ok: r.snapshots_ok,
+          result: payload.summary,
+        })
+        .eq('id', executionRow.id)
+    }
+
+    /* -----------------------------
+       Render output (unchanged)
+    ----------------------------- */
+
+    const lines = []
+
+    if (payload?.summary?.result) {
+      const r = payload.summary.result
+      lines.push('✔ Execution completed')
+      lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
+      lines.push(`Runs: ${r.runs}`)
+      lines.push(`Duration: ${r.max_duration_ms} ms`)
+      lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
+    }
+
+    if (Array.isArray(payload?.events)) {
+      lines.push('')
+      lines.push('--- Events ---')
+      lines.push(...formatEvents(payload.events))
+    }
+
+    setLogs(l => [...l, ...lines])
+  } catch (err) {
+    /* -----------------------------
+       Update execution (FAILURE)
+    ----------------------------- */
+
+    if (executionRow) {
+      await supabase
+        .from('action_executions')
+        .update({
+          status: 'failed',
+          finished_at: new Date().toISOString(),
+          ok: false,
+          error_message: err.message,
+        })
+        .eq('id', executionRow.id)
+    }
+
+    setLogs(l => [...l, `✖ ${err.message}`])
+  } finally {
+    setRunning(false)
+  }
+}
+
 
 
 

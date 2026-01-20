@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 import { SidebarLeft } from '@/components/sidebar-left';
 import { SidebarRight } from '@/components/sidebar-right';
@@ -55,8 +55,9 @@ function RuntimeStatus({ healthy, checking }) {
 ------------------------------------- */
 
 export default function Page() {
-  const params = useParams();
-  const actionIdFromUrl = params?.actionId;
+  const searchParams = useSearchParams();
+  const router = useRouter();
+const actionIdFromUrl = searchParams.get('actionId');
 
   const [actions, setActions] = useState([]);
   const [activeAction, setActiveAction] = useState(null);
@@ -103,6 +104,19 @@ export default function Page() {
       console.warn('[Dashboard] Invalid actionId:', actionIdFromUrl);
     }
   }, [actionIdFromUrl, actions]);
+
+useEffect(() => {
+  if (!activeAction) return;
+
+  if (actionIdFromUrl === activeAction.id) return;
+
+  const params = new URLSearchParams(searchParams);
+  params.set('actionId', activeAction.id);
+
+  router.replace(`/dashboard?${params.toString()}`);
+}, [activeAction]);
+
+  
 
   /* -----------------------------
      Debug visibility

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 
 import { SidebarLeft } from '@/components/sidebar-left';
 import { SidebarRight } from '@/components/sidebar-right';
@@ -10,7 +11,11 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from '@/components/ui/breadcrumb';
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
 import { EditorPanel } from '@/components/editor-panel';
 import {
   Tooltip,
@@ -20,19 +25,20 @@ import {
 import { Separator } from '@/components/ui/separator';
 
 /* -------------------------------------
-   Runtime status indicator (inline)
+   Runtime status indicator
 ------------------------------------- */
+
 function RuntimeStatus({ healthy, checking }) {
-  let label = 'Checking'
-  let color = 'bg-muted'
+  let label = 'Checking';
+  let color = 'bg-muted';
 
   if (!checking) {
     if (healthy) {
-      label = 'Ready'
-      color = 'bg-emerald-500'
+      label = 'Ready';
+      color = 'bg-emerald-500';
     } else {
-      label = 'Offline'
-      color = 'bg-red-500'
+      label = 'Offline';
+      color = 'bg-red-500';
     }
   }
 
@@ -41,32 +47,32 @@ function RuntimeStatus({ healthy, checking }) {
       <span className={`h-2 w-2 rounded-full ${color}`} />
       <span>{label}</span>
     </div>
-  )
+  );
 }
 
+/* -------------------------------------
+   Page
+------------------------------------- */
+
 export default function Page() {
-  const [activeAction, setActiveAction] = useState(null)
+  const params = useParams();
+  const actionIdFromUrl = params?.actionId;
+
+  const [actions, setActions] = useState([]);
+  const [activeAction, setActiveAction] = useState(null);
+
   const [healthy, setHealthy] = useState(false);
   const [checkingHealth, setCheckingHealth] = useState(true);
 
-  useEffect(() => {
-  if (activeAction) {
-    console.log('[Page] activeAction received:', {
-      id: activeAction.id,
-      owner_id: activeAction.owner_id,
-      name: activeAction.name,
-    })
-  } else {
-    console.log('[Page] activeAction is null')
-  }
-}, [activeAction])
+  /* -----------------------------
+     Runtime health check
+  ----------------------------- */
 
-  // Health check (header-level, single source of truth)
   useEffect(() => {
     async function checkHealth() {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_RUNTIME_URL}/health`,
+          `${process.env.NEXT_PUBLIC_RUNTIME_URL}/health`
         );
         setHealthy(res.ok);
       } catch {
@@ -79,41 +85,81 @@ export default function Page() {
     checkHealth();
   }, []);
 
+  /* -----------------------------
+     URL → activeAction
+  ----------------------------- */
+
+  useEffect(() => {
+    if (!actionIdFromUrl) return;
+    if (!actions.length) return;
+
+    if (activeAction?.id === actionIdFromUrl) return;
+
+    const match = actions.find((a) => a.id === actionIdFromUrl);
+
+    if (match) {
+      setActiveAction(match);
+    } else {
+      console.warn('[Dashboard] Invalid actionId:', actionIdFromUrl);
+    }
+  }, [actionIdFromUrl, actions]);
+
+  /* -----------------------------
+     Debug visibility
+  ----------------------------- */
+
+  useEffect(() => {
+    if (activeAction) {
+      console.log('[Page] activeAction:', {
+        id: activeAction.id,
+        owner_id: activeAction.owner_id,
+        name: activeAction.name,
+      });
+    } else {
+      console.log('[Page] activeAction is null');
+    }
+  }, [activeAction]);
+
+  /* -----------------------------
+     Render
+  ----------------------------- */
+
   return (
     <SidebarProvider>
-      
-      <SidebarLeft onSelectAction={setActiveAction} />
-      
+      <SidebarLeft
+        onSelectAction={setActiveAction}
+        onActionsLoaded={setActions}
+      />
 
       <SidebarInset className="min-w-0 flex flex-col">
         {/* Header */}
-        <header className='sticky top-0 z-10 flex h-14 items-center bg-background'>
-          <div className='flex w-full items-center justify-between px-4'>
-            {/* Left: breadcrumb */}
+        <header className="sticky top-0 z-10 flex h-14 items-center bg-background">
+          <div className="flex w-full items-center justify-between px-4">
+            {/* Breadcrumb */}
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
-                  <BreadcrumbPage className='line-clamp-1'>
+                  <SidebarTrigger className="-ml-1" />
+                  <Separator
+                    orientation="vertical"
+                    className="mr-2 data-[orientation=vertical]:h-4"
+                  />
+                  <BreadcrumbPage className="line-clamp-1">
                     Code Action Editor
                   </BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
 
-            {/* Right: runtime status */}
-
+            {/* Runtime status */}
             <Tooltip>
               <TooltipTrigger>
-                <RuntimeStatus healthy={healthy} checking={checkingHealth} />
+                <RuntimeStatus
+                  healthy={healthy}
+                  checking={checkingHealth}
+                />
               </TooltipTrigger>
-              
-              {/* Hide tooltip if healthy is true */}
+
               {!healthy && !checkingHealth && (
                 <TooltipContent sideOffset={4}>
                   The server is offline. You can run a local runtime.
@@ -123,13 +169,12 @@ export default function Page() {
           </div>
         </header>
 
-        {/* Main content */}
+        {/* Main */}
         <div className="flex flex-1 min-w-0 flex-col p-4">
           <EditorPanel
             runtimeHealthy={healthy}
             activeAction={activeAction}
           />
-
         </div>
       </SidebarInset>
 

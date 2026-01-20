@@ -34,13 +34,17 @@ const data = {
   ],
 };
 
-export function SidebarLeft({ onSelectAction, ...props }) {
+export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   const supabase = createSupabaseBrowserClient();
-  const [activeActionId, setActiveActionId] = useState(null);
 
+  const [activeActionId, setActiveActionId] = useState(null);
   const [query, setQuery] = useState('');
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  /* -----------------------------
+     Load actions (ONCE)
+  ----------------------------- */
 
   useEffect(() => {
     async function loadActions() {
@@ -54,61 +58,67 @@ export function SidebarLeft({ onSelectAction, ...props }) {
       if (error) {
         console.error('[SidebarLeft] Failed to load actions:', error);
       } else {
-        console.log('[SidebarLeft] Actions loaded:', data);
         setActions(data ?? []);
+        onActionsLoaded?.(data ?? []);
       }
 
       setLoading(false);
     }
 
     loadActions();
-  }, [supabase]);
+  }, [supabase]); // ✅ CONSTANT dependency array
+
+  /* -----------------------------
+     Filter
+  ----------------------------- */
 
   const filteredActions = actions.filter((action) =>
     action.name.toLowerCase().includes(query.toLowerCase()),
   );
 
-  return (
-    <Sidebar className='border-r-0' {...props}>
-      {/* Header */}
-      <SidebarHeader className='gap-4'>
-        <TeamSwitcher className='w-full' teams={data.projects} />
+  /* -----------------------------
+     Render
+  ----------------------------- */
 
-        {/* Actions toolbar */}
-        <div className='flex flex-col gap-2 px-3'>
-          <div className='flex items-center justify-between'>
-            <span className='text-xs font-medium text-muted-foreground'>
+  return (
+    <Sidebar className="border-r-0" {...props}>
+      {/* Header */}
+      <SidebarHeader className="gap-4">
+        <TeamSwitcher className="w-full" teams={data.projects} />
+
+        <div className="flex flex-col gap-2 px-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">
               Actions
             </span>
 
             <Button
-              variant='ghost'
-              size='icon'
-              className='h-7 w-7'
-              title='Create new action'
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="Create new action"
             >
-              <Plus className='h-4 w-4' />
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Search */}
-          <div className='relative'>
-            <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder='Search actions…'
+              placeholder="Search actions…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className='h-9 pl-8 text-sm'
+              className="h-9 pl-8 text-sm"
             />
           </div>
         </div>
       </SidebarHeader>
 
       {/* Content */}
-      <SidebarContent className='flex flex-col'>
-        <div className='flex-1 overflow-auto space-y-1 px-1'>
+      <SidebarContent className="flex flex-col">
+        <div className="flex-1 overflow-auto space-y-1 px-1">
           {loading ? (
-            <div className='px-4 py-6 text-xs text-muted-foreground'>
+            <div className="px-4 py-6 text-xs text-muted-foreground">
               Loading actions…
             </div>
           ) : filteredActions.length > 0 ? (
@@ -124,36 +134,30 @@ export function SidebarLeft({ onSelectAction, ...props }) {
                     { addSuffix: true },
                   ),
                   type:
-                    action.language === 'javascript' ? 'JavaScript' : 'Python',
+                    action.language === 'javascript'
+                      ? 'JavaScript'
+                      : 'Python',
                 }}
                 active={action.id === activeActionId}
                 onClick={() => {
-                  console.log('[SidebarLeft] Action clicked:', {
-                    id: action.id,
-                    owner_id: action.owner_id,
-                    name: action.name,
-                  });
-
                   setActiveActionId(action.id);
-
-                  console.log('[SidebarLeft] Passing action up to parent');
                   onSelectAction?.(action);
                 }}
               />
             ))
           ) : (
-            <div className='px-4 py-6 text-xs text-muted-foreground'>
+            <div className="px-4 py-6 text-xs text-muted-foreground">
               No actions found
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className='border-t px-3 py-2'>
-          <div className='flex flex-col gap-1'>
-            <SidebarFooterItem icon={Settings2} label='Settings' />
-            <SidebarFooterItem icon={Blocks} label='Templates' />
-            <SidebarFooterItem icon={MessageCircleQuestion} label='Help' />
+        <div className="border-t px-3 py-2">
+          <div className="flex flex-col gap-1">
+            <SidebarFooterItem icon={Settings2} label="Settings" />
+            <SidebarFooterItem icon={Blocks} label="Templates" />
+            <SidebarFooterItem icon={MessageCircleQuestion} label="Help" />
           </div>
         </div>
       </SidebarContent>
@@ -163,11 +167,14 @@ export function SidebarLeft({ onSelectAction, ...props }) {
   );
 }
 
-/* Footer item helper */
+/* -------------------------------------
+   Footer item helper
+------------------------------------- */
+
 function SidebarFooterItem({ icon: Icon, label }) {
   return (
-    <button className='flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground'>
-      <Icon className='h-4 w-4' />
+    <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+      <Icon className="h-4 w-4" />
       <span>{label}</span>
     </button>
   );

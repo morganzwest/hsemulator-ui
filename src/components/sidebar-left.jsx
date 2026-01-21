@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Blocks,
   MessageCircleQuestion,
@@ -26,6 +26,10 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
+/* -------------------------------------
+   Demo data
+------------------------------------- */
+
 const data = {
   projects: [
     { name: 'Demo Portal', logo: GalleryVerticalEnd, id: '1' },
@@ -34,6 +38,10 @@ const data = {
   ],
 };
 
+/* -------------------------------------
+   Sidebar
+------------------------------------- */
+
 export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   const supabase = createSupabaseBrowserClient();
 
@@ -41,33 +49,52 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   const [query, setQuery] = useState('');
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [createOpen, setCreateOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false);
 
   /* -----------------------------
-     Load actions (ONCE)
+     Load actions (reusable)
+  ----------------------------- */
+
+  const loadActions = useCallback(async () => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('actions')
+      .select('id, owner_id, name, description, language, updated_at')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('[SidebarLeft] Failed to load actions:', error);
+    } else {
+      setActions(data ?? []);
+      onActionsLoaded?.(data ?? []);
+    }
+
+    setLoading(false);
+  }, [supabase, onActionsLoaded]);
+
+  /* -----------------------------
+     Initial load
   ----------------------------- */
 
   useEffect(() => {
-    async function loadActions() {
-      setLoading(true);
+    loadActions();
+  }, [loadActions]);
 
-      const { data, error } = await supabase
-        .from('actions')
-        .select('id, owner_id, name, description, language, updated_at')
-        .order('updated_at', { ascending: false });
+  /* -----------------------------
+     Global resync listener
+  ----------------------------- */
 
-      if (error) {
-        console.error('[SidebarLeft] Failed to load actions:', error);
-      } else {
-        setActions(data ?? []);
-        onActionsLoaded?.(data ?? []);
-      }
-
-      setLoading(false);
+  useEffect(() => {
+    function handleResync() {
+      loadActions();
     }
 
-    loadActions();
-  }, [supabase]); // ✅ CONSTANT dependency array
+    window.addEventListener('actions:resync', handleResync);
+    return () => {
+      window.removeEventListener('actions:resync', handleResync);
+    };
+  }, [loadActions]);
 
   /* -----------------------------
      Filter
@@ -94,15 +121,14 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             </span>
 
             <Button
-  variant="ghost"
-  size="icon"
-  className="h-7 w-7"
-  title="Create new action"
-  onClick={() => setCreateOpen(true)}
->
-  <Plus className="h-4 w-4" />
-</Button>
-
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              title="Create new action"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
 
           <div className="relative">
@@ -130,6 +156,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
                 key={action.id}
                 action={{
                   id: action.id,
+                  owner_id: action.owner_id,
                   title: action.name,
                   description: action.description,
                   updatedAt: formatDistanceToNowStrict(
@@ -163,19 +190,19 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             <SidebarFooterItem icon={MessageCircleQuestion} label="Help" />
           </div>
         </div>
-        <CreateActionDialog
-  open={createOpen}
-  onOpenChange={setCreateOpen}
-  onCreated={(action) => {
-    setActions((prev) => [action, ...prev])
-    onSelectAction?.(action)
-  }}
-/>
 
+        {/* Create dialog */}
+        <CreateActionDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={() => {
+            // 🔁 Canonical refresh
+            window.dispatchEvent(new Event('actions:resync'));
+          }}
+        />
       </SidebarContent>
 
       <SidebarRail />
-    
     </Sidebar>
   );
 }

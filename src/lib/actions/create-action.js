@@ -90,5 +90,7 @@ export async function createAction({
     if (uploadError) throw uploadError
   }
 
+  window.dispatchEvent(new Event('actions:resync'));
+
   return action
 }

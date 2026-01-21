@@ -1,10 +1,10 @@
 'use client'
 
 import * as React from 'react'
-import { Plus } from 'lucide-react'
 
 import { NavUser } from '@/components/nav-user'
 import { ExecutionMiniCard } from '@/components/execution-mini-card'
+import { ExecutionDrawer } from '@/components/execution-drawer'
 import { useActionExecutions } from '@/lib/useActionExecutions'
 
 import {
@@ -12,9 +12,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
 
@@ -26,6 +23,10 @@ export function SidebarRight({ activeAction, ...props }) {
   const [user, setUser] = React.useState(null)
   const [onlyThisAction, setOnlyThisAction] =
     React.useState(false)
+
+  // Drawer state
+  const [openExecution, setOpenExecution] =
+    React.useState(null)
 
   const executions = useActionExecutions({
     limit: 19,
@@ -67,82 +68,84 @@ export function SidebarRight({ activeAction, ...props }) {
   if (!user) return null
 
   return (
-    <Sidebar
-      collapsible="none"
-      className="sticky top-0 hidden h-svh border-l lg:flex overflow-hidden"
-      {...props}
-    >
-      {/* Header */}
-      <SidebarHeader className="border-sidebar-border h-16 border-b">
-        <NavUser user={user} />
-      </SidebarHeader>
+    <>
+      <Sidebar
+        collapsible="none"
+        className="sticky top-0 hidden h-svh border-l lg:flex overflow-hidden"
+        {...props}
+      >
+        {/* Header */}
+        <SidebarHeader className="border-sidebar-border h-16 border-b">
+          <NavUser user={user} />
+        </SidebarHeader>
 
-      {/* Content */}
-      <SidebarContent className="flex-1 space-y-3 p-3 overflow-y-auto overflow-x-hidden min-w-0">
-        <div className="text-xs font-medium text-muted-foreground">
-          Recent executions
-        </div>
+        {/* Content */}
+        <SidebarContent className="flex-1 space-y-3 p-3 overflow-y-auto overflow-x-hidden min-w-0">
+          <div className="text-xs font-medium text-muted-foreground">
+            Recent executions
+          </div>
 
-        <div className="
-  space-y-2
-  max-h-full
-  overflow-hidden
-  [@media(max-height:700px)]:hidden
-">
-  {executions.length === 0 ? (
-    <div className="text-xs text-muted-foreground">
-      No executions yet
-    </div>
-  ) : (
-    executions.map(exec => (
-      <ExecutionMiniCard
-        key={exec.id}
-        execution={exec}
-        isCurrentAction={
-    activeAction && exec.action_id === activeAction.id
-  }
-      />
-    ))
-  )}
-</div>
+          <div
+            className="
+              space-y-2
+              max-h-full
+              overflow-hidden
+              [@media(max-height:700px)]:hidden
+            "
+          >
+            {executions.length === 0 ? (
+              <div className="text-xs text-muted-foreground">
+                No executions yet
+              </div>
+            ) : (
+              executions.map(exec => (
+                <ExecutionMiniCard
+                  key={exec.id}
+                  execution={exec}
+                  isCurrentAction={
+                    activeAction &&
+                    exec.action_id === activeAction.id
+                  }
+                  onOpen={setOpenExecution}
+                />
+              ))
+            )}
+          </div>
+        </SidebarContent>
 
+        <SidebarSeparator />
 
-        {/* Toggle
-        {activeAction && (
-          <label className="mt-4 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={onlyThisAction}
-              onChange={e =>
-                setOnlyThisAction(e.target.checked)
+        {/* Footer */}
+        <SidebarFooter className="border-t px-3 py-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Execution scope</span>
+
+            <button
+              onClick={() =>
+                setOnlyThisAction(v => !v)
               }
-              className="accent-primary"
-            />
-            Show only executions for this action
-          </label>
-        )} */}
-      </SidebarContent>
+              className="
+                rounded-md border px-2 py-1
+                text-xs font-medium
+                hover:bg-sidebar-accent
+              "
+            >
+              {onlyThisAction
+                ? 'This action'
+                : 'All actions'}
+            </button>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
 
-      <SidebarSeparator />
-
-      {/* Footer */}
-      <SidebarFooter className="border-t px-3 py-2">
-  <div className="flex items-center justify-between text-xs text-muted-foreground">
-    <span>Execution scope</span>
-
-    <button
-      onClick={() => setOnlyThisAction(v => !v)}
-      className="
-        rounded-md border px-2 py-1
-        text-xs font-medium
-        hover:bg-sidebar-accent
-      "
-    >
-      {onlyThisAction ? 'This action' : 'All actions'}
-    </button>
-  </div>
-</SidebarFooter>
-
-    </Sidebar>
+      {/* Execution drawer (mounted once) */}
+      <ExecutionDrawer
+        executionId={openExecution?.id}
+        open={!!openExecution}
+        onOpenChange={open => {
+          if (!open) setOpenExecution(null)
+        }}
+      />
+    </>
   )
 }

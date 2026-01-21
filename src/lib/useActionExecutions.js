@@ -11,8 +11,15 @@ export function useActionExecutions({
 
   useEffect(() => {
     let mounted = true
+    let intervalId = null
 
-    async function load() {
+    async function load(reason = 'poll') {
+      console.debug('[useActionExecutions] load', {
+        reason,
+        actionId,
+        limit,
+      })
+
       let query = supabase
         .from('action_executions')
         .select(`
@@ -22,6 +29,7 @@ export function useActionExecutions({
           status,
           ok,
           max_duration_ms,
+          created_at,
           owner:profiles (
             full_name,
             avatar_url
@@ -35,7 +43,13 @@ export function useActionExecutions({
       }
 
       const { data, error } = await query
-      if (!mounted || error || !data) return
+
+      if (!mounted) return
+
+      if (error) {
+        console.error('[useActionExecutions] load failed', error)
+        return
+      }
 
       setExecutions(
         data.map(row => ({
@@ -45,6 +59,7 @@ export function useActionExecutions({
           status: row.status,
           ok: row.ok,
           max_duration_ms: row.max_duration_ms,
+          created_at: row.created_at,
           owner_name: row.owner?.full_name ?? 'User',
           owner_avatar:
             row.owner?.avatar_url ?? '/avatars/default.jpg',
@@ -52,57 +67,51 @@ export function useActionExecutions({
       )
     }
 
-    load()
+    function startPolling() {
+      if (intervalId) return
 
-    const channel = supabase
-      .channel(
-        actionId
-          ? `action-executions-${actionId}`
-          : 'action-executions-all'
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'action_executions',
-          ...(actionId
-            ? { filter: `action_id=eq.${actionId}` }
-            : {}),
-        },
-        payload => {
-          setExecutions(prev => {
-            const existing = prev.filter(
-              e => e.id !== payload.new.id
-            )
+      console.debug('[useActionExecutions] polling started')
+      load('initial')
 
-            return [
-              {
-                id: payload.new.id,
-                execution_id: payload.new.execution_id,
-                action_id: payload.new.action_id,
-                status: payload.new.status,
-                ok: payload.new.ok,
-                max_duration_ms:
-                  payload.new.max_duration_ms,
-                owner_name:
-                  prev.find(e => e.id === payload.new.id)
-                    ?.owner_name ?? 'User',
-                owner_avatar:
-                  prev.find(e => e.id === payload.new.id)
-                    ?.owner_avatar ??
-                  '/avatars/default.jpg',
-              },
-              ...existing,
-            ].slice(0, limit)
-          })
-        }
-      )
-      .subscribe()
+      intervalId = setInterval(() => {
+        load('interval')
+      }, 3000)
+    }
+
+    function stopPolling() {
+      if (!intervalId) return
+
+      console.debug('[useActionExecutions] polling stopped')
+      clearInterval(intervalId)
+      intervalId = null
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        load('tab-visible')
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    // Initial state
+    if (document.visibilityState === 'visible') {
+      startPolling()
+    }
+
+    document.addEventListener(
+      'visibilitychange',
+      handleVisibilityChange
+    )
 
     return () => {
       mounted = false
-      supabase.removeChannel(channel)
+      stopPolling()
+      document.removeEventListener(
+        'visibilitychange',
+        handleVisibilityChange
+      )
     }
   }, [limit, actionId])
 

@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { TemplatesSheet } from '~/components/template-sheet';
 
 /* -------------------------------------
    Demo data
@@ -44,7 +45,7 @@ const data = {
 
 export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   const supabase = createSupabaseBrowserClient();
-
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const [activeActionId, setActiveActionId] = useState(null);
   const [query, setQuery] = useState('');
   const [actions, setActions] = useState([]);
@@ -185,8 +186,8 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         {/* Footer */}
         <div className="border-t px-3 py-2">
           <div className="flex flex-col gap-1">
+            <SidebarFooterItem icon={Blocks} label="Templates" onClick={() => setTemplatesOpen(true)} />
             <SidebarFooterItem icon={Settings2} label="Settings" />
-            <SidebarFooterItem icon={Blocks} label="Templates" />
             <SidebarFooterItem icon={MessageCircleQuestion} label="Help" />
           </div>
         </div>
@@ -200,6 +201,14 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             window.dispatchEvent(new Event('actions:resync'));
           }}
         />
+        <TemplatesSheet
+  open={templatesOpen}
+  onOpenChange={setTemplatesOpen}
+  onSelectTemplate={(template) => {
+    console.log('Selected template:', template)
+    // later: create action from template
+  }}
+/>
       </SidebarContent>
 
       <SidebarRail />
@@ -211,9 +220,12 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
    Footer item helper
 ------------------------------------- */
 
-function SidebarFooterItem({ icon: Icon, label }) {
+function SidebarFooterItem({ icon: Icon, label, onClick }) {
   return (
-    <button className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+    >
       <Icon className="h-4 w-4" />
       <span>{label}</span>
     </button>

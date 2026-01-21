@@ -28,7 +28,7 @@ export function SidebarRight({ activeAction, ...props }) {
     React.useState(false)
 
   const executions = useActionExecutions({
-    limit: 17,
+    limit: 19,
     actionId:
       onlyThisAction && activeAction
         ? activeAction.id

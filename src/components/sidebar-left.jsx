@@ -23,7 +23,7 @@ import { ActionListItem } from '@/components/action-list-item';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNowStrict } from 'date-fns';
-
+import { CreateActionDialog } from '@/components/create-action-dialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 const data = {
@@ -41,6 +41,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   const [query, setQuery] = useState('');
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false)
 
   /* -----------------------------
      Load actions (ONCE)
@@ -93,13 +94,15 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             </span>
 
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              title="Create new action"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+  variant="ghost"
+  size="icon"
+  className="h-7 w-7"
+  title="Create new action"
+  onClick={() => setCreateOpen(true)}
+>
+  <Plus className="h-4 w-4" />
+</Button>
+
           </div>
 
           <div className="relative">
@@ -160,9 +163,19 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             <SidebarFooterItem icon={MessageCircleQuestion} label="Help" />
           </div>
         </div>
+        <CreateActionDialog
+  open={createOpen}
+  onOpenChange={setCreateOpen}
+  onCreated={(action) => {
+    setActions((prev) => [action, ...prev])
+    onSelectAction?.(action)
+  }}
+/>
+
       </SidebarContent>
 
       <SidebarRail />
+    
     </Sidebar>
   );
 }

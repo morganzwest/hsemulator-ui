@@ -4,7 +4,7 @@ import * as React from 'react'
 
 import { NavUser } from '@/components/nav-user'
 import { ExecutionMiniCard } from '@/components/execution-mini-card'
-import { ExecutionDrawer } from '@/components/execution-drawer'
+import { ExecutionSheet } from '@/components/execution-drawer'
 import { useActionExecutions } from '@/lib/useActionExecutions'
 
 import {
@@ -139,7 +139,7 @@ export function SidebarRight({ activeAction, ...props }) {
       </Sidebar>
 
       {/* Execution drawer (mounted once) */}
-      <ExecutionDrawer
+      <ExecutionSheet
         executionId={openExecution?.id}
         open={!!openExecution}
         onOpenChange={open => {

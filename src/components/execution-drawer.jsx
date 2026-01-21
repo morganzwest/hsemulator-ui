@@ -93,7 +93,7 @@ export function ExecutionSheet({
         className="w-[50vw] max-w-[900px] min-w-[30vw] flex flex-col p-0"
       >
         {/* Header */}
-        <SheetHeader className="border-b px-6 py-4">
+        <SheetHeader className="border-b px-6 pl-4 pr-10">
           <div className="flex items-start justify-between gap-4">
             <div>
               <SheetTitle className="text-base font-semibold">

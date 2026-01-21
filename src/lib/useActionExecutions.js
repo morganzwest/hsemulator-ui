@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 
 const supabase = createSupabaseBrowserClient()
@@ -8,6 +8,7 @@ export function useActionExecutions({
   actionId = null,
 }) {
   const [executions, setExecutions] = useState([])
+  const seenIdsRef = useRef(new Set())
 
   useEffect(() => {
     let mounted = true
@@ -51,28 +52,34 @@ export function useActionExecutions({
         return
       }
 
-      setExecutions(
-        data.map(row => ({
-          id: row.id,
-          execution_id: row.execution_id,
-          action_id: row.action_id,
-          status: row.status,
-          ok: row.ok,
-          max_duration_ms: row.max_duration_ms,
-          created_at: row.created_at,
-          owner_name: row.owner?.full_name ?? 'User',
-          owner_avatar:
-            row.owner?.avatar_url ?? '/avatars/default.jpg',
-        }))
-      )
-    }
+      setExecutions(prev => {
+        const next = data.map(row => {
+          const isNew = !seenIdsRef.current.has(row.id)
+
+          return {
+            id: row.id,
+            execution_id: row.execution_id,
+            action_id: row.action_id,
+            status: row.status,
+            ok: row.ok,
+            max_duration_ms: row.max_duration_ms,
+            created_at: row.created_at,
+            owner_name: row.owner?.full_name ?? 'User',
+            owner_avatar:
+              row.owner?.avatar_url ?? '/avatars/default.jpg',
+            __isNew: isNew,
+          }
+        })
+
+        next.forEach(e => seenIdsRef.current.add(e.id))
+        return next
+      })
+    } // ✅ close load()
 
     function startPolling() {
       if (intervalId) return
 
-      console.debug('[useActionExecutions] polling started')
       load('initial')
-
       intervalId = setInterval(() => {
         load('interval')
       }, 3000)
@@ -80,8 +87,6 @@ export function useActionExecutions({
 
     function stopPolling() {
       if (!intervalId) return
-
-      console.debug('[useActionExecutions] polling stopped')
       clearInterval(intervalId)
       intervalId = null
     }
@@ -95,7 +100,6 @@ export function useActionExecutions({
       }
     }
 
-    // Initial state
     if (document.visibilityState === 'visible') {
       startPolling()
     }

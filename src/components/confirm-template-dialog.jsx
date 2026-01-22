@@ -41,19 +41,30 @@ export function ConfirmTemplateDialog({
   onConfirm,
 }) {
   const [language, setLanguage] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (!template) return
+
     if (template.languages.length === 1) {
       setLanguage(template.languages[0])
     } else {
       setLanguage(null)
     }
-  }, [template])
+
+    // reset when template or dialog changes
+    setSubmitting(false)
+  }, [template, open])
 
   if (!template) return null
 
-  const canConfirm = !!language
+  const canConfirm = !!language && !submitting
+
+  function handleConfirm() {
+    if (submitting) return
+    setSubmitting(true)
+    onConfirm(language)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -66,7 +77,6 @@ export function ConfirmTemplateDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Language selection */}
         {template.languages.length > 1 && (
           <div className="mt-4 space-y-2">
             <div className="text-sm font-medium">
@@ -90,15 +100,16 @@ export function ConfirmTemplateDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
+            disabled={submitting}
           >
             Cancel
           </Button>
 
           <Button
             disabled={!canConfirm}
-            onClick={() => onConfirm(language)}
+            onClick={handleConfirm}
           >
-            Create action
+            {submitting ? 'Creating…' : 'Create action'}
           </Button>
         </div>
       </DialogContent>

@@ -6,6 +6,17 @@ import YAML from 'yaml'
    Helpers
 ----------------------------- */
 
+function formatOutputFields(outputFields) {
+  if (!outputFields || Object.keys(outputFields).length === 0) return []
+
+  return [
+    '',
+    '--- Output Fields ---',
+    JSON.stringify(outputFields, null, 2),
+  ]
+}
+
+
 function formatTimestamp(ts) {
   if (!ts) return ''
   const ms =
@@ -460,12 +471,18 @@ export function useActionEditor({
 
     if (payload?.summary?.result) {
       const r = payload.summary.result
+
       lines.push('✔ Execution completed')
       lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
       lines.push(`Runs: ${r.runs}`)
       lines.push(`Duration: ${r.max_duration_ms} ms`)
       lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
+
+      if (r.outputFields) {
+        lines.push(...formatOutputFields(r.outputFields))
+      }
     }
+
 
     if (Array.isArray(payload?.events)) {
       lines.push('')

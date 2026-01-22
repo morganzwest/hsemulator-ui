@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { MonacoEditor } from '@/components/monaco-editor'
-import { Play, Save, Columns, Rows, Trash2 } from 'lucide-react'
+import { Play, Save, Star, Columns, Rows, Trash2 } from 'lucide-react'
 import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5'
 import { SiYaml } from 'react-icons/si'
 import { TbJson } from 'react-icons/tb'
@@ -15,8 +15,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-
+import { PlusCircle } from 'lucide-react'
 import { useActionEditor } from '@/lib/editor/use-action-editor'
+import { CreateActionDialog } from '@/components/create-action-dialog'
+
 
 /* -----------------------------
    Language icon
@@ -58,10 +60,11 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   const [split, setSplit] = useState('verticalS')
   const [splitSize, setSplitSize] = useState(60)
 
+  const [createOpen, setCreateOpen] = useState(false)
   const active = activeFile ? files[activeFile] : null
   const hasDirtyFiles = Object.values(files).some(f => f.dirty)
   const canRun = runtimeHealthy && !running
-
+  
   const { loadFiles, saveAllFiles, runFile } = useActionEditor({
     activeAction,
     files,
@@ -95,6 +98,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
       },
     }))
   }
+  
 
   async function handleSave() {
     await saveAllFiles(editorRef)
@@ -122,13 +126,46 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
       : { gridTemplateColumns: `${splitSize}% 4px 1fr` }
 
   if (!activeAction) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        Select an action to view its files
-      </div>
-    )
-  }
+  return (
+    <>
+      <div className="flex h-full items-center justify-center">
+        <div className="flex max-w-sm flex-col items-center text-center">
+          {/* Icon */}
+          <div className="mb-4 rounded-full bg-muted p-4">
+            <PlusCircle className="h-8 w-8 text-muted-foreground" />
+          </div>
 
+          {/* Text */}
+          <h3 className="text-sm font-medium">
+            No action selected
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Select an existing action to view its files, or create a new one to get started.
+          </p>
+
+          {/* Button */}
+          <Button
+            className="mt-6"
+            onClick={() => setCreateOpen(true)}
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Create New Action
+          </Button>
+        </div>
+      </div>
+
+      {/* Shared create dialog */}
+      <CreateActionDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          // 🔁 keep behaviour identical to sidebar
+          window.dispatchEvent(new Event('actions:resync'))
+        }}
+      />
+    </>
+  )
+}
   if (loadingFiles) {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -164,7 +201,10 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
         </Tabs>
 
         <div className="flex items-center gap-2">
-          <Button
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
             variant="ghost"
             size="icon"
             onClick={() =>
@@ -173,6 +213,29 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           >
             {split === 'horizontal' ? <Columns /> : <Rows />}
           </Button>
+            </TooltipTrigger>
+              <TooltipContent>
+                Swap the output view orientation to {split === 'horizontal' ? 'vertical' : 'horizontal'}
+              </TooltipContent>
+          </Tooltip>
+
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+            variant="ghost"
+            size="icon"
+            onClick={() =>
+              setSplit(split === 'horizontal' ? 'vertical' : 'horizontal')
+            }
+          >
+                        <Star className="mr-1 h-4 w-4" />
+          </Button>
+            </TooltipTrigger>
+              <TooltipContent>
+                Save as a Template
+              </TooltipContent>
+          </Tooltip>
 
           <Button
             variant="outline"

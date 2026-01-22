@@ -146,7 +146,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   }
 
   return (
-    <div className="flex h-[93vh] min-w-0 flex-col gap-3 overflow-hidden">
+    <div className="flex h-[90vh] min-w-0 flex-col gap-3 overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b pb-2">
         <Tabs value={activeFile} onValueChange={setActiveFile}>

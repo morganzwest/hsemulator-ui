@@ -35,9 +35,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const data = {
   projects: [
-    { name: 'Demo Portal', logo: GalleryVerticalEnd, id: '1' },
-    { name: 'Portal B', logo: AudioWaveform, id: '2' },
-    { name: 'Sandbox Portal', logo: Command, id: '3' },
+    { name: 'Personal Portal', logo: AudioWaveform, id: '1' },
+    { name: 'Demo Portal', logo: GalleryVerticalEnd, id: '2' },
+    { name: 'Client Portal', logo: Command, id: '3' },
   ],
 };
 

@@ -46,7 +46,7 @@ export function TeamSwitcher({
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-64 rounded-lg" align="start" side="bottom" sideOffset={4}>
             <DropdownMenuLabel className="text-muted-foreground text-xs">
-              Teams
+              HubSpot Portals
             </DropdownMenuLabel>
             {teams.map((team, index) => (
               <DropdownMenuItem key={team.name} onClick={() => setActiveTeam(team)} className="gap-2 p-2">

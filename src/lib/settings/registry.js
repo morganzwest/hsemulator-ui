@@ -48,18 +48,11 @@ export const EDITOR_SETTINGS = {
         { label: 'Amy', value: 'amy' },
 
         // Built-in Monaco themes (NO JSON, NO fetch)
-        { label: 'VS Code Dark', value: 'vs-dark' },
-        { label: 'VS Code Light', value: 'vs' },
+        { label: 'VS Code Dark', value: 'github-dark' },
+        { label: 'VS Code Light', value: 'github' },
         { label: 'High Contrast Dark', value: 'hc-black' },
       ],
-      default: 'vs-dark',
-    },
-
-    minimap: {
-      key: 'editor.minimap',
-      label: 'Minimap',
-      type: 'toggle',
-      default: true,
+      default: 'github-dark',
     },
 
     validateThemes: {

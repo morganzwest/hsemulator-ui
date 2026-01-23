@@ -59,7 +59,7 @@ export function SettingsSheet({ children }) {
         <span onClick={() => setOpen(true)}>{children}</span>
       </DrawerTrigger>
 
-      <DrawerContent className='fixed inset-y-0 right-0 min-w-[65vw] w-full p-0 flex flex-col rounded-none'>
+      <DrawerContent className='fixed inset-y-0 right-0 xl:min-w-[70vw] lg:min-w-[80vw] md:min-w-[100vw] w-full p-0 flex flex-col rounded-none'>
         {/* Header */}
         <DrawerHeader className='border-b px-6 py-4 flex flex-row items-center justify-between'>
           <DrawerTitle className='text-base'>Settings</DrawerTitle>

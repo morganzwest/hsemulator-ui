@@ -27,18 +27,18 @@ function log(...args) {
  */
 async function loadTheme(monaco, themeName) {
   if (loadedThemes.has(themeName)) {
-    log('Theme already loaded:', themeName)
+    console.debug('Theme already loaded:', themeName)
     return
   }
 
-  log('Loading theme:', themeName)
+  console.debug('Loading theme:', themeName)
 
   const res = await fetch(`/themes/${themeName}.json`)
   if (!res.ok) {
     if (THEME_OPTIONS.validate) {
-      console.error('[monaco-themes] Theme file missing:', themeName)
+      console.warn('[monaco-themes] Theme file missing:', themeName)
     } else {
-      log('Skipping missing theme:', themeName)
+      console.debug('Skipping missing theme:', themeName)
     }
     return
   }
@@ -72,14 +72,9 @@ export async function registerMonacoThemes(monaco) {
       'github-dark',
       'github',
     ]
-
-    log('Registering themes:', themes)
-
     for (const theme of themes) {
       await loadTheme(monaco, theme)
     }
-
-    log('Theme registration complete')
   })()
 
   return registrationPromise
@@ -87,7 +82,7 @@ export async function registerMonacoThemes(monaco) {
 
 export async function bootstrapMonacoTheme(monaco) {
   const theme = getCachedEditorTheme()
-  log('Bootstrapping cached theme:', theme)
+  console.debug('Bootstrapping cached theme:', theme)
 
   if (!theme) return
 
@@ -100,9 +95,6 @@ export async function bootstrapMonacoTheme(monaco) {
 
 export async function setMonacoTheme(monaco, themeName) {
   if (!themeName) return
-
-  log('Theme switch requested:', themeName)
-
   await registerMonacoThemes(monaco)
   await loadTheme(monaco, themeName)
 

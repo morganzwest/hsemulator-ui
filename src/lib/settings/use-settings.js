@@ -16,26 +16,6 @@ function getDefaults() {
   return defaults
 }
 
-export function useSettings() {
-  const [settings, setSettings] = useState(() => ({
-    ...getDefaults(),
-    ...loadSettings(),
-  }))
-
-  useEffect(() => {
-    saveSettings(settings)
-  }, [settings])
-
-  const set = useCallback((key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
-  }, [])
-
-  return { settings, set }
-}
-
 /* Used BEFORE Monaco mounts */
 export function getCachedEditorTheme() {
   if (typeof window === 'undefined') return null

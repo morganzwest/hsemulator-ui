@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import Editor from '@monaco-editor/react'
-import { useSettings } from '@/lib/settings/use-settings'
+import { useSettingsContext as useSettings } from '@/lib/settings/settings-provider'
 import {
   registerMonacoThemes,
   bootstrapMonacoTheme,
@@ -22,6 +22,30 @@ export function MonacoEditor({
   const { settings } = useSettings()
 
   /* -------------------------------------
+     Remount key (ALL non-theme settings)
+  ------------------------------------- */
+
+  const editorKey = useMemo(() => {
+    return [
+      settings['editor.fontSize'],
+      settings['editor.lineHeight'],
+      settings['editor.minimap'],
+      settings['editor.wordWrap'],
+      settings['editor.smoothScrolling'],
+      settings['editor.renderWhitespace'],
+      settings['editor.bracketColorization'],
+    ].join(':')
+  }, [
+    settings['editor.fontSize'],
+    settings['editor.lineHeight'],
+    settings['editor.minimap'],
+    settings['editor.wordWrap'],
+    settings['editor.smoothScrolling'],
+    settings['editor.renderWhitespace'],
+    settings['editor.bracketColorization'],
+  ])
+
+  /* -------------------------------------
      Resize handling
   ------------------------------------- */
 
@@ -37,66 +61,67 @@ export function MonacoEditor({
   }, [])
 
   /* -------------------------------------
-     Apply editor options reactively
-     (NOT theme)
-  ------------------------------------- */
-
-  useEffect(() => {
-    if (!editorRef.current || !monacoRef.current) return
-
-    editorRef.current.updateOptions({
-      fontSize: settings['editor.fontSize'],
-      lineHeight: settings['editor.lineHeight'],
-      fontFamily: settings['editor.fontFamily'],
-
-      minimap: { enabled: settings['editor.minimap'] },
-      wordWrap: settings['editor.wordWrap'] ? 'on' : 'off',
-      smoothScrolling: settings['editor.smoothScrolling'],
-      renderWhitespace: settings['editor.renderWhitespace']
-        ? 'all'
-        : 'none',
-      bracketPairColorization: {
-        enabled: settings['editor.bracketColorization'],
-      },
-    })
-  }, [settings])
-
-  /* -------------------------------------
      Render
   ------------------------------------- */
 
   return (
     <div ref={containerRef} className="h-full w-full overflow-hidden">
       <Editor
+        key={editorKey}
         height="100%"
         value={value}
         language={language}
-
-        /* 🔑 DO NOT set theme prop (prevents flash) */
         theme={undefined}
 
         onMount={async (editor, monaco) => {
           editorRef.current = editor
           monacoRef.current = monaco
-
-          // Expose for settings page + commands
           window.monaco = monaco
 
-          /* 1️⃣ Register all themes (once) */
-          await registerMonacoThemes(monaco)
-
-          /* 2️⃣ Apply cached theme BEFORE first paint */
-          await bootstrapMonacoTheme(monaco)
-
-          onMount?.(editor)
-
-          /* Restore cursor + scroll position */
+          /* Restore view state */
           if (viewStateRef.current) {
             editor.restoreViewState(viewStateRef.current)
             editor.focus()
           }
 
-          /* Better JS defaults */
+          /* Static + user preferences (construction-time only) */
+          editor.updateOptions({
+            scrollBeyondLastLine: false,
+            cursorSmoothCaretAnimation: 'on',
+            renderLineHighlight: 'all',
+            wrappingIndent: 'indent',
+            tabSize: 2,
+            insertSpaces: true,
+            autoClosingBrackets: 'always',
+            autoClosingQuotes: 'always',
+            matchBrackets: 'always',
+            formatOnPaste: true,
+            formatOnType: true,
+            suggestOnTriggerCharacters: true,
+            quickSuggestions: true,
+
+            fontSize: Number(settings['editor.fontSize']),
+            lineHeight: Number(settings['editor.lineHeight']),
+            minimap: {
+              enabled: Boolean(settings['editor.minimap']),
+            },
+            wordWrap: settings['editor.wordWrap'] ? 'on' : 'off',
+            smoothScrolling: Boolean(settings['editor.smoothScrolling']),
+            renderWhitespace: settings['editor.renderWhitespace']
+              ? 'all'
+              : 'none',
+            bracketPairColorization: {
+              enabled: Boolean(settings['editor.bracketColorization']),
+            },
+          })
+
+          /* Themes (no remount required) */
+          await registerMonacoThemes(monaco)
+          await bootstrapMonacoTheme(monaco)
+
+          onMount?.(editor)
+
+          /* Language-specific defaults */
           if (language === 'javascript') {
             monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
               allowNonTsExtensions: true,
@@ -104,60 +129,44 @@ export function MonacoEditor({
             })
           }
 
-          /* Save shortcut */
+          /* Shortcuts */
           editor.addCommand(
             monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
             () =>
               editor
                 .getAction('editor.action.formatDocument')
-                ?.run()
+                ?.run(),
           )
 
-          /* Run shortcut */
           editor.addCommand(
             monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
             () =>
               document.dispatchEvent(
-                new CustomEvent('editor:run')
-              )
+                new CustomEvent('editor:run'),
+              ),
           )
 
-          /* Word wrap toggle */
           editor.addCommand(
             monaco.KeyMod.Alt | monaco.KeyCode.KeyZ,
             () => {
               const current = editor.getOption(
-                monaco.editor.EditorOption.wordWrap
+                monaco.editor.EditorOption.wordWrap,
               )
 
               editor.updateOptions({
                 wordWrap: current === 'on' ? 'off' : 'on',
               })
-            }
+            },
           )
         }}
 
         onChange={(v) => onChange?.(v ?? '')}
 
         onBlur={() => {
-          viewStateRef.current =
-            editorRef.current?.saveViewState()
-        }}
-
-        options={{
-          scrollBeyondLastLine: false,
-          cursorSmoothCaretAnimation: 'on',
-          renderLineHighlight: 'all',
-          wrappingIndent: 'indent',
-          tabSize: 2,
-          insertSpaces: true,
-          autoClosingBrackets: 'always',
-          autoClosingQuotes: 'always',
-          matchBrackets: 'always',
-          formatOnPaste: true,
-          formatOnType: true,
-          suggestOnTriggerCharacters: true,
-          quickSuggestions: true,
+          if (editorRef.current) {
+            viewStateRef.current =
+              editorRef.current.saveViewState()
+          }
         }}
       />
     </div>

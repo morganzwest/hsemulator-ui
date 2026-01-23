@@ -28,6 +28,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { TemplatesSheet } from '~/components/template-sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SettingsSheet } from '@/components/settings/settings-sheet'
 
 /* -------------------------------------
    Demo data
@@ -53,6 +54,8 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
 
   /* -----------------------------
      Load actions (reusable)
@@ -200,10 +203,12 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         label="Templates"
         onClick={() => setTemplatesOpen(true)}
       />
-      <SidebarFooterItem
-        icon={Settings2}
-        label="Settings"
-      />
+      <SettingsSheet>
+  <SidebarFooterItem
+    icon={Settings2}
+    label="Settings"
+  />
+</SettingsSheet>
       <SidebarFooterItem
         icon={MessageCircleQuestion}
         label="Help"
@@ -230,6 +235,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
     }}
     portalId='1234567'
   />
+
 </SidebarContent>
 
       <SidebarRail />
@@ -262,7 +268,7 @@ function SidebarFooterItem({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className='flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground'
+      className='flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground w-full'
     >
       <Icon className='h-4 w-4' />
       <span>{label}</span>

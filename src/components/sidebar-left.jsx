@@ -228,6 +228,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
     onSelectTemplate={(template) => {
       console.log('Selected template:', template)
     }}
+    portalId='1234567'
   />
 </SidebarContent>
 

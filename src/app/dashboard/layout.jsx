@@ -5,3 +5,4 @@ export default function DashboardLayout({ children }) {
 }
 
 export const metadata = { title: 'Action Editor' }
+

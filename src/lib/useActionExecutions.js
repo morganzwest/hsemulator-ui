@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
+import { toast } from 'sonner'
 
 const supabase = createSupabaseBrowserClient()
 
@@ -9,6 +10,9 @@ export function useActionExecutions({
 }) {
   const [executions, setExecutions] = useState([])
   const seenIdsRef = useRef(new Set())
+
+  // Prevent repeated toasts during polling
+  const lastErrorRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -48,12 +52,29 @@ export function useActionExecutions({
       if (!mounted) return
 
       if (error) {
-        console.error('[useActionExecutions] load failed', error)
+        console.error(
+          '[useActionExecutions] load failed',
+          error
+        )
+
+        const message =
+          error.message ||
+          'Failed to load action executions'
+
+        // Deduplicate identical polling errors
+        if (lastErrorRef.current !== message) {
+          toast.error(message)
+          lastErrorRef.current = message
+        }
+
         return
       }
 
+      // Reset error state on successful fetch
+      lastErrorRef.current = null
+
       setExecutions(prev => {
-        const next = data.map(row => {
+        const next = (data ?? []).map(row => {
           const isNew = !seenIdsRef.current.has(row.id)
 
           return {
@@ -66,7 +87,8 @@ export function useActionExecutions({
             created_at: row.created_at,
             owner_name: row.owner?.full_name ?? 'User',
             owner_avatar:
-              row.owner?.avatar_url ?? '/avatars/default.jpg',
+              row.owner?.avatar_url ??
+              '/avatars/default.jpg',
             __isNew: isNew,
           }
         })
@@ -74,7 +96,7 @@ export function useActionExecutions({
         next.forEach(e => seenIdsRef.current.add(e.id))
         return next
       })
-    } // ✅ close load()
+    }
 
     function startPolling() {
       if (intervalId) return

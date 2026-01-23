@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
+import { toast } from 'sonner'
 
 const supabase = createSupabaseBrowserClient()
 
@@ -9,12 +12,16 @@ export function useExecutionDetails(executionId) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  // Prevent duplicate error toasts for the same execution
+  const lastErrorRef = useRef(null)
+
   useEffect(() => {
     if (!executionId) return
 
     let mounted = true
     setLoading(true)
     setError(null)
+    lastErrorRef.current = null
 
     async function load() {
       try {
@@ -78,7 +85,6 @@ export function useExecutionDetails(executionId) {
           .order('event_time', { ascending: true })
 
         if (eventsError) throw eventsError
-
         if (!mounted) return
 
         setExecution({
@@ -124,6 +130,17 @@ export function useExecutionDetails(executionId) {
 
         setError(err)
         setLoading(false)
+
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Failed to load execution details'
+
+        // Avoid duplicate toasts for the same failure
+        if (lastErrorRef.current !== message) {
+          toast.error(message)
+          lastErrorRef.current = message
+        }
       }
     }
 

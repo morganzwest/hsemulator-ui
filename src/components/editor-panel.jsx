@@ -204,7 +204,6 @@ async function handleSaveTemplate() {
       description: 'Saved from editor',
       files,
     })
-
     setTemplateSaved(true)
 
     // optional: reset after a moment

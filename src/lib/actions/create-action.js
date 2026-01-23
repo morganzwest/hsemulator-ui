@@ -1,4 +1,5 @@
 import YAML from 'yaml'
+import { toast } from 'sonner'
 
 const MAX_NAME = 32
 const MAX_DESC = 64
@@ -41,12 +42,28 @@ export async function createAction({
   description,
   language,
 }) {
-  if (!name || name.length > MAX_NAME) {
+  /* -------------------------------
+     Validation (Warnings / Errors)
+  -------------------------------- */
+
+  if (!name) {
+    toast.warning('Action name is required')
     throw new Error('Invalid name')
   }
 
+  if (name.length > MAX_NAME) {
+    toast.warning(`Action name must be ≤ ${MAX_NAME} characters`)
+    throw new Error('Invalid name length')
+  }
+
   if (description && description.length > MAX_DESC) {
-    throw new Error('Invalid description')
+    toast.warning(`Description must be ≤ ${MAX_DESC} characters`)
+    throw new Error('Invalid description length')
+  }
+
+  if (!portalId) {
+    toast.error('Portal ID is missing')
+    throw new Error('Missing portal ID')
   }
 
   const config = buildConfig(language)
@@ -61,36 +78,58 @@ export async function createAction({
         : `def main(event):\n    return {"ok": True}\n`,
   }
 
-  const { data: action, error } = await supabase
-    .from('actions')
-    .insert({
-      owner_id: ownerId,
-      portal_id: portalId,
-      name,
-      description,
-      language,
-      filepath: '',
-      config,
-    })
-    .select()
-    .single()
+  /* -------------------------------
+     Promise Toast (Main Flow)
+  -------------------------------- */
 
-  if (error) throw error
+  return toast.promise(
+    (async () => {
+      toast.info('Creating action record')
 
-  const basePath = `${ownerId}/${action.id}`
+      const { data: action, error } = await supabase
+        .from('actions')
+        .insert({
+          owner_id: ownerId,
+          portal_id: portalId,
+          name,
+          description,
+          language,
+          filepath: '',
+          config,
+        })
+        .select()
+        .single()
 
-  for (const [path, contents] of Object.entries(files)) {
-    const { error: uploadError } = await supabase.storage
-      .from('actions')
-      .upload(`${basePath}/${path}`, contents, {
-        contentType: 'text/plain',
-        upsert: false,
-      })
+      if (error) {
+        throw new Error(error.message || 'Failed to create action')
+      }
 
-    if (uploadError) throw uploadError
-  }
+      const basePath = `${ownerId}/${action.id}`
 
-  window.dispatchEvent(new Event('actions:resync'));
+      for (const [path, contents] of Object.entries(files)) {
+        const { error: uploadError } = await supabase.storage
+          .from('actions')
+          .upload(`${basePath}/${path}`, contents, {
+            contentType: 'text/plain',
+            upsert: false,
+          })
 
-  return action
+        if (uploadError) {
+          throw new Error(`Upload failed: ${path}`)
+        }
+      }
+
+      window.dispatchEvent(new Event('actions:resync'))
+
+      return action
+    })(),
+    {
+      loading: 'Creating action…',
+      success: (action) => `Action "${action.name}" created successfully`,
+      error: (err) =>
+        err instanceof Error
+          ? err.message
+          : 'Something went wrong while creating the action',
+    }
+  )
 }

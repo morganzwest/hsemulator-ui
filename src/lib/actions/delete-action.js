@@ -1,28 +1,65 @@
 'use client'
 
+import { toast } from 'sonner'
+
 export async function deleteAction({
   supabase,
   ownerId,
   actionId,
 }) {
-  // 1. Delete storage files
-  const { data: files } = await supabase.storage
-    .from('actions')
-    .list(`${ownerId}/${actionId}`)
-
-  if (files?.length) {
-    await supabase.storage
-      .from('actions')
-      .remove(files.map(f => `${ownerId}/${actionId}/${f.name}`))
+  if (!ownerId || !actionId) {
+    toast.error('Missing action details')
+    throw new Error('Missing ownerId or actionId')
   }
 
-  // 2. Delete DB record
-  const { error } = await supabase
-    .from('actions')
-    .delete()
-    .eq('id', actionId)
+  return toast.promise(
+    (async () => {
+      /* -------------------------------------
+         Delete storage files (best-effort)
+      ------------------------------------- */
 
-  window.dispatchEvent(new Event('actions:resync'));
+      const { data: files, error: listError } = await supabase.storage
+        .from('actions')
+        .list(`${ownerId}/${actionId}`)
 
-  if (error) throw error
+      if (listError) {
+        throw new Error('Failed to read action storage')
+      }
+
+      if (files?.length) {
+        const { error: removeError } = await supabase.storage
+          .from('actions')
+          .remove(
+            files.map(f => `${ownerId}/${actionId}/${f.name}`)
+          )
+
+        if (removeError) {
+          throw new Error('Failed to delete action files')
+        }
+      }
+
+      /* -------------------------------------
+         Delete DB record (authoritative)
+      ------------------------------------- */
+
+      const { error: deleteError } = await supabase
+        .from('actions')
+        .delete()
+        .eq('id', actionId)
+
+      if (deleteError) {
+        throw new Error(deleteError.message || 'Failed to delete action')
+      }
+
+      window.dispatchEvent(new Event('actions:resync'))
+    })(),
+    {
+      loading: 'Deleting action…',
+      success: 'Action deleted successfully',
+      error: (err) =>
+        err instanceof Error
+          ? err.message
+          : 'Failed to delete action',
+    }
+  )
 }

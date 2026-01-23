@@ -1,5 +1,6 @@
 import YAML from 'yaml'
 import slugify from 'slugify'
+import { toast } from 'sonner'
 
 const MAX_NAME = 64
 const MAX_DESC = 256
@@ -41,15 +42,27 @@ export async function createPrivateTemplate({
   description,
   files,
 }) {
-  if (!name || name.length > MAX_NAME) {
-    throw new Error('Invalid template name')
+  /* -------------------------------------
+     Validation (Warnings)
+  ------------------------------------- */
+
+  if (!name) {
+    toast.warning('Template name is required')
+    throw new Error('Missing template name')
+  }
+
+  if (name.length > MAX_NAME) {
+    toast.warning(`Template name must be ≤ ${MAX_NAME} characters`)
+    throw new Error('Template name too long')
   }
 
   if (description && description.length > MAX_DESC) {
-    throw new Error('Invalid description')
+    toast.warning(`Description must be ≤ ${MAX_DESC} characters`)
+    throw new Error('Description too long')
   }
 
   if (!files || typeof files !== 'object') {
+    toast.error('Editor files are missing or invalid')
     throw new Error('Missing editor files')
   }
 
@@ -62,6 +75,7 @@ export async function createPrivateTemplate({
   const eventJsonRaw = files['event.json']?.value
 
   if (!eventJsonRaw) {
+    toast.error('event.json is required to create a template')
     throw new Error('Missing event.json')
   }
 
@@ -70,7 +84,20 @@ export async function createPrivateTemplate({
   if (pyAction) languages.push('python')
 
   if (languages.length === 0) {
-    throw new Error('Template must contain at least one action')
+    toast.warning('Template must include at least one action file')
+    throw new Error('No action source provided')
+  }
+
+  /* -------------------------------------
+     Parse event.json safely
+  ------------------------------------- */
+
+  let parsedEventJson
+  try {
+    parsedEventJson = JSON.parse(eventJsonRaw)
+  } catch {
+    toast.error('event.json contains invalid JSON')
+    throw new Error('Invalid event.json')
   }
 
   /* -------------------------------------
@@ -86,31 +113,46 @@ export async function createPrivateTemplate({
     : null
 
   /* -------------------------------------
-     Insert template
+     Insert template (Promise Toast)
   ------------------------------------- */
 
-  const slug = slugify(name, { lower: true, strict: true })
+  return toast.promise(
+    (async () => {
+      const slug = slugify(ownerId + '_' + name, { lower: true, strict: true })
 
-  const { data: template, error } = await supabase
-    .from('action_templates')
-    .insert({
-      name,
-      description,
-      slug,
-      created_by: ownerId,
-      visibility: 'private',
-      languages,
-      js_action: jsAction,
-      py_action: pyAction,
-      event_json: JSON.parse(eventJsonRaw),
-      config_yaml_js: configYamlJs,
-      config_yaml_py: configYamlPy,
-      version: 1,
-    })
-    .select()
-    .single()
+      const { data: template, error } = await supabase
+        .from('action_templates')
+        .insert({
+          name,
+          description,
+          slug,
+          created_by: ownerId,
+          visibility: 'private',
+          languages,
+          js_action: jsAction,
+          py_action: pyAction,
+          event_json: parsedEventJson,
+          config_yaml_js: configYamlJs,
+          config_yaml_py: configYamlPy,
+          version: 1,
+        })
+        .select()
+        .single()
 
-  if (error) throw error
+      if (error) {
+        throw new Error(error.message || 'Failed to create template')
+      }
 
-  return template
+      return template
+    })(),
+    {
+      loading: 'Creating private template…',
+      success: (template) =>
+        `Template "${template.name}" created successfully`,
+      error: (err) =>
+        err instanceof Error
+          ? err.message
+          : 'Failed to create template',
+    }
+  )
 }

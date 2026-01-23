@@ -26,6 +26,7 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { TemplatesSheet } from '~/components/template-sheet';
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 /* -------------------------------------
    Demo data
@@ -145,71 +146,92 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
       </SidebarHeader>
 
       {/* Content */}
-      <SidebarContent className="flex flex-col">
-        <div className="flex-1 overflow-auto space-y-1 px-1">
-          {loading ? (
-            <div className="px-4 py-6 text-xs text-muted-foreground">
-              Loading actions…
-            </div>
-          ) : filteredActions.length > 0 ? (
-            filteredActions.map((action) => (
-              <ActionListItem
-                key={action.id}
-                action={{
-                  id: action.id,
-                  owner_id: action.owner_id,
-                  title: action.name,
-                  description: action.description,
-                  updatedAt: formatDistanceToNowStrict(
-                    new Date(action.updated_at),
-                    { addSuffix: true },
-                  ),
-                  type:
-                    action.language === 'javascript'
-                      ? 'JavaScript'
-                      : 'Python',
-                }}
-                active={action.id === activeActionId}
-                onClick={() => {
-                  setActiveActionId(action.id);
-                  onSelectAction?.(action);
-                }}
-              />
-            ))
-          ) : (
-            <div className="px-4 py-6 text-xs text-muted-foreground">
-              No actions found
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t px-3 py-2">
-          <div className="flex flex-col gap-1">
-            <SidebarFooterItem icon={Blocks} label="Templates" onClick={() => setTemplatesOpen(true)} />
-            <SidebarFooterItem icon={Settings2} label="Settings" />
-            <SidebarFooterItem icon={MessageCircleQuestion} label="Help" />
+      <SidebarContent className="flex flex-col h-full">
+  {/* ---------------------------------
+     Actions list (ONLY scrollable area)
+  --------------------------------- */}
+  <div className="flex-1 min-h-0">
+    <ScrollArea className="h-full px-1">
+      <div className="space-y-1">
+        {loading ? (
+          <div className="px-4 py-6 text-xs text-muted-foreground">
+            Loading actions…
           </div>
-        </div>
+        ) : filteredActions.length > 0 ? (
+          filteredActions.map((action) => (
+            <ActionListItem
+              key={action.id}
+              action={{
+                id: action.id,
+                owner_id: action.owner_id,
+                title: action.name,
+                description: action.description,
+                updatedAt: formatDistanceToNowStrict(
+                  new Date(action.updated_at),
+                  { addSuffix: true },
+                ),
+                type:
+                  action.language === 'javascript'
+                    ? 'JavaScript'
+                    : 'Python',
+              }}
+              active={action.id === activeActionId}
+              onClick={() => {
+                setActiveActionId(action.id)
+                onSelectAction?.(action)
+              }}
+            />
+          ))
+        ) : (
+          <div className="px-4 py-6 text-xs text-muted-foreground">
+            No actions found
+          </div>
+        )}
+      </div>
+    </ScrollArea>
+  </div>
 
-        {/* Create dialog */}
-        <CreateActionDialog
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          onCreated={() => {
-            // 🔁 Canonical refresh
-            window.dispatchEvent(new Event('actions:resync'));
-          }}
-        />
-        <TemplatesSheet
-  open={templatesOpen}
-  onOpenChange={setTemplatesOpen}
-  onSelectTemplate={(template) => {
-    console.log('Selected template:', template)
-    // later: create action from template
-  }}
-/>
-      </SidebarContent>
+  {/* ---------------------------------
+     Footer (NON-scrollable)
+  --------------------------------- */}
+  <div className="border-t px-3 py-2">
+    <div className="flex flex-col gap-1">
+      <SidebarFooterItem
+        icon={Blocks}
+        label="Templates"
+        onClick={() => setTemplatesOpen(true)}
+      />
+      <SidebarFooterItem
+        icon={Settings2}
+        label="Settings"
+      />
+      <SidebarFooterItem
+        icon={MessageCircleQuestion}
+        label="Help"
+      />
+    </div>
+  </div>
+
+  {/* ---------------------------------
+     Modals / Sheets (portals)
+  --------------------------------- */}
+  <CreateActionDialog
+    open={createOpen}
+    onOpenChange={setCreateOpen}
+    onCreated={() => {
+      window.dispatchEvent(new Event('actions:resync'))
+    }}
+  />
+
+  <TemplatesSheet
+    open={templatesOpen}
+    onOpenChange={setTemplatesOpen}
+    onSelectTemplate={(template) => {
+      console.log('Selected template:', template)
+    }}
+  />
+</SidebarContent>
+
 
       <SidebarRail />
     </Sidebar>

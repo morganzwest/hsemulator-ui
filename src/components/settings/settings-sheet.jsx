@@ -52,7 +52,7 @@ export function SettingsSheet({ children }) {
       direction='right'
       open={open}
       onOpenChange={setOpen}
-      dismissible={false}
+      dismissible={true}
       closeOnOutsideClick
     >
       <DrawerTrigger asChild>

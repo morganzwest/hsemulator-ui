@@ -1,42 +1,42 @@
-'use client';
+'use client'
 
-import { useCallback, useEffect, useState } from 'react';
-import { loadSettings, saveSettings } from './store';
-import { EDITOR_SETTINGS } from './registry';
-export { useSettingsContext as useSettings } from './settings-provider';
+import { useCallback, useEffect, useState } from 'react'
+import { loadSettings, saveSettings } from './store'
+import { EDITOR_SETTINGS } from './registry'
 
 function getDefaults() {
-  const defaults = {};
+  const defaults = {}
 
   Object.values(EDITOR_SETTINGS).forEach((group) => {
     Object.values(group).forEach((setting) => {
-      defaults[setting.key] = setting.default;
-    });
-  });
+      defaults[setting.key] = setting.default
+    })
+  })
 
-  return defaults;
+  return defaults
 }
 
-function useSettings() {
+export function useSettings() {
   const [settings, setSettings] = useState(() => ({
     ...getDefaults(),
     ...loadSettings(),
-  }));
+  }))
 
   useEffect(() => {
-    saveSettings(settings);
-  }, [settings]);
+    saveSettings(settings)
+  }, [settings])
 
   const set = useCallback((key, value) => {
     setSettings((prev) => ({
       ...prev,
       [key]: value,
-    }));
-  }, []);
+    }))
+  }, [])
 
-  return { settings, set };
+  return { settings, set }
 }
 
+/* Used BEFORE Monaco mounts */
 export function getCachedEditorTheme() {
   if (typeof window === 'undefined') return null
 

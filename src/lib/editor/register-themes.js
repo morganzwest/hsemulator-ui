@@ -1,11 +1,14 @@
 // src/lib/editor/register-themes.js
 // Client-side only – call from Monaco onMount
+import { getCachedEditorTheme } from '@/lib/settings/use-settings'
 
 const loadedThemes = new Set()
 let registrationPromise = null
+
 const THEME_OPTIONS = {
-  validate: true, // default behaviour
+  validate: true,
 }
+
 export function configureMonacoThemes(options = {}) {
   Object.assign(THEME_OPTIONS, options)
   console.log('[monaco-themes] Config updated:', THEME_OPTIONS)
@@ -17,21 +20,6 @@ export function configureMonacoThemes(options = {}) {
 
 function log(...args) {
   console.log('[monaco-themes]', ...args)
-}
-
-function getCachedEditorTheme() {
-  if (typeof window === 'undefined') return null
-
-  try {
-    const raw = localStorage.getItem('settings')
-    if (!raw) return null
-
-    const settings = JSON.parse(raw)
-    return settings?.['editor.theme'] ?? null
-  } catch (err) {
-    console.warn('[monaco-themes] Failed to read cached theme', err)
-    return null
-  }
 }
 
 /**
@@ -56,13 +44,10 @@ async function loadTheme(monaco, themeName) {
   }
 
   const themeData = await res.json()
-
-  log('Defining Monaco theme:', themeName)
   monaco.editor.defineTheme(themeName, themeData)
 
   loadedThemes.add(themeName)
 }
-
 
 /* -------------------------------------
    Public API
@@ -70,10 +55,7 @@ async function loadTheme(monaco, themeName) {
 
 export async function registerMonacoThemes(monaco) {
   if (typeof window === 'undefined') return
-  if (registrationPromise) {
-    log('Theme registration already in progress')
-    return registrationPromise
-  }
+  if (registrationPromise) return registrationPromise
 
   registrationPromise = (async () => {
     const themes = [
@@ -112,9 +94,9 @@ export async function bootstrapMonacoTheme(monaco) {
   await registerMonacoThemes(monaco)
   await loadTheme(monaco, theme)
 
-  log('Applying theme:', theme)
   monaco.editor.setTheme(theme)
 }
+
 
 export async function setMonacoTheme(monaco, themeName) {
   if (!themeName) return
@@ -124,6 +106,5 @@ export async function setMonacoTheme(monaco, themeName) {
   await registerMonacoThemes(monaco)
   await loadTheme(monaco, themeName)
 
-  log('Applying theme:', themeName)
   monaco.editor.setTheme(themeName)
 }

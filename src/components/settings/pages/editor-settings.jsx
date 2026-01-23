@@ -24,7 +24,7 @@ import { Minus, Plus, RotateCcw } from 'lucide-react'
 const EDITOR_DEFAULTS = {
   'editor.fontSize': 14,
   'editor.lineHeight': 22,
-  'editor.theme': 'vs-dark',
+  'editor.theme': 'github-dark',
   'editor.minimap': false,
   'editor.wordWrap': false,
   'editor.smoothScrolling': true,
@@ -46,7 +46,7 @@ const THEMES = [
 
   // Popular but slightly more opinionated
   { id: 'oceanic-next', name: 'Oceanic Next', color: '#1b2b34' }, // Oceanic Next bg
-  { id: 'cobalt2', name: 'Cobalt 2', color: '#193549' },          // Cobalt 2 deep blue
+  { id: 'cobalt2', name: 'Cobalt', color: '#193549' },          // Cobalt 2 deep blue
   { id: 'solarized-dark', name: 'Solarized Dark', color: '#002b36' }, // Solarized base03
 
   // Niche / stylistic

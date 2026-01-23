@@ -27,7 +27,7 @@ function StatusIcon({ status, ok }) {
 
 export function ExecutionMiniCard({ execution, isCurrentAction, onOpen }) {
   const {
-    execution_id,
+    id,
     status,
     ok,
     max_duration_ms,
@@ -77,7 +77,7 @@ export function ExecutionMiniCard({ execution, isCurrentAction, onOpen }) {
                 )}
               />
               <span className="truncate">
-                {execution_id?.slice(0, 12)}
+                {id?.slice(0, 12)}...
               </span>
             </div>
 

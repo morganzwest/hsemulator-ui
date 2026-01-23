@@ -104,7 +104,6 @@ export async function createActionFromTemplate({
 
   return toast.promise(
     (async () => {
-      toast.info('Creating action record')
 
       const { data: action, error } = await supabase
         .from('actions')
@@ -126,8 +125,6 @@ export async function createActionFromTemplate({
       }
 
       const basePath = `${ownerId}/${action.id}`
-
-      toast.info('Uploading action files')
 
       const files = {
         'config.yaml': configYaml,

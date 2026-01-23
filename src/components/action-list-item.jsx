@@ -51,7 +51,7 @@ export function ActionListItem({ action, active, onClick }) {
             {action.title}
           </span>
 
-          <span className="line-clamp-2 text-xs text-muted-foreground">
+          <span className="line-clamp-2 max-w-[85%] text-xs text-muted-foreground">
             {action.description}
           </span>
         </div>

@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Braces, Terminal } from 'lucide-react'
+import { Braces, Terminal, AlertTriangle } from 'lucide-react'
 
 /* -------------------------------------
    Language radio
@@ -57,13 +57,22 @@ export function ConfirmTemplateDialog({
   cancelLabel = 'Cancel',
 
   /**
+   * default | destructive
+   */
+  variant = 'default',
+
+  /**
    * If false, language selection is skipped entirely
-   * (useful for delete / generic confirmations)
+   * (forced to false for destructive actions)
    */
   requireLanguage = true,
 }) {
   const [language, setLanguage] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const isDestructive = variant === 'destructive'
+  const effectiveRequireLanguage =
+    isDestructive ? false : requireLanguage
 
   /* -----------------------------
      Reset state on open/template
@@ -72,31 +81,35 @@ export function ConfirmTemplateDialog({
   useEffect(() => {
     if (!template) return
 
-    if (requireLanguage && template.languages?.length === 1) {
+    if (
+      effectiveRequireLanguage &&
+      template.languages?.length === 1
+    ) {
       setLanguage(template.languages[0])
     } else {
       setLanguage(null)
     }
 
     setSubmitting(false)
-  }, [template, open, requireLanguage])
+  }, [template, open, effectiveRequireLanguage])
 
   if (!template) return null
 
   const canConfirm =
     !submitting &&
-    (!requireLanguage || !!language)
+    (!effectiveRequireLanguage || !!language)
 
   function handleConfirm() {
     if (submitting) return
     setSubmitting(true)
 
-    // Pass language only if relevant
-    onConfirm(requireLanguage ? language : undefined)
+    onConfirm(
+      effectiveRequireLanguage ? language : undefined,
+    )
   }
 
   /* -----------------------------
-     Default description
+     Description resolution
   ----------------------------- */
 
   const resolvedDescription =
@@ -105,7 +118,11 @@ export function ConfirmTemplateDialog({
       : description ?? (
           <>
             This will create a new action from the template
-            <span className="font-medium"> {template.name}</span>.
+            <span className="font-medium">
+              {' '}
+              {template.name}
+            </span>
+            .
           </>
         )
 
@@ -113,14 +130,37 @@ export function ConfirmTemplateDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle
+            className={cn(
+              isDestructive && 'text-destructive',
+            )}
+          >
+            {title}
+          </DialogTitle>
+
           <DialogDescription>
             {resolvedDescription}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Destructive warning */}
+        {isDestructive && (
+          <div className="mt-4 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <div>
+              <div className="font-medium text-destructive">
+                This action is permanent
+              </div>
+              <div className="text-muted-foreground">
+                This cannot be undone. All associated data will
+                be removed.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Language selection (optional) */}
-        {requireLanguage &&
+        {effectiveRequireLanguage &&
           template.languages?.length > 1 && (
             <div className="mt-4 space-y-2">
               <div className="text-sm font-medium">
@@ -151,6 +191,7 @@ export function ConfirmTemplateDialog({
           </Button>
 
           <Button
+            variant={isDestructive ? 'destructive' : 'default'}
             disabled={!canConfirm}
             onClick={handleConfirm}
           >

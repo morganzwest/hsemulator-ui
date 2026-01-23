@@ -133,6 +133,55 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
     await runFile()
   }
 
+  function EditorLoadingState() {
+  return (
+    <div className="flex h-[90vh] min-w-0 flex-col gap-3 overflow-hidden animate-pulse">
+      {/* Toolbar skeleton */}
+      <div className="flex items-center justify-between border-b pb-2">
+        <div className="flex gap-2">
+          <div className="h-8 w-24 rounded bg-muted" />
+          <div className="h-8 w-20 rounded bg-muted" />
+          <div className="h-8 w-28 rounded bg-muted" />
+        </div>
+
+        <div className="flex gap-2">
+          <div className="h-8 w-8 rounded bg-muted" />
+          <div className="h-8 w-8 rounded bg-muted" />
+          <div className="h-8 w-20 rounded bg-muted" />
+          <div className="h-8 w-20 rounded bg-muted" />
+        </div>
+      </div>
+
+      {/* Editor + Output skeleton */}
+      <div className="grid flex-1 min-w-0 grid-cols-[60%_4px_1fr] rounded-md border bg-background overflow-hidden">
+        {/* Editor */}
+        <div className="h-full bg-muted/40" />
+
+        {/* Divider */}
+        <div className="bg-border" />
+
+        {/* Output */}
+        <div className="flex flex-col bg-muted/30">
+          <div className="border-b px-3 py-1 text-xs text-muted-foreground">
+            Output
+          </div>
+          <div className="flex-1 space-y-2 px-3 py-2">
+            <div className="h-3 w-3/4 rounded bg-muted" />
+            <div className="h-3 w-2/3 rounded bg-muted" />
+            <div className="h-3 w-1/2 rounded bg-muted" />
+          </div>
+        </div>
+      </div>
+
+      {/* Status text */}
+      <div className="text-xs text-muted-foreground px-1">
+        Loading action files and preparing editor…
+      </div>
+    </div>
+  )
+}
+
+
   async function handleSaveTemplate() {
     if (!activeAction || templateSaving) return
 
@@ -222,10 +271,8 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           </EmptyContent>
         </Empty>
       ) : loadingFiles ? (
-        <div className="flex h-full items-center justify-center">
-          <Spinner /> Loading files…
-        </div>
-      ) : !active ? (
+  <EditorLoadingState />
+) : !active ? (
         <div className="flex h-full items-center justify-center">
           No files found for this action
         </div>

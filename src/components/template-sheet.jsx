@@ -306,7 +306,6 @@ function TemplateSection({
               key={template.id}
               template={template}
               onSelect={onSelect}
-              onDelete={() => {}}
               onRequestDelete={onRequestDelete}
               userId={userId}
             />
@@ -396,18 +395,7 @@ export function TemplatesSheet({ open, onOpenChange, portalId }) {
   created_at,
   event_json,
   created_by
-`)
-
-const t = data[1];
-
-console.log('TEMPLATE RAW', {
-  id: t.id,
-  py_action: !!t.py_action,
-  config_yaml_py: t.config_yaml_py,
-  config_yaml_py_type: typeof t.config_yaml_py,
-})
-
-
+`);
 
     if (error) {
       toast.error('Failed to load templates');
@@ -417,20 +405,19 @@ console.log('TEMPLATE RAW', {
     }
 
     setTemplates(
-  (data ?? []).map((t) => {
-    const supportedLanguages = []
+      (data ?? []).map((t) => {
+        const supportedLanguages = [];
+        if (t.js_action) supportedLanguages.push('javascript');
+        if (t.py_action) supportedLanguages.push('python');
 
-    if (t.js_action) supportedLanguages.push('javascript')
-    if (t.py_action) supportedLanguages.push('python')
-
-    return {
-      ...t,
-      languages: supportedLanguages,
-      icon: ICON_MAP[t.slug],
-      objectType: extractObjectType(t.event_json),
-    }
-  }),
-)
+        return {
+          ...t,
+          languages: supportedLanguages,
+          icon: ICON_MAP[t.slug],
+          objectType: extractObjectType(t.event_json),
+        };
+      }),
+    );
 
     setLoading(false);
   }
@@ -679,6 +666,7 @@ console.log('TEMPLATE RAW', {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         template={selectedTemplate}
+        variant="default"
         onConfirm={async (language) => {
           if (!userId) return;
 
@@ -697,22 +685,23 @@ console.log('TEMPLATE RAW', {
         }}
       />
       <ConfirmTemplateDialog
-  open={deleteOpen}
-  onOpenChange={setDeleteOpen}
-  template={templateToDelete}
-  title="Delete template?"
-  description={(t) => (
-    <>
-      This will permanently delete
-      <span className="font-medium"> {t.name}</span>.
-      This action cannot be undone.
-    </>
-  )}
-  confirmLabel="Delete"
-  confirmLoadingLabel="Deleting…"
-  requireLanguage={false}
-  onConfirm={() => deleteTemplateRow(templateToDelete)}
-/>
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        template={templateToDelete}
+        title="Delete template?"
+        variant="destructive"
+        description={(t) => (
+          <>
+            This will permanently delete
+            <span className="font-medium"> {t.name}</span>.
+            This action cannot be undone.
+          </>
+        )}
+        confirmLabel="Delete"
+        confirmLoadingLabel="Deleting…"
+        requireLanguage={false}
+        onConfirm={() => deleteTemplateRow(templateToDelete)}
+      />
 
     </>
   );

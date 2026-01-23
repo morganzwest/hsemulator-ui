@@ -26,7 +26,8 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { TemplatesSheet } from '~/components/template-sheet';
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /* -------------------------------------
    Demo data
@@ -46,7 +47,7 @@ const data = {
 
 export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   const supabase = createSupabaseBrowserClient();
-  const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [activeActionId, setActiveActionId] = useState(null);
   const [query, setQuery] = useState('');
   const [actions, setActions] = useState([]);
@@ -111,35 +112,35 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   ----------------------------- */
 
   return (
-    <Sidebar className="border-r-0" {...props}>
+    <Sidebar className='border-r-0' {...props}>
       {/* Header */}
-      <SidebarHeader className="gap-4">
-        <TeamSwitcher className="w-full" teams={data.projects} />
+      <SidebarHeader className='gap-4'>
+        <TeamSwitcher className='w-full' teams={data.projects} />
 
-        <div className="flex flex-col gap-2 px-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">
+        <div className='flex flex-col gap-2 px-3'>
+          <div className='flex items-center justify-between'>
+            <span className='text-xs font-medium text-muted-foreground'>
               Actions
             </span>
 
             <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              title="Create new action"
+              variant='ghost'
+              size='icon'
+              className='h-7 w-7'
+              title='Create new action'
               onClick={() => setCreateOpen(true)}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className='h-4 w-4' />
             </Button>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className='relative'>
+            <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
             <Input
-              placeholder="Search actions…"
+              placeholder='Search actions…'
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-9 pl-8 text-sm"
+              className='h-9 pl-8 text-sm'
             />
           </div>
         </div>
@@ -148,15 +149,13 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
       {/* Content */}
       <SidebarContent className="flex flex-col h-full">
   {/* ---------------------------------
-     Actions list (ONLY scrollable area)
+     Actions list (ONLY scrollable)
   --------------------------------- */}
   <div className="flex-1 min-h-0">
     <ScrollArea className="h-full px-1">
       <div className="space-y-1">
         {loading ? (
-          <div className="px-4 py-6 text-xs text-muted-foreground">
-            Loading actions…
-          </div>
+          <ActionListSkeleton />
         ) : filteredActions.length > 0 ? (
           filteredActions.map((action) => (
             <ActionListItem
@@ -232,7 +231,6 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   />
 </SidebarContent>
 
-
       <SidebarRail />
     </Sidebar>
   );
@@ -242,13 +240,30 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
    Footer item helper
 ------------------------------------- */
 
+function ActionListSkeleton() {
+  return (
+    <div className="space-y-2 px-2 py-2">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="flex flex-col gap-1 rounded-md px-2 py-2"
+        >
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+
 function SidebarFooterItem({ icon: Icon, label, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      className='flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground'
     >
-      <Icon className="h-4 w-4" />
+      <Icon className='h-4 w-4' />
       <span>{label}</span>
     </button>
   );

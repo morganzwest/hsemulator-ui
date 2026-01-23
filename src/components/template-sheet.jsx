@@ -9,6 +9,9 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet'
 import { Card } from '@/components/ui/card'
+import { Toggle } from '@/components/ui/toggle'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 
@@ -19,19 +22,37 @@ import {
   Building2,
   UserPlus,
   ChevronDown,
+  Lock,
+  Globe,
+  Search,
 } from 'lucide-react'
 
 import { createActionFromTemplate } from '@/lib/actions/create-template'
 import { ConfirmTemplateDialog } from '@/components/confirm-template-dialog'
 
 /* -------------------------------------
-   Supabase client (CREATE ONCE)
+   Supabase client
 ------------------------------------- */
 
 const supabase = createSupabaseBrowserClient()
 
 /* -------------------------------------
-   Icon map (controlled, safe)
+   Constants
+------------------------------------- */
+
+const SHOW_COMMUNITY_KEY = 'templates:show-community'
+
+const DEFAULT_FILTERS = {
+  languageFilter: 'all',
+  objectFilter: 'ALL',
+  categoryFilter: 'ALL',
+  sortBy: 'name_asc',
+  search: '',
+  showCommunity: true,
+}
+
+/* -------------------------------------
+   Icon map
 ------------------------------------- */
 
 const ICON_MAP = {
@@ -42,73 +63,67 @@ const ICON_MAP = {
 }
 
 /* -------------------------------------
-   Language icon
+   Helpers
 ------------------------------------- */
 
-function LanguageIcon({ lang }) {
-  if (lang === 'javascript')
-    return <Braces className="h-3.5 w-3.5 text-yellow-500" />
-
-  if (lang === 'python')
-    return <Terminal className="h-3.5 w-3.5 text-blue-500" />
-
-  return null
+function extractObjectType(eventJson) {
+  const raw = eventJson?.object?.objectType
+  if (!raw) return null
+  if (raw.startsWith('p')) return 'CUSTOM'
+  return raw.toUpperCase()
 }
 
-/* -------------------------------------
-   Tag badge
-------------------------------------- */
-
-function TagBadge({ tag }) {
-  if (!tag) return null
-
-  const colorMap = {
-    blue: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-    pink: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
-    green: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-    orange: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+function sortTemplates(list, sortBy) {
+  switch (sortBy) {
+    case 'name_asc':
+      return [...list].sort((a, b) => a.name.localeCompare(b.name))
+    case 'name_desc':
+      return [...list].sort((a, b) => b.name.localeCompare(a.name))
+    case 'newest':
+      return [...list].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at),
+      )
+    case 'oldest':
+      return [...list].sort(
+        (a, b) => new Date(a.created_at) - new Date(b.created_at),
+      )
+    default:
+      return list
   }
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium',
-        colorMap[tag.color] ?? colorMap.blue,
-      )}
-    >
-      {tag.name}
-    </span>
-  )
 }
 
 /* -------------------------------------
-   Language filter dropdown
+   Dropdown (width-locked)
 ------------------------------------- */
 
-function LanguageFilter({ value, onChange }) {
+function Dropdown({ value, options, onChange }) {
   const [open, setOpen] = useState(false)
-
-  const options = [
-    { id: 'all', label: 'All Languages' },
-    { id: 'javascript', label: 'JavaScript' },
-    { id: 'python', label: 'Python' },
-  ]
-
   const current = options.find((o) => o.id === value)
 
   return (
     <div className="relative">
+      {/* Width anchor */}
+      <span
+        className="invisible absolute whitespace-nowrap px-3 py-1.5 text-sm"
+        aria-hidden
+      >
+        {options.reduce(
+          (longest, o) =>
+            o.label.length > longest.length ? o.label : longest,
+          '',
+        )}
+      </span>
+
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+        className="flex min-w-full items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-muted"
       >
-        {value !== 'all' && <LanguageIcon lang={value} />}
         <span>{current?.label}</span>
         <ChevronDown className="h-4 w-4 opacity-60" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-md border bg-popover shadow">
+        <div className="absolute left-0 top-full z-50 mt-1 min-w-full rounded-md border bg-popover shadow">
           {options.map((opt) => (
             <button
               key={opt.id}
@@ -116,9 +131,8 @@ function LanguageFilter({ value, onChange }) {
                 onChange(opt.id)
                 setOpen(false)
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+              className="flex w-full items-center px-3 py-2 text-sm hover:bg-muted"
             >
-              {opt.id !== 'all' && <LanguageIcon lang={opt.id} />}
               {opt.label}
             </button>
           ))}
@@ -137,10 +151,10 @@ function TemplateCard({ template, onSelect }) {
 
   return (
     <Card
-      onClick={() => onSelect?.(template)}
+      onClick={() => onSelect(template)}
       tabIndex={0}
       className={cn(
-        'group relative cursor-pointer p-4 transition-all',
+        'group cursor-pointer p-4 transition-all',
         'hover:-translate-y-0.5 hover:shadow-md',
         'hover:border-primary/40',
         'focus-visible:ring-2 focus-visible:ring-primary',
@@ -156,83 +170,96 @@ function TemplateCard({ template, onSelect }) {
             <h4 className="text-sm font-semibold leading-tight">
               {template.name}
             </h4>
-
             <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
               {template.description}
             </p>
           </div>
         </div>
-
-        <TagBadge tag={template.tag} />
-      </div>
-
-      <div className="mt-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {template.languages.map((lang) => (
-            <div
-              key={lang}
-              className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground"
-            >
-              <LanguageIcon lang={lang} />
-              <span className="capitalize">{lang}</span>
-            </div>
-          ))}
-        </div>
-
-        <span className="text-xs text-muted-foreground opacity-0 transition group-hover:opacity-100">
-          Select →
-        </span>
       </div>
     </Card>
   )
 }
 
 /* -------------------------------------
-   Templates sheet (DB-backed)
+   Section
+------------------------------------- */
+
+function TemplateSection({ title, templates, empty, onSelect }) {
+  return (
+    <div className="space-y-3">
+      <div className="px-1 text-xs font-medium uppercase text-muted-foreground">
+        {title}
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="px-1 text-sm text-muted-foreground">
+          {empty}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {templates.map((template) => (
+            <TemplateCard
+              key={template.id}
+              template={template}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* -------------------------------------
+   Templates sheet
 ------------------------------------- */
 
 export function TemplatesSheet({ open, onOpenChange, portalId }) {
   const [userId, setUserId] = useState(null)
 
-  const [languageFilter, setLanguageFilter] = useState('all')
+  const [languageFilter, setLanguageFilter] = useState(DEFAULT_FILTERS.languageFilter)
+  const [objectFilter, setObjectFilter] = useState(DEFAULT_FILTERS.objectFilter)
+  const [categoryFilter, setCategoryFilter] = useState(DEFAULT_FILTERS.categoryFilter)
+  const [sortBy, setSortBy] = useState(DEFAULT_FILTERS.sortBy)
+  const [search, setSearch] = useState(DEFAULT_FILTERS.search)
+  const [showCommunity, setShowCommunity] = useState(DEFAULT_FILTERS.showCommunity)
+
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState(null)
 
-  // Hard guard to prevent repeated fetches (even in StrictMode dev double-effect)
-  const userLoadedRef = useRef(false)
+  /* -----------------------------
+     Reset filters
+  ----------------------------- */
+
+  function resetFilters() {
+    setLanguageFilter(DEFAULT_FILTERS.languageFilter)
+    setObjectFilter(DEFAULT_FILTERS.objectFilter)
+    setCategoryFilter(DEFAULT_FILTERS.categoryFilter)
+    setSortBy(DEFAULT_FILTERS.sortBy)
+    setSearch(DEFAULT_FILTERS.search)
+    setShowCommunity(DEFAULT_FILTERS.showCommunity)
+
+    localStorage.setItem(
+      SHOW_COMMUNITY_KEY,
+      String(DEFAULT_FILTERS.showCommunity),
+    )
+  }
 
   /* -----------------------------
-     Load authenticated user ONCE
+     Load user
   ----------------------------- */
 
   useEffect(() => {
-    if (userLoadedRef.current) return
-    userLoadedRef.current = true
-
-    supabase.auth.getUser().then(({ data, error }) => {
-      if (error) {
-        console.error('[TemplatesSheet] Failed to get user', error)
-        setUserId(null)
-        return
-      }
+    supabase.auth.getUser().then(({ data }) => {
       setUserId(data?.user?.id ?? null)
     })
-
-    // Optional: keep userId in sync without re-fetching
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id ?? null)
-    })
-
-    return () => {
-      sub?.subscription?.unsubscribe()
-    }
   }, [])
 
   /* -----------------------------
-     Load templates when opened
+     Load templates
   ----------------------------- */
 
   useEffect(() => {
@@ -241,7 +268,7 @@ export function TemplatesSheet({ open, onOpenChange, portalId }) {
     async function loadTemplates() {
       setLoading(true)
 
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('action_templates')
         .select(
           `
@@ -250,31 +277,20 @@ export function TemplatesSheet({ open, onOpenChange, portalId }) {
           name,
           description,
           languages,
-          tag_name,
-          tag_color,
-          js_action,
-          py_action,
-          event_json,
-          config_yaml_js,
-          config_yaml_py
+          visibility,
+          category,
+          created_at,
+          event_json
         `,
         )
-        .order('name')
 
-      if (error) {
-        console.error('[TemplatesSheet] Failed to load templates', error)
-        setTemplates([])
-      } else {
-        setTemplates(
-          (data ?? []).map((t) => ({
-            ...t,
-            icon: ICON_MAP[t.slug],
-            tag: t.tag_name
-              ? { name: t.tag_name, color: t.tag_color }
-              : null,
-          })),
-        )
-      }
+      setTemplates(
+        (data ?? []).map((t) => ({
+          ...t,
+          icon: ICON_MAP[t.slug],
+          objectType: extractObjectType(t.event_json),
+        })),
+      )
 
       setLoading(false)
     }
@@ -282,12 +298,75 @@ export function TemplatesSheet({ open, onOpenChange, portalId }) {
     loadTemplates()
   }, [open])
 
-  const filteredTemplates = useMemo(() => {
-    if (languageFilter === 'all') return templates
-    return templates.filter((t) =>
-      t.languages.includes(languageFilter),
-    )
-  }, [templates, languageFilter])
+  /* -----------------------------
+     Derived categories
+  ----------------------------- */
+
+  const categories = useMemo(() => {
+    return Array.from(
+      new Set(templates.map((t) => t.category).filter(Boolean)),
+    ).sort((a, b) => a.localeCompare(b))
+  }, [templates])
+
+  /* -----------------------------
+     Filtering
+  ----------------------------- */
+
+  const filtered = useMemo(() => {
+    let list = templates.filter((t) => {
+      if (
+        search &&
+        !`${t.name} ${t.description}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      )
+        return false
+
+      if (
+        languageFilter !== 'all' &&
+        !t.languages.includes(languageFilter)
+      )
+        return false
+
+      if (
+        objectFilter !== 'ALL' &&
+        t.objectType !== objectFilter
+      )
+        return false
+
+      if (
+        categoryFilter !== 'ALL' &&
+        t.category !== categoryFilter
+      )
+        return false
+
+      return true
+    })
+
+    return sortTemplates(list, sortBy)
+  }, [
+    templates,
+    languageFilter,
+    objectFilter,
+    categoryFilter,
+    sortBy,
+    search,
+  ])
+
+  const privateTemplates = filtered.filter(
+    (t) => t.visibility === 'private',
+  )
+  const publicTemplates = filtered.filter(
+    (t) => t.visibility === 'public',
+  )
+
+  const visibleCount =
+    privateTemplates.length +
+    (showCommunity ? publicTemplates.length : 0)
+
+  /* -----------------------------
+     Render
+  ----------------------------- */
 
   return (
     <>
@@ -301,30 +380,132 @@ export function TemplatesSheet({ open, onOpenChange, portalId }) {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="mt-4 flex items-center justify-between">
-            <LanguageFilter
+          {/* Filters */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Dropdown
               value={languageFilter}
               onChange={setLanguageFilter}
+              options={[
+                { id: 'all', label: 'All languages' },
+                { id: 'javascript', label: 'JavaScript' },
+                { id: 'python', label: 'Python' },
+              ]}
             />
+
+            <Dropdown
+              value={objectFilter}
+              onChange={setObjectFilter}
+              options={[
+                { id: 'ALL', label: 'All objects' },
+                { id: 'CONTACT', label: 'Contact' },
+                { id: 'DEAL', label: 'Deal' },
+                { id: 'COMPANY', label: 'Company' },
+                { id: 'TICKET', label: 'Ticket' },
+                { id: 'SERVICE', label: 'Service' },
+                { id: 'CUSTOM', label: 'Custom' },
+              ]}
+            />
+
+            <Dropdown
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={[
+                { id: 'ALL', label: 'All categories' },
+                ...categories.map((c) => ({
+                  id: c,
+                  label: c,
+                })),
+              ]}
+            />
+
+            <Dropdown
+              value={sortBy}
+              onChange={setSortBy}
+              options={[
+                { id: 'name_asc', label: 'Name (A–Z)' },
+                { id: 'name_desc', label: 'Name (Z–A)' },
+                { id: 'newest', label: 'Newest first' },
+                { id: 'oldest', label: 'Oldest first' },
+              ]}
+            />
+
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search templates…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+
+            <Toggle
+              pressed={showCommunity}
+              onPressedChange={setShowCommunity}
+              className="flex items-center gap-2"
+            >
+              {showCommunity ? (
+                <>
+                  <Globe className="h-4 w-4" />
+                  Community
+                </>
+              ) : (
+                <>
+                  <Lock className="h-4 w-4" />
+                  Yours only
+                </>
+              )}
+            </Toggle>
+
+            {/* Reset */}
+            <button
+              onClick={resetFilters}
+              className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Reset filters"
+            >
+              ✕
+            </button>
+            
+              <span className="tabular-nums text-xs">
+                {visibleCount} templates found
+              </span>
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {loading ? (
-              <div className="text-sm text-muted-foreground">
-                Loading templates…
+          {/* Content */}
+          <div className="mt-6 flex-1 min-h-0">
+            <ScrollArea className="h-full pr-2">
+              <div className="space-y-10 pb-6">
+                {loading ? (
+                  <div className="text-sm text-muted-foreground">
+                    Loading templates…
+                  </div>
+                ) : (
+                  <>
+                    <TemplateSection
+                      title="Your Templates"
+                      templates={privateTemplates}
+                      empty="You haven’t created any templates yet."
+                      onSelect={(t) => {
+                        setSelectedTemplate(t)
+                        setConfirmOpen(true)
+                      }}
+                    />
+
+                    {showCommunity && (
+                      <TemplateSection
+                        title="Community Templates"
+                        templates={publicTemplates}
+                        empty="No community templates available."
+                        onSelect={(t) => {
+                          setSelectedTemplate(t)
+                          setConfirmOpen(true)
+                        }}
+                      />
+                    )}
+                  </>
+                )}
               </div>
-            ) : (
-              filteredTemplates.map((template) => (
-                <TemplateCard
-                  key={template.id}
-                  template={template}
-                  onSelect={(t) => {
-                    setSelectedTemplate(t)
-                    setConfirmOpen(true)
-                  }}
-                />
-              ))
-            )}
+            </ScrollArea>
           </div>
         </SheetContent>
       </Sheet>
@@ -334,10 +515,7 @@ export function TemplatesSheet({ open, onOpenChange, portalId }) {
         onOpenChange={setConfirmOpen}
         template={selectedTemplate}
         onConfirm={async (language) => {
-          if (!userId) {
-            console.error('[TemplatesSheet] No authenticated user')
-            return
-          }
+          if (!userId) return
 
           await createActionFromTemplate({
             supabase,

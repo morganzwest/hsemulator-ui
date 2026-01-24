@@ -17,7 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-
+import { Badge } from "./ui/badge"
 export function TeamSwitcher({
   teams
 }) {
@@ -58,12 +58,13 @@ export function TeamSwitcher({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 p-2">
+            <DropdownMenuItem disabled className="gap-2 p-2">
               <div
                 className="bg-background flex size-6 items-center justify-center rounded-md border">
                 <Plus className="size-4" />
               </div>
-              <div className="text-muted-foreground font-medium">Add Portal</div>
+              <div className="text-muted-foreground font-medium">Add Portal 
+      <Badge className="ml-2" variant="outline">Coming Soon</Badge></div>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

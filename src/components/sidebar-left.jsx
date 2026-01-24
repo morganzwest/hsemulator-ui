@@ -14,7 +14,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
-
+import { Badge } from './ui/badge';
 import {
   Sidebar,
   SidebarContent,
@@ -43,18 +43,12 @@ import { IconBell } from '@tabler/icons-react';
 import { RefreshCcwIcon } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { cn } from '@/lib/utils';
-
-/* -------------------------------------
-   Demo data
-------------------------------------- */
-
-const data = {
-  projects: [
-    { name: 'Personal Portal', logo: AudioWaveform, id: '1' },
-    { name: 'Demo Portal', logo: GalleryVerticalEnd, id: '2' },
-    { name: 'Client Portal', logo: Command, id: '3' },
-  ],
-};
+import {
+  initPortalState,
+  getActivePortal,
+  setActivePortal,
+  getAvailablePortals
+} from '@/lib/portal-state'
 
 /* -------------------------------------
    Sidebar
@@ -94,6 +88,9 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
 
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+const [portals, setPortals] = useState([])
+const [activePortal, setActivePortalState] = useState(null)
+const [portalsLoaded, setPortalsLoaded] = useState(false)
 
   const [activeActionId, setActiveActionId] = useState(null);
   const [query, setQuery] = useState('');
@@ -103,6 +100,31 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
   /* -----------------------------
      Load actions
   ----------------------------- */
+
+  useEffect(() => {
+  async function loadPortals() {
+    const { data, error } = await supabase
+      .from('portals')
+      .select('uuid, name, created_at')
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('[SidebarLeft] Failed to load portals:', error)
+      return
+    }
+
+    const activeUuid = initPortalState(data)
+    const active = data.find(p => p.uuid === activeUuid)
+
+    setPortals(data)
+    setActivePortalState(active)
+    setPortalsLoaded(true)
+  }
+
+  loadPortals()
+}, [supabase])
+
+
 
   const loadActions = useCallback(async () => {
     setLoading(true);
@@ -180,7 +202,31 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
     <Sidebar className='border-r-0' {...props}>
       {/* Header */}
       <SidebarHeader className='gap-3 pb-2'>
-        <TeamSwitcher className='w-full' teams={data.projects} />
+        {portalsLoaded && activePortal ? (
+  <TeamSwitcher
+    className="w-full"
+    teams={portals.map(portal => ({
+      id: portal.uuid,
+      name: portal.name,
+      logo: AudioWaveform,
+    }))}
+    activeTeamId={activePortal.uuid}
+    onTeamChange={(portalId) => {
+      setActivePortal(portalId)
+
+      const portal = portals.find(p => p.uuid === portalId)
+      setActivePortalState(portal)
+
+      window.dispatchEvent(
+        new CustomEvent('portal:changed', { detail: portal })
+      )
+    }}
+  />
+) : (
+  <Skeleton className="h-9 w-full rounded-md" />
+)}
+
+
 
         <div className='flex flex-col gap-2 px-1.5 pt-1'>
           <div className='flex items-center justify-between border-b pb-1'>
@@ -302,7 +348,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         {/* Footer */}
         <div className='border-t bg-muted/30 px-3 py-2'>
           <div className='flex flex-col gap-1'>
-            <SidebarFooterItem icon={Activity} label='Monitoring' />
+            <SidebarFooterItem icon={Activity} label='Monitoring' badge="Coming Soon" />
 
             <SidebarFooterItem
               icon={Blocks}
@@ -361,7 +407,13 @@ function ActionListSkeleton() {
    Footer item
 ------------------------------------- */
 
-function SidebarFooterItem({ icon: Icon, label, onClick, emphasis }) {
+function SidebarFooterItem({
+  icon: Icon,
+  label,
+  onClick,
+  emphasis,
+  badge, // e.g. "Coming Soon" or undefined
+}) {
   return (
     <button
       onClick={onClick}
@@ -371,8 +423,14 @@ function SidebarFooterItem({ icon: Icon, label, onClick, emphasis }) {
         emphasis && 'font-medium',
       )}
     >
-      <Icon className='h-4 w-4' />
+      <Icon className="h-4 w-4" />
       <span>{label}</span>
+
+      {badge && (
+        <Badge className="ml-auto" variant="outline">
+          {badge}
+        </Badge>
+      )}
     </button>
-  );
+  )
 }

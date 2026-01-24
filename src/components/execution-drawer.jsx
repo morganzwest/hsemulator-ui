@@ -147,7 +147,7 @@ function ExecutionExportFooter({ execution, events }) {
                 })
               }
             >
-              Export TXT <i>(coming soon)</i>
+              Export TXT <Badge className="ml-2" variant="outline">Coming Soon</Badge>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

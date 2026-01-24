@@ -11,6 +11,7 @@ import {
   GalleryVerticalEnd,
   Command,
   Terminal,
+  Activity,
 } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 
@@ -181,7 +182,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
       <SidebarHeader className='gap-3 pb-2'>
         <TeamSwitcher className='w-full' teams={data.projects} />
 
-        <div className='flex flex-col gap-2 px-3 pt-1'>
+        <div className='flex flex-col gap-2 px-1.5 pt-1'>
           <div className='flex items-center justify-between'>
             <span className='text-xs font-medium text-muted-foreground'>
               Actions
@@ -205,12 +206,12 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
               placeholder='Search actions…'
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className='h-9 pl-8 pr-7 text-sm focus-visible:ring-2'
+              className='h-9 pl-9 pr-7 text-sm focus-visible:ring-2'
             />
             {query && (
               <button
                 onClick={() => setQuery('')}
-                className='absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground'
+                className='absolute top-1.5 right-2.5 text-muted-foreground cursor-pointer hover:text-foreground'
               >
                 ×
               </button>
@@ -280,6 +281,8 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         {/* Footer */}
         <div className='border-t bg-muted/30 px-3 py-2'>
           <div className='flex flex-col gap-1'>
+            <SidebarFooterItem icon={Activity} label='Monitoring' />
+
             <SidebarFooterItem
               icon={Blocks}
               label='Templates'
@@ -342,7 +345,7 @@ function SidebarFooterItem({ icon: Icon, label, onClick, emphasis }) {
     <button
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition',
+        'flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-xs text-muted-foreground transition',
         'hover:bg-muted hover:text-foreground',
         emphasis && 'font-medium',
       )}

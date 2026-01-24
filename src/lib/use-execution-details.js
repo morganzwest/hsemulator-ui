@@ -48,6 +48,7 @@ export function useExecutionDetails(executionId) {
               error_message,
               snapshots_ok,
               created_at,
+              result,
               updated_at,
               owner:profiles (
                 full_name,
@@ -86,37 +87,50 @@ export function useExecutionDetails(executionId) {
 
         if (eventsError) throw eventsError
         if (!mounted) return
+        const parsed =
+          typeof data.result === 'string'
+            ? JSON.parse(data.result)
+            : data.result
+
+        const inner = parsed?.result ?? {}
 
         setExecution({
           id: data.id,
           execution_id: data.execution_id,
           status: data.status,
           ok: data.ok,
+
           started_at: data.started_at,
           finished_at: data.finished_at,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+
           duration_ms: data.duration_ms,
           max_duration_ms: data.max_duration_ms,
           max_memory_kb: data.max_memory_kb,
+
           runs: data.runs,
           failures_count: data.failures_count,
           error_message: data.error_message,
           snapshots_ok: data.snapshots_ok,
-          created_at: data.created_at,
-          updated_at: data.updated_at,
 
-          owner_name:
-            data.owner?.full_name ?? 'User',
+          // normalized result
+          result: {
+            ...inner,
+            outputFields: inner.outputFields ?? {},
+          },
+
+          owner_name: data.owner?.full_name ?? 'User',
           owner_avatar:
-            data.owner?.avatar_url ??
-            '/avatars/default.jpg',
+            data.owner?.avatar_url ?? '/avatars/default.jpg',
 
-          action_name:
-            data.action?.name ?? 'Unnamed action',
-          action_description:
-            data.action?.description ?? null,
+          action_name: data.action?.name ?? 'Unnamed action',
+          action_description: data.action?.description ?? null,
           action_language: data.action?.language,
           action_filepath: data.action?.filepath,
         })
+
+
 
         setEvents(eventRows ?? [])
         setLoading(false)

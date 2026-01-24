@@ -100,7 +100,7 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
   async function loadPortals() {
     const { data, error } = await supabase
       .from('portals')
-      .select('uuid, name, created_at')
+      .select('uuid, name, icon, color, created_at')
       .order('created_at', { ascending: true })
 
     if (error) {

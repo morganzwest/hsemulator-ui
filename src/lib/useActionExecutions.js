@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useRef, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { toast } from 'sonner'
@@ -7,21 +9,24 @@ const supabase = createSupabaseBrowserClient()
 export function useActionExecutions({
   limit = 10,
   actionId = null,
+  portalId = null,
 }) {
   const [executions, setExecutions] = useState([])
   const seenIdsRef = useRef(new Set())
-
-  // Prevent repeated toasts during polling
   const lastErrorRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
     let intervalId = null
 
+    // Scope change = new stream
+    seenIdsRef.current.clear()
+
     async function load(reason = 'poll') {
       console.debug('[useActionExecutions] load', {
         reason,
         actionId,
+        portalId,
         limit,
       })
 
@@ -35,6 +40,10 @@ export function useActionExecutions({
           ok,
           max_duration_ms,
           created_at,
+
+          actions!inner (
+            portal_id
+          ),
           owner:profiles (
             full_name,
             avatar_url
@@ -47,21 +56,25 @@ export function useActionExecutions({
         query = query.eq('action_id', actionId)
       }
 
+      if (portalId) {
+        query = query.eq('actions.portal_id', portalId)
+      }
+
       const { data, error } = await query
 
       if (!mounted) return
 
       if (error) {
-        console.error(
-          '[useActionExecutions] load failed',
-          error
-        )
+        console.error('[useActionExecutions] load failed', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        })
 
         const message =
-          error.message ||
-          'Failed to load action executions'
+          error.message || 'Failed to load action executions'
 
-        // Deduplicate identical polling errors
         if (lastErrorRef.current !== message) {
           toast.error(message)
           lastErrorRef.current = message
@@ -70,10 +83,9 @@ export function useActionExecutions({
         return
       }
 
-      // Reset error state on successful fetch
       lastErrorRef.current = null
 
-      setExecutions(prev => {
+      setExecutions(() => {
         const next = (data ?? []).map(row => {
           const isNew = !seenIdsRef.current.has(row.id)
 
@@ -81,14 +93,18 @@ export function useActionExecutions({
             id: row.id,
             execution_id: row.execution_id,
             action_id: row.action_id,
+
+            portal_id: row.actions?.portal_id ?? null,
+
             status: row.status,
             ok: row.ok,
             max_duration_ms: row.max_duration_ms,
             created_at: row.created_at,
+
             owner_name: row.owner?.full_name ?? 'User',
             owner_avatar:
-              row.owner?.avatar_url ??
-              '/avatars/default.jpg',
+              row.owner?.avatar_url ?? '/avatars/default.jpg',
+
             __isNew: isNew,
           }
         })
@@ -100,11 +116,8 @@ export function useActionExecutions({
 
     function startPolling() {
       if (intervalId) return
-
       load('initial')
-      intervalId = setInterval(() => {
-        load('interval')
-      }, 3000)
+      intervalId = setInterval(() => load('interval'), 3000)
     }
 
     function stopPolling() {
@@ -139,7 +152,7 @@ export function useActionExecutions({
         handleVisibilityChange
       )
     }
-  }, [limit, actionId])
+  }, [limit, actionId, portalId])
 
   return executions
 }

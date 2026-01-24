@@ -234,7 +234,6 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
         open={templatesOpen}
         onOpenChange={setTemplatesOpen}
         onSelectTemplate={() => {}}
-        portalId='123456789'
       />
       <CreateActionDialog
         open={createOpen}

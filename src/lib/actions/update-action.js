@@ -2,8 +2,8 @@
 
 import { toast } from 'sonner'
 
-const MAX_NAME = 32
-const MAX_DESC = 64
+const MAX_NAME = 64
+const MAX_DESC = 128
 
 export async function updateAction({
   supabase,

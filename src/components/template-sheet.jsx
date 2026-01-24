@@ -38,6 +38,7 @@ import {
 
 import { createActionFromTemplate } from '@/lib/actions/create-template';
 import { ConfirmTemplateDialog } from '@/components/confirm-template-dialog';
+import { getActivePortalId } from '@/lib/portal-state'
 
 /* -------------------------------------
    Supabase client
@@ -320,8 +321,25 @@ function TemplateSection({
    Templates sheet
 ------------------------------------- */
 
-export function TemplatesSheet({ open, onOpenChange, portalId }) {
+export function TemplatesSheet({ open, onOpenChange }) {
   const [userId, setUserId] = useState(null);
+const [portalId, setPortalId] = useState(null)
+
+
+useEffect(() => {
+  if (!open) return
+
+  try {
+    const id = getActivePortalId()
+    setPortalId(id)
+  } catch {
+    setPortalId(null)
+    toast.error('No active workspace selected')
+  }
+}, [open])
+
+
+
 
   const [languageFilter, setLanguageFilter] = useState(
     DEFAULT_FILTERS.languageFilter,

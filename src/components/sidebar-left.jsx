@@ -382,7 +382,6 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
           onSelectTemplate={(template) =>
             console.log('Selected template:', template)
           }
-          portalId='1234567'
         />
       </SidebarContent>
 

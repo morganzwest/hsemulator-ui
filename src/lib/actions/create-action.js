@@ -1,5 +1,6 @@
 import YAML from 'yaml'
 import { toast } from 'sonner'
+import { getActivePortalId } from '@/lib/portal-state'
 
 const MAX_NAME = 32
 const MAX_DESC = 64
@@ -37,7 +38,6 @@ function buildConfig(language) {
 export async function createAction({
   supabase,
   ownerId,
-  portalId,
   name,
   description,
   language,
@@ -45,6 +45,14 @@ export async function createAction({
   /* -------------------------------
      Validation (Warnings / Errors)
   -------------------------------- */
+
+  let portalId
+try {
+  portalId = getActivePortalId()
+} catch {
+  toast.error('No active workspace selected')
+  throw new Error('Missing active portal')
+}
 
   if (!name) {
     toast.warning('Action name is required')
@@ -59,11 +67,6 @@ export async function createAction({
   if (description && description.length > MAX_DESC) {
     toast.warning(`Description must be ≤ ${MAX_DESC} characters`)
     throw new Error('Invalid description length')
-  }
-
-  if (!portalId) {
-    toast.error('Portal ID is missing')
-    throw new Error('Missing portal ID')
   }
 
   const config = buildConfig(language)

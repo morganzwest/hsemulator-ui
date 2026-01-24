@@ -126,15 +126,13 @@ export async function createPrivateTemplate({
           name,
           description,
           slug,
-          created_by: ownerId,
-          visibility: 'private',
           languages,
+          visibility: 'private',
           js_action: jsAction,
           py_action: pyAction,
           event_json: parsedEventJson,
           config_yaml_js: configYamlJs,
           config_yaml_py: configYamlPy,
-          version: 1,
         })
         .select()
         .single()

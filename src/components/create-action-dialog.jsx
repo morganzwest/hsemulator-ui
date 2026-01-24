@@ -60,7 +60,6 @@ export function CreateActionDialog({ open, onOpenChange, onCreated }) {
       const action = await createAction({
         supabase,
         ownerId: user.id,
-        portalId: 12345678,
         name,
         description,
         language,

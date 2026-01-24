@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-
+import { getActivePortalId } from '@/lib/portal-state'
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { TemplatesSheet } from '~/components/template-sheet';
 import { SettingsSheet } from '@/components/settings/settings-sheet';
@@ -39,15 +39,10 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
-import { IconBell } from '@tabler/icons-react';
-import { RefreshCcwIcon } from 'lucide-react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { cn } from '@/lib/utils';
 import {
   initPortalState,
-  getActivePortal,
-  setActivePortal,
-  getAvailablePortals
 } from '@/lib/portal-state'
 
 /* -------------------------------------
@@ -127,30 +122,44 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
 
 
   const loadActions = useCallback(async () => {
-    setLoading(true);
+  if (!portalsLoaded) return
 
-    const { data, error } = await supabase
-      .from('actions')
-      .select('id, owner_id, name, description, language, updated_at')
-      .order('updated_at', { ascending: false });
+  setLoading(true)
 
-    if (error) {
-      console.error('[SidebarLeft] Failed to load actions:', error);
-    } else {
-      setActions(data ?? []);
-      onActionsLoaded?.(data ?? []);
-    }
+  let portalId
+  try {
+    portalId = getActivePortalId()
+  } catch {
+    setLoading(false)
+    return
+  }
 
-    setLoading(false);
-  }, [supabase, onActionsLoaded]);
+  const { data, error } = await supabase
+    .from('actions')
+    .select('id, owner_id, name, description, language, updated_at')
+    .eq('portal_id', portalId)
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+
+  if (error) {
+    console.error('[SidebarLeft] Failed to load actions:', error)
+  } else {
+    setActions(data ?? [])
+    onActionsLoaded?.(data ?? [])
+  }
+
+  setLoading(false)
+}, [supabase, onActionsLoaded, portalsLoaded])
+
 
   /* -----------------------------
      Initial load
   ----------------------------- */
 
   useEffect(() => {
-    loadActions();
-  }, [loadActions]);
+  if (!portalsLoaded) return
+  loadActions()
+}, [portalsLoaded, loadActions])
 
   /* -----------------------------
      Global resync listener
@@ -186,6 +195,17 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  useEffect(() => {
+  function handlePortalChange() {
+    loadActions()
+  }
+
+  window.addEventListener('portal:changed', handlePortalChange)
+  return () =>
+    window.removeEventListener('portal:changed', handlePortalChange)
+}, [loadActions])
+
+
   /* -----------------------------
      Filter
   ----------------------------- */
@@ -204,23 +224,8 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
       <SidebarHeader className='gap-3 pb-2'>
         {portalsLoaded && activePortal ? (
   <TeamSwitcher
-    className="w-full"
-    teams={portals.map(portal => ({
-      id: portal.uuid,
-      name: portal.name,
-      logo: AudioWaveform,
-    }))}
-    activeTeamId={activePortal.uuid}
-    onTeamChange={(portalId) => {
-      setActivePortal(portalId)
-
-      const portal = portals.find(p => p.uuid === portalId)
-      setActivePortalState(portal)
-
-      window.dispatchEvent(
-        new CustomEvent('portal:changed', { detail: portal })
-      )
-    }}
+    teams={portals}
+    Icon={AudioWaveform}
   />
 ) : (
   <Skeleton className="h-9 w-full rounded-md" />

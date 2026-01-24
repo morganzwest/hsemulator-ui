@@ -427,7 +427,7 @@ function SidebarFooterItem({
       <span>{label}</span>
 
       {badge && (
-        <Badge className="ml-auto" variant="outline">
+        <Badge className="ml-auto text-muted-foreground" variant="outline">
           {badge}
         </Badge>
       )}

@@ -71,7 +71,7 @@ function EmptyMuted({ onCreate, onImport }) {
         <EmptyTitle>No Actions</EmptyTitle>
 
         <EmptyDescription className='text-pretty'>
-          You have no actions yet.
+          You have no actions here.
         </EmptyDescription>
       </EmptyHeader>
 
@@ -183,7 +183,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         <TeamSwitcher className='w-full' teams={data.projects} />
 
         <div className='flex flex-col gap-2 px-1.5 pt-1'>
-          <div className='flex items-center justify-between'>
+          <div className='flex items-center justify-between border-b pb-1'>
             <span className='text-xs font-medium text-muted-foreground'>
               Actions
             </span>
@@ -199,24 +199,45 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             </Button>
           </div>
 
-          <div className='relative'>
-            <Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
-            <Input
-              id='action-search'
-              placeholder='Search actions…'
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className='h-9 pl-9 pr-7 text-sm focus-visible:ring-2'
-            />
-            {query && (
-              <button
-                onClick={() => setQuery('')}
-                className='absolute top-1.5 right-2.5 text-muted-foreground cursor-pointer hover:text-foreground'
-              >
-                ×
-              </button>
-            )}
-          </div>
+          <div className="relative">
+  {/* Search icon */}
+  <Search
+    className="pointer-events-none absolute left-3 inset-y-0 my-auto h-4 w-4 text-muted-foreground"
+  />
+
+  <Input
+    id="action-search"
+    placeholder="Search actions…"
+    value={query}
+    onChange={(e) => setQuery(e.target.value)}
+    className="
+      h-9 pl-9 pr-9 text-sm
+      bg-background
+      focus-visible:ring-2 focus-visible:ring-ring
+    "
+  />
+
+  {/* Clear button */}
+  {query && (
+    <button
+      type="button"
+      onClick={() => setQuery('')}
+      aria-label="Clear search"
+      className="
+        absolute right-2 inset-y-0 my-auto
+        inline-flex h-6 w-6 items-center justify-center
+        rounded-md text-muted-foreground
+        transition-colors
+        hover:bg-accent hover:text-foreground
+        focus-visible:outline-none
+        focus-visible:ring-2 focus-visible:ring-ring
+      "
+    >
+      <span className="text-base leading-none">×</span>
+    </button>
+  )}
+</div>
+
         </div>
       </SidebarHeader>
 
@@ -225,7 +246,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         {/* Scrollable actions */}
         <div className='flex-1 min-h-0'>
           <ScrollArea className='h-full pr-2 px-1'>
-            <div className='space-y-1'>
+            <div className='space-y-1 px-2'>
               {loading ? (
                 <ActionListSkeleton />
               ) : filteredActions.length > 0 ? (

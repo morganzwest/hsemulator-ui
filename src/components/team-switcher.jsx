@@ -22,10 +22,12 @@ import { cn } from '@/lib/utils'
 
 import { getActivePortal, setActivePortal } from '@/lib/portal-state'
 import { resolvePortalIcon, resolvePortalColor } from '@/lib/portal-icons'
+import { CreatePortalSheet } from './createPortalSheet'
 
 export function TeamSwitcher({ teams }) {
   const { isMobile } = useSidebar()
   const [activeTeam, setActiveTeam] = React.useState(null)
+const [openCreate, setOpenCreate] = React.useState(false)
 
   React.useEffect(() => {
     try {
@@ -133,8 +135,19 @@ export function TeamSwitcher({ teams }) {
             </div>
 
             <DropdownMenuSeparator />
+              <DropdownMenuItem
+  onClick={() => setOpenCreate(true)}
+  className="flex items-center gap-3"
+>
+  <div className="grid size-8 place-items-center rounded-md border">
+    <Plus className="size-4" />
+  </div>
 
-            <DropdownMenuItem
+  <span className="text-sm">Add portal</span>
+</DropdownMenuItem>
+
+
+            {/* <DropdownMenuItem
               disabled
               className="flex items-center gap-3 opacity-70"
             >
@@ -146,10 +159,15 @@ export function TeamSwitcher({ teams }) {
                 Add portal
                 <Badge variant="outline">Coming soon</Badge>
               </span>
-            </DropdownMenuItem>
+            </DropdownMenuItem> */}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+      
+<CreatePortalSheet
+  open={openCreate}
+  onOpenChange={setOpenCreate}
+/>
     </SidebarMenu>
   )
 }

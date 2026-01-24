@@ -14,12 +14,24 @@ let availablePortals = []
 ------------------------------------- */
 
 function log(...args) {
-  console.log('[portal-state]', ...args)
+  console.debug('[portal-state]', ...args)
 }
 
 /* -------------------------------------
    Helpers
 ------------------------------------- */
+
+export function addAvailablePortal(portal) {
+  if (!portal?.uuid) {
+    throw new Error('Invalid portal')
+  }
+
+  const exists = availablePortals.some(p => p.uuid === portal.uuid)
+  if (exists) return
+
+  availablePortals.push(portal)
+}
+
 
 function isValidUuid(uuid) {
   return typeof uuid === 'string' && uuid.length > 0

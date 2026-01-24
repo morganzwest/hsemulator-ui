@@ -98,10 +98,27 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
 
   useEffect(() => {
   async function loadPortals() {
-    const { data, error } = await supabase
-      .from('portals')
-      .select('uuid, name, icon, color, created_at')
-      .order('created_at', { ascending: true })
+    let { data, error } = await supabase
+  .from('portals')
+  .select(`
+    uuid,
+    name,
+    icon,
+    color,
+    created_at,
+    created_by,
+    profiles:created_by (
+      plan
+    )
+  `)
+  .order('created_at', { ascending: true });
+
+    data =
+  data?.map((portal) => ({
+    ...portal,
+    plan: portal.profiles?.plan === 'pro' ? 'Professional' : null,
+  })) ?? [];
+
 
     if (error) {
       console.error('[SidebarLeft] Failed to load portals:', error)

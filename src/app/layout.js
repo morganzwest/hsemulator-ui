@@ -3,6 +3,8 @@ import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from "@/components/ui/sonner"
 import { SettingsProvider } from '@/lib/settings/settings-provider';
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -42,6 +44,8 @@ export default function RootLayout({ children }) {
           'bg-background text-foreground antialiased',
         ].join(' ')}
       >
+        <Analytics/>
+        <SpeedInsights />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

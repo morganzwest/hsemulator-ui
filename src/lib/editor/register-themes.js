@@ -59,18 +59,18 @@ export async function registerMonacoThemes(monaco) {
 
   registrationPromise = (async () => {
     const themes = [
-      'monokai',
-      'dracula',
-      'solarized-dark',
-      'night-owl',
-      'oceanic-next',
-      'amy',
-      'cobalt2',
-      'monoindustrial',
-      'merbivore',
-      'merbivore-soft',
-      'github-dark',
-      'github',
+      'Monokai',
+      'Dracula',
+      'Solarized-Dark',
+      'Night-Owl',
+      'Oceanic-Next',
+      'Amy',
+      'Cobalt2',
+      'Monoindustrial',
+      'Merbivore',
+      'Merbivore-Soft',
+      'GitHub-Dark',
+      'GitHub',
     ]
     for (const theme of themes) {
       await loadTheme(monaco, theme)

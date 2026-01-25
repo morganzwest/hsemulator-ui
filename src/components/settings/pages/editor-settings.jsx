@@ -40,21 +40,21 @@ const EDITOR_DEFAULTS = {
 ------------------------------------- */
 
 const THEMES = [
-  { id: 'github-dark', name: 'GitHub Dark', color: '#0d1117' },
+  { id: 'githubdark', name: 'GitHub Dark', color: '#0d1117' },
   { id: 'monokai', name: 'Monokai', color: '#272822' },
   { id: 'dracula', name: 'Dracula', color: '#282a36' },
-  { id: 'night-owl', name: 'Night Owl', color: '#011627' },
+  { id: 'nightowl', name: 'Night Owl', color: '#011627' },
 
-  { id: 'oceanic-next', name: 'Oceanic Next', color: '#1b2b34' },
+  { id: 'oceanicnext', name: 'Oceanic Next', color: '#1b2b34' },
   { id: 'cobalt2', name: 'Cobalt', color: '#193549' },
-  { id: 'solarized-dark', name: 'Solarized Dark', color: '#002b36' },
+  { id: 'solarizeddark', name: 'Solarized Dark', color: '#002b36' },
 
   { id: 'merbivore', name: 'Merbivore', color: '#161616' },
   { id: 'monoindustrial', name: 'Mono Industrial', color: '#263238' },
   { id: 'amy', name: 'Amy', color: '#200020' },
 
   { id: 'github', name: 'GitHub Light', color: '#ffffff' },
-  { id: 'merbivore-soft', name: 'High Contrast', color: '#000000' },
+  { id: 'merbivoresoft', name: 'High Contrast', color: '#000000' },
 ];
 
 const VALID_THEMES = new Set(THEMES.map((t) => t.id));

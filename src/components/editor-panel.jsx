@@ -29,7 +29,7 @@ import {
 import { IconFolderCode } from '@tabler/icons-react';
 import { TemplatesSheet } from '~/components/template-sheet';
 import { CreateActionDialog } from '@/components/create-action-dialog';
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 /* --------------------------------
    Language icon
@@ -379,26 +379,25 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
               }`}
             />
 
-            <div className="flex flex-col bg-muted/30 overflow-hidden">
-  {/* Sticky header */}
-  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-muted/30 px-3 py-1 text-xs text-muted-foreground">
-    <span>Output</span>
-    <Button variant="ghost" size="icon" onClick={() => setLogs([])}>
-      <Trash2 className="h-4 w-4" />
-    </Button>
-  </div>
+            <div className='flex flex-col bg-muted/30 overflow-hidden'>
+              {/* Sticky header */}
+              <div className='sticky top-0 z-10 flex items-center justify-between border-b bg-muted/30 px-3 py-1 text-xs text-muted-foreground'>
+                <span>Output</span>
+                <Button variant='ghost' size='icon' onClick={() => setLogs([])}>
+                  <Trash2 className='h-4 w-4' />
+                </Button>
+              </div>
 
-  {/* Scrollable content */}
-  <ScrollArea className="flex-1 h-0">
-    <div className="px-3 py-2 font-mono text-xs whitespace-pre-wrap">
-      {logs.length === 0
-        ? 'No output yet'
-        : logs.map((line, i) => <div key={i}>{line}</div>)}
-      <div ref={outputEndRef} />
-    </div>
-  </ScrollArea>
-</div>
-
+              {/* Scrollable content */}
+              <ScrollArea className='flex-1 h-0'>
+                <div className='px-3 py-2 font-mono text-xs whitespace-pre-wrap'>
+                  {logs.length === 0
+                    ? 'No output yet'
+                    : logs.map((line, i) => <div key={i}>{line}</div>)}
+                  <div ref={outputEndRef} />
+                </div>
+              </ScrollArea>
+            </div>
           </div>
         </div>
       )}

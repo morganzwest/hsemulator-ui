@@ -153,7 +153,7 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
 
   const { data, error } = await supabase
     .from('actions')
-    .select('id, owner_id, name, description, language, updated_at')
+    .select('id, owner_id, portal_id, name, description, language, updated_at')
     .eq('portal_id', portalId)
     .eq('is_active', true)
     .order('updated_at', { ascending: false })

@@ -124,7 +124,7 @@ export async function createActionFromTemplate({
         throw new Error(error.message || 'Failed to create action')
       }
 
-      const basePath = `${ownerId}/${action.id}`
+      const basePath = `${portalId}/${action.id}`
 
       const files = {
         'config.yaml': configYaml,

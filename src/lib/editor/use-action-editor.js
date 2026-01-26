@@ -1,7 +1,8 @@
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { inferLanguage } from '@/lib/editor/infer-language'
 import YAML from 'yaml'
-import { toast } from "sonner"
+import { toast } from 'sonner'
+import { getActivePortalId } from '../portal-state'
 
 /* -----------------------------
    Helpers
@@ -16,7 +17,6 @@ function formatOutputFields(outputFields) {
     JSON.stringify(outputFields, null, 2),
   ]
 }
-
 
 function formatTimestamp(ts) {
   if (!ts) return ''
@@ -37,6 +37,17 @@ function resolveEntryFile(files) {
     Object.keys(files).find(f => f.endsWith('.py')) ||
     null
   )
+}
+
+function resolveActionBasePath(action) {
+  if (!action?.id || !action?.portal_id) {
+    console.error('[ActionEditor] Invalid action for base path', action)
+    throw new Error('Invalid action: missing id or portal_id')
+  }
+
+  const path = `${action.portal_id}/${action.id}`
+  console.debug('[ActionEditor] Using storage path:', path)
+  return path
 }
 
 /* -----------------------------
@@ -81,7 +92,6 @@ function compileInlineConfig({
   }
 }
 
-
 export function useActionEditor({
   activeAction,
   files,
@@ -100,8 +110,17 @@ export function useActionEditor({
   async function loadFiles() {
     if (!activeAction) return
 
-    const { id, owner_id } = activeAction
-    const basePath = `${owner_id}/${id}`
+    // NOTE: still validating active portal, but path comes from action
+    try {
+      getActivePortalId()
+    } catch {
+      toast.error('No active workspace selected')
+      throw new Error('Missing active portal')
+    }
+
+    const basePath = resolveActionBasePath(activeAction)
+
+    console.debug('[ActionEditor] loadFiles → list', basePath)
 
     setLoadingFiles(true)
     setLogs([])
@@ -112,6 +131,7 @@ export function useActionEditor({
       .list(basePath)
 
     if (error) {
+      console.error('[ActionEditor] list failed', error)
       setLogs([`✖ Failed to load files: ${error.message}`])
       setLoadingFiles(false)
       return
@@ -122,12 +142,18 @@ export function useActionEditor({
         .filter(o => o.name && !o.name.endsWith('/'))
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(async obj => {
+          const filePath = `${basePath}/${obj.name}`
+          console.debug('[ActionEditor] download', filePath)
+
           const { data, error } = await supabase
             .storage
             .from('actions')
-            .download(`${basePath}/${obj.name}`)
+            .download(filePath)
 
-          if (error) return null
+          if (error) {
+            console.error('[ActionEditor] download failed', filePath, error)
+            return null
+          }
 
           return [
             obj.name,
@@ -153,76 +179,115 @@ export function useActionEditor({
   ----------------------------- */
 
   async function saveAllFiles(editorRef) {
-    if (!activeAction) return
+  if (!activeAction) return
 
-    const { id, owner_id } = activeAction
-    const basePath = `${owner_id}/${id}`
+  const basePath = resolveActionBasePath(activeAction)
+  console.debug('[ActionEditor] saveAllFiles → basePath', basePath)
 
+  // 1) Run formatter and allow Monaco to flush model updates
+  try {
     await editorRef?.current
       ?.getAction('editor.action.formatDocument')
       ?.run()
+  } catch (e) {
+    console.warn('[ActionEditor] formatDocument failed (continuing)', e)
+  }
 
-    const dirtyFiles = Object.entries(files).filter(
-      ([, f]) => f.dirty
+  // Let Monaco propagate the formatted text into state
+  await new Promise(r => setTimeout(r, 0))
+
+  // 2) Decide what to save (authoritative)
+  // Prefer saving all files if any are dirty to avoid missing changes
+  const entries = Object.entries(files)
+  const dirtyEntries = entries.filter(([, f]) => f.dirty)
+
+  if (!dirtyEntries.length) {
+    console.debug('[ActionEditor] No dirty files detected; skipping save')
+    return
+  }
+
+  // 3) Upload sequentially with verification logging
+  const saved = new Set()
+
+  try {
+    for (const [name, file] of dirtyEntries) {
+      const filePath = `${basePath}/${name}`
+
+      const contentType =
+        file.language === 'json'
+          ? 'application/json;charset=utf-8'
+          : name.endsWith('.yaml') || name.endsWith('.yml')
+            ? 'text/yaml;charset=utf-8'
+            : name.endsWith('.js')
+              ? 'text/javascript;charset=utf-8'
+              : name.endsWith('.py')
+                ? 'text/x-python;charset=utf-8'
+                : 'text/plain;charset=utf-8'
+
+      const body = new Blob([file.value], { type: contentType })
+
+      console.debug('[ActionEditor] upload →', {
+        path: filePath,
+        bytes: file.value?.length ?? 0,
+        contentType,
+      })
+
+      const { error } = await supabase.storage
+        .from('actions')
+        .upload(filePath, body, { upsert: true })
+
+      if (error) {
+        console.error('[ActionEditor] upload failed', filePath, error)
+        throw error
+      }
+
+      saved.add(name)
+    }
+
+    // 4) Touch action updated_at only if uploads succeeded
+    await supabase
+      .from('actions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', activeAction.id)
+
+    // 5) Clear dirty only for successfully saved files
+    setFiles(prev =>
+      Object.fromEntries(
+        Object.entries(prev).map(([k, v]) => [
+          k,
+          saved.has(k) ? { ...v, dirty: false } : v,
+        ])
+      )
     )
 
-    if (!dirtyFiles.length) return
-
-    try {
-      await Promise.all(
-        dirtyFiles.map(([name, file]) =>
-          supabase.storage
-            .from('actions')
-            .upload(
-              `${basePath}/${name}`,
-              new Blob([file.value]),
-              {
-                upsert: true,
-                contentType:
-                  file.language === 'json'
-                    ? 'application/json'
-                    : 'text/plain',
-              }
-            )
-        )
-      )
-
-      await supabase
-        .from('actions')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', id)
-
-      setFiles(prev =>
-        Object.fromEntries(
-          Object.entries(prev).map(([k, v]) => [
-            k,
-            { ...v, dirty: false },
-          ])
-        )
-      )
-
-      setLogs(l => [...l, '✔ Files saved'])
-    } catch (err) {
-      setLogs(l => [...l, `✖ Save failed: ${err.message}`])
-    }
+    setLogs(l => [...l, '✔ Files saved'])
+    console.debug('[ActionEditor] saveAllFiles completed', {
+      saved: Array.from(saved),
+    })
+  } catch (err) {
+    // Do NOT clear dirty flags on failure
+    console.error('[ActionEditor] saveAllFiles failed', err)
+    setLogs(l => [...l, `✖ Save failed: ${err.message}`])
   }
+}
+
 
   function resolveLevel(event) {
     switch (event.kind) {
       case 'Stderr':
-        return 'ERROR' // for now; later you can split info/error
+        return 'ERROR'
       case 'ExecutionCreated':
       case 'ValidationStarted':
       case 'ExecutionStarted':
       case 'ExecutionFinished':
         return 'EVENT'
       default:
-        return 'INFO'
+        return 'debug'
     }
   }
 
   function formatTime(ts) {
-    if (!ts) return '--:--:--'
+    if (!ts) return '--:--:--:--'
     const ms =
       ts.secs_since_epoch * 1000 +
       Math.floor((ts.nanos_since_epoch || 0) / 1e6)
@@ -238,7 +303,7 @@ export function useActionEditor({
 
   function formatEventLine(event) {
     const time = formatTime(event.timestamp)
-    const level = resolveLevel(event).padEnd(5, ' ') // fixed width
+    const level = resolveLevel(event).padEnd(5, ' ')
     const prefix = `${time} [${level}]`
 
     if (event.message) {
@@ -255,9 +320,7 @@ export function useActionEditor({
 
     for (const e of events) {
       if (e.kind === 'Stderr') {
-        if (!bufferingErrorBlock) {
-          bufferingErrorBlock = true
-        }
+        bufferingErrorBlock = true
         lines.push(formatEventLine(e))
         continue
       }
@@ -270,262 +333,197 @@ export function useActionEditor({
   }
 
   function eventTimestampToISO(ts) {
-  if (!ts) return null
-  const ms =
-    ts.secs_since_epoch * 1000 +
-    Math.floor((ts.nanos_since_epoch || 0) / 1e6)
-  return new Date(ms).toISOString()
-}
-
-
+    if (!ts) return null
+    const ms =
+      ts.secs_since_epoch * 1000 +
+      Math.floor((ts.nanos_since_epoch || 0) / 1e6)
+    return new Date(ms).toISOString()
+  }
 
   /* -----------------------------
      Run action (INLINE execution)
   ----------------------------- */
-async function runFile() {
-  if (!activeAction) return
 
-  const entryFile = resolveEntryFile(files)
-  if (!entryFile) {
-    setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
-    return
-  }
+  async function runFile() {
+    if (!activeAction) return
 
-  const actionFile = files[entryFile]
+    const entryFile = resolveEntryFile(files)
+    if (!entryFile) {
+      setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
+      return
+    }
 
-  setRunning(true)
-  setLogs(l => [...l, '', `▶ Running ${entryFile}`])
+    const actionFile = files[entryFile]
+    const basePath = resolveActionBasePath(activeAction)
 
-  toast.promise(
-    async () => {
-      let executionRow = null
-      let executionId = null
+    console.debug('[ActionEditor] runFile → basePath', basePath)
 
-      try {
-        const { owner_id, id: action_id } = activeAction
-        const basePath = `${owner_id}/${action_id}`
+    setRunning(true)
+    setLogs(l => [...l, '', `▶ Running ${entryFile}`])
 
-        /* -----------------------------
-           Load config.yaml
-        ----------------------------- */
+    toast.promise(
+      async () => {
+        let executionRow = null
+        let executionId = null
 
-        const { data: configBlob, error: configErr } =
-          await supabase.storage
-            .from('actions')
-            .download(`${basePath}/config.yaml`)
-
-        if (configErr || !configBlob) {
-          throw new Error('config.yaml is required')
-        }
-
-        let yamlConfig
         try {
-          yamlConfig = YAML.parse(await configBlob.text()) ?? {}
-        } catch (e) {
-          throw new Error(`Invalid config.yaml: ${e.message}`)
-        }
+          const { id: action_id, owner_id } = activeAction
 
-        /* -----------------------------
-           Resolve fixtures
-        ----------------------------- */
-
-        const fixtureFiles = await Promise.all(
-          (yamlConfig.fixtures ?? []).map(async path => {
-            const { data, error } = await supabase.storage
+          const { data: configBlob, error: configErr } =
+            await supabase.storage
               .from('actions')
-              .download(`${basePath}/${path}`)
+              .download(`${basePath}/config.yaml`)
 
-            if (error || !data) {
-              throw new Error(`Missing fixture: ${path}`)
-            }
-
-            return {
-              name: path.startsWith('/') ? path.slice(1) : path,
-              source: await data.text(),
-            }
-          })
-        )
-
-        /* -----------------------------
-           Compile inline config
-        ----------------------------- */
-
-        const inlineConfig = {
-          version: yamlConfig.version ?? 1,
-          action: {
-            language:
-              yamlConfig.action?.type === 'python' ||
-              entryFile.endsWith('.py')
-                ? 'python'
-                : 'js',
-            entry: yamlConfig.action?.entry ?? entryFile,
-            source: actionFile.value,
-          },
-          fixtures: fixtureFiles,
-          env: yamlConfig.env ?? {},
-          runtime: {
-            node: yamlConfig.runtime?.node ?? 'node',
-            python: yamlConfig.runtime?.python ?? 'python',
-          },
-          output: yamlConfig.output,
-          snapshots: {
-            enabled: yamlConfig.snapshots?.enabled ?? true,
-            ignore: yamlConfig.snapshots?.ignore ?? [],
-          },
-          repeat: yamlConfig.repeat ?? 1,
-        }
-
-        /* -----------------------------
-           Create execution row (START)
-        ----------------------------- */
-
-        const { data: execInsert, error: execErr } = await supabase
-          .from('action_executions')
-          .insert({
-            action_id,
-            owner_id,
-            status: 'running',
-            started_at: new Date().toISOString(),
-          })
-          .select()
-          .single()
-
-        if (execErr) throw execErr
-
-        executionRow = execInsert
-
-        /* -----------------------------
-           Execute
-        ----------------------------- */
-
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: 'Bearer dev_secret_key',
-            },
-            body: JSON.stringify({
-              mode: 'execute',
-              config: inlineConfig,
-            }),
+          if (configErr || !configBlob) {
+            throw new Error('config.yaml is required')
           }
-        )
 
-        const payload = await res.json()
-        if (!res.ok) {
-          throw new Error(payload?.error || 'Execution failed')
-        }
+          const yamlConfig = YAML.parse(await configBlob.text()) ?? {}
 
-        executionId = payload?.summary?.execution_id
+          const fixtureFiles = await Promise.all(
+            (yamlConfig.fixtures ?? []).map(async path => {
+              const { data, error } = await supabase.storage
+                .from('actions')
+                .download(`${basePath}/${path}`)
 
-        /* -----------------------------
-           Persist events
-        ----------------------------- */
+              if (error || !data) {
+                throw new Error(`Missing fixture: ${path}`)
+              }
 
-        if (Array.isArray(payload?.events)) {
-          const rows = payload.events.map(e => ({
-            execution_fk: executionRow.id,
-            execution_id: executionId,
-            kind: e.kind,
-            event_time: eventTimestampToISO(e.timestamp),
-            message: e.message ?? null,
-          }))
+              return {
+                name: path.startsWith('/') ? path.slice(1) : path,
+                source: await data.text(),
+              }
+            })
+          )
 
-          const { error } = await supabase
-            .from('action_execution_events')
-            .insert(rows)
+          const inlineConfig = compileInlineConfig({
+            yamlConfig,
+            files,
+            fixtures: fixtureFiles,
+          })
 
-          if (error) console.error('Event insert failed', error)
-        }
-
-        /* -----------------------------
-           Update execution (SUCCESS)
-        ----------------------------- */
-
-        if (payload?.summary?.result) {
-          const r = payload.summary.result
-
-          await supabase
+          const { data: execInsert, error: execErr } = await supabase
             .from('action_executions')
-            .update({
+            .insert({
+              action_id,
+              owner_id,
+              status: 'running',
+              started_at: new Date().toISOString(),
+            })
+            .select()
+            .single()
+
+          if (execErr) throw execErr
+          executionRow = execInsert
+
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer dev_secret_key',
+              },
+              body: JSON.stringify({
+                mode: 'execute',
+                config: inlineConfig,
+              }),
+            }
+          )
+
+          const payload = await res.json()
+          if (!res.ok) {
+            throw new Error(payload?.error || 'Execution failed')
+          }
+
+          executionId = payload?.summary?.execution_id
+
+          if (Array.isArray(payload?.events)) {
+            const rows = payload.events.map(e => ({
+              execution_fk: executionRow.id,
               execution_id: executionId,
-              status: r.ok ? 'executed' : 'failed',
-              finished_at: new Date().toISOString(),
-              duration_ms: r.max_duration_ms,
-              max_duration_ms: r.max_duration_ms,
-              max_memory_kb: r.max_memory_kb,
-              runs: r.runs,
-              failures_count: r.failures?.length ?? 0,
-              ok: r.ok,
-              snapshots_ok: r.snapshots_ok,
-              result: payload.summary,
-            })
-            .eq('id', executionRow.id)
-        }
+              kind: e.kind,
+              event_time: eventTimestampToISO(e.timestamp),
+              message: e.message ?? null,
+            }))
 
-        /* -----------------------------
-           Render output
-        ----------------------------- */
-
-        const lines = []
-
-        if (payload?.summary?.result) {
-          const r = payload.summary.result
-
-          lines.push('✔ Execution completed')
-          lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
-          lines.push(`Runs: ${r.runs}`)
-          lines.push(`Duration: ${r.max_duration_ms} ms`)
-          lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
-
-          if (r.outputFields) {
-            lines.push(...formatOutputFields(r.outputFields))
+            await supabase
+              .from('action_execution_events')
+              .insert(rows)
           }
+
+          if (payload?.summary?.result) {
+            const r = payload.summary.result
+
+            await supabase
+              .from('action_executions')
+              .update({
+                execution_id: executionId,
+                status: r.ok ? 'executed' : 'failed',
+                finished_at: new Date().toISOString(),
+                duration_ms: r.max_duration_ms,
+                max_duration_ms: r.max_duration_ms,
+                max_memory_kb: r.max_memory_kb,
+                runs: r.runs,
+                failures_count: r.failures?.length ?? 0,
+                ok: r.ok,
+                snapshots_ok: r.snapshots_ok,
+                result: payload.summary,
+              })
+              .eq('id', executionRow.id)
+          }
+
+          const lines = []
+
+          if (payload?.summary?.result) {
+            const r = payload.summary.result
+            lines.push('✔ Execution completed')
+            lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
+            lines.push(`Runs: ${r.runs}`)
+            lines.push(`Duration: ${r.max_duration_ms} ms`)
+            lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
+
+            if (r.outputFields) {
+              lines.push(...formatOutputFields(r.outputFields))
+            }
+          }
+
+          if (Array.isArray(payload?.events)) {
+            lines.push('')
+            lines.push('--- Events ---')
+            lines.push(...formatEvents(payload.events))
+          }
+
+          setLogs(l => [...l, ...lines])
+
+          return { entryFile }
+        } catch (err) {
+          if (executionRow) {
+            await supabase
+              .from('action_executions')
+              .update({
+                status: 'failed',
+                finished_at: new Date().toISOString(),
+                ok: false,
+                error_message: err.message,
+              })
+              .eq('id', executionRow.id)
+          }
+
+          setLogs(l => [...l, `✖ ${err.message}`])
+          throw err
+        } finally {
+          setRunning(false)
         }
-
-        if (Array.isArray(payload?.events)) {
-          lines.push('')
-          lines.push('--- Events ---')
-          lines.push(...formatEvents(payload.events))
-        }
-
-        setLogs(l => [...l, ...lines])
-
-        return { entryFile }
-      } catch (err) {
-        if (executionRow) {
-          await supabase
-            .from('action_executions')
-            .update({
-              status: 'failed',
-              finished_at: new Date().toISOString(),
-              ok: false,
-              error_message: err.message,
-            })
-            .eq('id', executionRow.id)
-        }
-
-        setLogs(l => [...l, `✖ ${err.message}`])
-        throw err
-      } finally {
-        setRunning(false)
+      },
+      {
+        loading: 'Running action…',
+        success: 'Execution complete',
+        error: 'Execution failed',
       }
-    },
-    {
-    loading: 'Running action…',
-    success: (entryFile) => `Execution complete`,
-    error: (err) => `Execution failed`,
-    description: (entryFile) =>
-      typeof entryFile === 'string'
-        ? `Executing ${entryFile}`
-        : 'Action execution',
+    )
   }
-  )
-}
-
-
 
   return {
     loadFiles,

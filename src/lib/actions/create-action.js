@@ -81,6 +81,13 @@ try {
         : `def main(event):\n    return {"ok": True}\n`,
   }
 
+
+  function contentTypeFor(path) {
+  if (path.endsWith('.json')) return 'application/json'
+  if (path.endsWith('.yaml') || path.endsWith('.yml')) return 'text/yaml'
+  return 'text/plain'
+}
+
   /* -------------------------------
      Promise Toast (Main Flow)
   -------------------------------- */
@@ -107,20 +114,24 @@ try {
         throw new Error(error.message || 'Failed to create action')
       }
 
-      const basePath = `${ownerId}/${action.id}`
+      const basePath = `${portalId}/${action.id}`
 
-      for (const [path, contents] of Object.entries(files)) {
-        const { error: uploadError } = await supabase.storage
-          .from('actions')
-          .upload(`${basePath}/${path}`, contents, {
-            contentType: 'text/plain',
-            upsert: false,
-          })
+      try {
+        for (const [path, contents] of Object.entries(files)) {
+          const { error } = await supabase.storage
+            .from('actions')
+            .upload(`${basePath}/${path}`, contents, {
+              contentType: contentTypeFor(path),
+              upsert: false,
+            })
 
-        if (uploadError) {
-          throw new Error(`Upload failed: ${path}`)
+          if (error) throw error
         }
+      } catch (err) {
+        await supabase.from('actions').delete().eq('id', action.id)
+        throw err
       }
+
 
       window.dispatchEvent(new Event('actions:resync'))
 

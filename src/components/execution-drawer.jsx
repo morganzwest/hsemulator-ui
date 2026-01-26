@@ -134,7 +134,7 @@ function ExecutionExportFooter({ execution, events }) {
                 })
               }
             >
-              Export JSON
+              Export to JSON
             </DropdownMenuItem>
 
             <DropdownMenuItem
@@ -147,7 +147,7 @@ function ExecutionExportFooter({ execution, events }) {
                 })
               }
             >
-              Export TXT <Badge className="ml-2" variant="outline">Coming Soon</Badge>
+              Export to TXT <Badge className="ml-2" variant="outline">Coming Soon</Badge>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -401,7 +401,14 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                               {ev.kind}
                             </span>
                             <span>
-                              {new Date(ev.event_time).toLocaleTimeString()}
+                              {new Date(ev.event_time).toLocaleTimeString('en-GB', {
+  hour12: false,
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  fractionalSecondDigits: 3,
+})
+}
                             </span>
                           </div>
 

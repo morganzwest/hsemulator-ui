@@ -191,26 +191,6 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
     return () => window.removeEventListener('actions:resync', handleResync);
   }, [loadActions]);
 
-  /* -----------------------------
-     Keyboard shortcuts
-  ----------------------------- */
-
-  useEffect(() => {
-    function onKeyDown(e) {
-      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
-        e.preventDefault();
-        document.getElementById('action-search')?.focus();
-      }
-
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        setCreateOpen(true);
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
 
   useEffect(() => {
   function handlePortalChange() {

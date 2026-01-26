@@ -109,6 +109,30 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
     outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
+  useEffect(() => {
+  const openCreate = () => setCreateOpen(true)
+  const openTemplates = () => setTemplatesOpen(true)
+  const saveTemplate = () => handleSaveTemplate()
+  const saveAll = () => handleSave()
+  const run = () => handleRun()
+
+  window.addEventListener('action:create', openCreate)
+  window.addEventListener('templates:open', openTemplates)
+  window.addEventListener('template:save', saveTemplate)
+  window.addEventListener('editor:save-all', saveAll)
+  window.addEventListener('editor:run', run)
+
+  return () => {
+    window.removeEventListener('action:create', openCreate)
+    window.removeEventListener('templates:open', openTemplates)
+    window.removeEventListener('template:save', saveTemplate)
+    window.removeEventListener('editor:save-all', saveAll)
+    window.removeEventListener('editor:run', run)
+  }
+}, [])
+
+
+
   /* -----------------------------
      Handlers
   ----------------------------- */

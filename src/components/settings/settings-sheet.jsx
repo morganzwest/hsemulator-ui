@@ -27,6 +27,7 @@ import {
   Terminal,
   Plug,
 } from 'lucide-react';
+import { useEffect } from 'react';
 
 export const SETTINGS_TABS = [
   // { key: 'general', label: 'General', icon: Settings },
@@ -46,6 +47,13 @@ export function SettingsSheet({ children }) {
   const [activeTab, setActiveTab] = React.useState(SETTINGS_TABS[0].key);
 
   const activeTabDef = SETTINGS_TABS.find((t) => t.key === activeTab);
+
+  useEffect(() => {
+  const open = () => setOpen(true)
+  window.addEventListener('settings:open', open)
+  return () => window.removeEventListener('settings:open', open)
+}, [])
+
 
   return (
     <Drawer

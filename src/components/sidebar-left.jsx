@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import {
   initPortalState,
 } from '@/lib/portal-state'
+import { useSearchParams } from 'next/navigation'
 
 /* -------------------------------------
    Sidebar
@@ -91,10 +92,22 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
   const [query, setQuery] = useState('');
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
+const searchParams = useSearchParams()
+const actionIdFromUrl = searchParams.get('actionId')
 
   /* -----------------------------
      Load actions
   ----------------------------- */
+useEffect(() => {
+  if (!actionIdFromUrl) return
+  if (!actions.length) return
+
+  const match = actions.find(a => a.id === actionIdFromUrl)
+  if (!match) return
+
+  setActiveActionId(match.id)
+  onSelectAction?.(match)
+}, [actionIdFromUrl, actions, onSelectAction])
 
   useEffect(() => {
   async function loadPortals() {
@@ -181,6 +194,32 @@ const [portalsLoaded, setPortalsLoaded] = useState(false)
   /* -----------------------------
      Global resync listener
   ----------------------------- */
+
+useEffect(() => {
+  function handleChangeAction() {
+    setActiveActionId(null)
+  }
+
+  function handleEditCurrentAction() {
+    if (!activeActionId) return
+
+    window.dispatchEvent(
+      new CustomEvent('action:edit', {
+        detail: { actionId: activeActionId },
+      })
+    )
+  }
+
+  window.addEventListener('action:change', handleChangeAction)
+  window.addEventListener('action:edit-current', handleEditCurrentAction)
+
+  return () => {
+    window.removeEventListener('action:change', handleChangeAction)
+    window.removeEventListener('action:edit-current', handleEditCurrentAction)
+  }
+}, [actions, activeActionId, onSelectAction])
+
+
 
   useEffect(() => {
     function handleResync() {

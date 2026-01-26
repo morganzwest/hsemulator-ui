@@ -3,6 +3,7 @@
 
 import { useState, useCallback } from 'react'
 import { MoreHorizontal } from 'lucide-react'
+import { useEffect } from 'react'
 
 import {
   DropdownMenu,
@@ -54,6 +55,16 @@ export function ActionMenu({ action }) {
     },
     [stop],
   )
+useEffect(() => {
+  function handleEditEvent(e) {
+    if (e.detail?.actionId !== action.id) return
+    setEditOpen(true)
+  }
+
+  window.addEventListener('action:edit', handleEditEvent)
+  return () =>
+    window.removeEventListener('action:edit', handleEditEvent)
+}, [action.id])
 
   return (
     <>

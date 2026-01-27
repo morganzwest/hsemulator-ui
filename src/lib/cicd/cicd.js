@@ -68,24 +68,43 @@ export async function saveCICDConfig({
   if (error) throw error
 }
 
+function inferRuntimeFromSource(sourceCode) {
+  // Very explicit Python signals
+  if (
+    /^\s*def\s+\w+\s*\(/m.test(sourceCode) ||
+    /^\s*import\s+\w+/m.test(sourceCode) ||
+    sourceCode.includes('requests.') ||
+    sourceCode.includes('os.environ')
+  ) {
+    return 'PYTHON39'
+  }
+
+  // Default to Node
+  return 'NODE20X'
+}
+
+
 /* ----------------------------------------
    Promote to runtime
 ---------------------------------------- */
-
 export async function promoteAction({
   workflowId,
   secretName,
   hubspotToken,
   sourceCode,
-  runtime = 'nodejs18.x',
+  runtime, // optional override
   force = false,
   dryRun = false,
 }) {
-  const apiKey = process.env.NEXT_PUBLIC_RUNTIME_API_KEY | 'dev_secret_key'
-
-  if (!apiKey) {
-    throw new Error('Missing NEXT_PUBLIC_RUNTIME_API_KEY')
+  if (!hubspotToken) {
+    throw new Error('hubspot_token is required for promotion')
   }
+
+  const resolvedRuntime =
+    runtime ?? inferRuntimeFromSource(sourceCode)
+
+  const apiKey =
+    process.env.NEXT_SECRET_RUNTIME_API_KEY || 'dev_secret_key'
 
   const res = await fetch(
     'https://hsemulator-712737660959.europe-west1.run.app/promote',
@@ -102,7 +121,7 @@ export async function promoteAction({
           type: 'secret',
           value: secretName,
         },
-        runtime,
+        runtime: resolvedRuntime,
         source_code: sourceCode,
         force,
         dry_run: dryRun,

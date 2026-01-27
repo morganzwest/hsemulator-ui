@@ -112,6 +112,7 @@ export function CICDSetupDrawer({
       const res = await promoteAction({
         workflowId,
         secretName,
+        hubspotToken: token,
         sourceCode,
       })
 

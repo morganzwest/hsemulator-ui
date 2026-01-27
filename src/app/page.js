@@ -87,7 +87,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl"
+            className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl leading-[1.4]"
           >
             Ship HubSpot custom code
             <span className="block bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">

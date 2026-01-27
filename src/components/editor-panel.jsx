@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MonacoEditor } from '@/components/monaco-editor';
-import { Play, Save, Star, Columns, Rows, Trash2 } from 'lucide-react';
+import { Play, Save, Star, Columns, Rows, Trash2, Workflow } from 'lucide-react';
 import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5';
 import { SiYaml } from 'react-icons/si';
 import { TbJson } from 'react-icons/tb';
@@ -30,6 +30,7 @@ import { IconFolderCode } from '@tabler/icons-react';
 import { TemplatesSheet } from '~/components/template-sheet';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { CICDSetupDrawer } from './cicdsetupdrawer';
 
 /* --------------------------------
    Language icon
@@ -73,6 +74,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState([]);
+const [cicdOpen, setCicdOpen] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [split, setSplit] = useState('vertical');
@@ -254,6 +256,14 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   return (
     <>
       {/* ALWAYS mounted */}
+      <CICDSetupDrawer
+  open={cicdOpen}
+  onOpenChange={setCicdOpen}
+  actionId={activeAction?.id}
+  portalId={activeAction?.portal_id}
+  sourceCode={active?.value}
+/>
+
       <TemplatesSheet
         open={templatesOpen}
         onOpenChange={setTemplatesOpen}
@@ -329,6 +339,19 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Swap output orientation</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+  variant="ghost"
+  size="icon"
+  onClick={() => setCicdOpen(true)}
+>
+  <Workflow />
+</Button>
+
+                </TooltipTrigger>
+                <TooltipContent>Push to HubSpot</TooltipContent>
               </Tooltip>
 
               <Tooltip>

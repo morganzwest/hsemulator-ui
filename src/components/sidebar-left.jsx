@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getActivePortalId } from '@/lib/portal-state'
+import { getActivePortalId } from '@/lib/portal-state';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { TemplatesSheet } from '~/components/template-sheet';
 import { SettingsSheet } from '@/components/settings/settings-sheet';
@@ -41,10 +41,8 @@ import {
 } from '@/components/ui/empty';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { cn } from '@/lib/utils';
-import {
-  initPortalState,
-} from '@/lib/portal-state'
-import { useSearchParams } from 'next/navigation'
+import { initPortalState } from '@/lib/portal-state';
+import { useSearchParams } from 'next/navigation';
 
 /* -------------------------------------
    Sidebar
@@ -84,36 +82,37 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
 
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-const [portals, setPortals] = useState([])
-const [activePortal, setActivePortalState] = useState(null)
-const [portalsLoaded, setPortalsLoaded] = useState(false)
+  const [portals, setPortals] = useState([]);
+  const [activePortal, setActivePortalState] = useState(null);
+  const [portalsLoaded, setPortalsLoaded] = useState(false);
 
   const [activeActionId, setActiveActionId] = useState(null);
   const [query, setQuery] = useState('');
   const [actions, setActions] = useState([]);
   const [loading, setLoading] = useState(true);
-const searchParams = useSearchParams()
-const actionIdFromUrl = searchParams.get('actionId')
+  const searchParams = useSearchParams();
+  const actionIdFromUrl = searchParams.get('actionId');
 
   /* -----------------------------
      Load actions
   ----------------------------- */
-useEffect(() => {
-  if (!actionIdFromUrl) return
-  if (!actions.length) return
+  useEffect(() => {
+    if (!actionIdFromUrl) return;
+    if (!actions.length) return;
 
-  const match = actions.find(a => a.id === actionIdFromUrl)
-  if (!match) return
+    const match = actions.find((a) => a.id === actionIdFromUrl);
+    if (!match) return;
 
-  setActiveActionId(match.id)
-  onSelectAction?.(match)
-}, [actionIdFromUrl, actions, onSelectAction])
+    setActiveActionId(match.id);
+    onSelectAction?.(match);
+  }, [actionIdFromUrl, actions, onSelectAction]);
 
   useEffect(() => {
-  async function loadPortals() {
-    let { data, error } = await supabase
-  .from('portals')
-  .select(`
+    async function loadPortals() {
+      let { data, error } = await supabase
+        .from('portals')
+        .select(
+          `
     uuid,
     name,
     icon,
@@ -123,103 +122,103 @@ useEffect(() => {
     profiles:created_by (
       plan
     )
-  `)
-  .order('created_at', { ascending: true });
+  `,
+        )
+        .order('created_at', { ascending: true });
 
-    data =
-  data?.map((portal) => ({
-    ...portal,
-    plan: portal.profiles?.plan === 'pro' ? 'Professional' : null,
-  })) ?? [];
+      data =
+        data?.map((portal) => ({
+          ...portal,
+          plan: portal.profiles?.plan === 'pro' ? 'Professional' : null,
+        })) ?? [];
 
+      if (error) {
+        console.error('[SidebarLeft] Failed to load portals:', error);
+        return;
+      }
 
-    if (error) {
-      console.error('[SidebarLeft] Failed to load portals:', error)
-      return
+      const activeUuid = initPortalState(data);
+      const active = data.find((p) => p.uuid === activeUuid);
+
+      setPortals(data);
+      setActivePortalState(active);
+      setPortalsLoaded(true);
     }
 
-    const activeUuid = initPortalState(data)
-    const active = data.find(p => p.uuid === activeUuid)
-
-    setPortals(data)
-    setActivePortalState(active)
-    setPortalsLoaded(true)
-  }
-
-  loadPortals()
-}, [supabase])
-
-
+    loadPortals();
+  }, [supabase]);
 
   const loadActions = useCallback(async () => {
-  if (!portalsLoaded) return
+    if (!portalsLoaded) return;
 
-  setLoading(true)
+    setLoading(true);
 
-  let portalId
-  try {
-    portalId = getActivePortalId()
-  } catch {
-    setLoading(false)
-    return
-  }
+    let portalId;
+    try {
+      portalId = getActivePortalId();
+    } catch {
+      setLoading(false);
+      return;
+    }
 
-  const { data, error } = await supabase
-    .from('actions')
-    .select('id, owner_id, portal_id, name, description, language, updated_at')
-    .eq('portal_id', portalId)
-    .eq('is_active', true)
-    .order('updated_at', { ascending: false })
+    const { data, error } = await supabase
+      .from('actions')
+      .select(
+        'id, owner_id, portal_id, name, description, language, updated_at',
+      )
+      .eq('portal_id', portalId)
+      .eq('is_active', true)
+      .order('updated_at', { ascending: false });
 
-  if (error) {
-    console.error('[SidebarLeft] Failed to load actions:', error)
-  } else {
-    setActions(data ?? [])
-    onActionsLoaded?.(data ?? [])
-  }
+    if (error) {
+      console.error('[SidebarLeft] Failed to load actions:', error);
+    } else {
+      setActions(data ?? []);
+      onActionsLoaded?.(data ?? []);
+    }
 
-  setLoading(false)
-}, [supabase, onActionsLoaded, portalsLoaded])
-
+    setLoading(false);
+  }, [supabase, onActionsLoaded, portalsLoaded]);
 
   /* -----------------------------
      Initial load
   ----------------------------- */
 
   useEffect(() => {
-  if (!portalsLoaded) return
-  loadActions()
-}, [portalsLoaded, loadActions])
+    if (!portalsLoaded) return;
+    loadActions();
+  }, [portalsLoaded, loadActions]);
 
   /* -----------------------------
      Global resync listener
   ----------------------------- */
 
-useEffect(() => {
-  function handleChangeAction() {
-    setActiveActionId(null)
-  }
+  useEffect(() => {
+    function handleChangeAction() {
+      setActiveActionId(null);
+    }
 
-  function handleEditCurrentAction() {
-    if (!activeActionId) return
+    function handleEditCurrentAction() {
+      if (!activeActionId) return;
 
-    window.dispatchEvent(
-      new CustomEvent('action:edit', {
-        detail: { actionId: activeActionId },
-      })
-    )
-  }
+      window.dispatchEvent(
+        new CustomEvent('action:edit', {
+          detail: { actionId: activeActionId },
+        }),
+      );
+    }
 
-  window.addEventListener('action:change', handleChangeAction)
-  window.addEventListener('action:edit-current', handleEditCurrentAction)
+    window.addEventListener('action:change', handleChangeAction);
+    window.addEventListener('action:edit-current', handleEditCurrentAction);
 
-  return () => {
-    window.removeEventListener('action:change', handleChangeAction)
-    window.removeEventListener('action:edit-current', handleEditCurrentAction)
-  }
-}, [actions, activeActionId, onSelectAction])
-
-
+    return () => {
+      window.removeEventListener('action:change', handleChangeAction);
+      window.removeEventListener(
+        'action:edit-current',
+        handleEditCurrentAction,
+      );
+    };
+  }, [actions, activeActionId, onSelectAction]);
 
   useEffect(() => {
     function handleResync() {
@@ -230,17 +229,15 @@ useEffect(() => {
     return () => window.removeEventListener('actions:resync', handleResync);
   }, [loadActions]);
 
-
   useEffect(() => {
-  function handlePortalChange() {
-    loadActions()
-  }
+    function handlePortalChange() {
+      loadActions();
+    }
 
-  window.addEventListener('portal:changed', handlePortalChange)
-  return () =>
-    window.removeEventListener('portal:changed', handlePortalChange)
-}, [loadActions])
-
+    window.addEventListener('portal:changed', handlePortalChange);
+    return () =>
+      window.removeEventListener('portal:changed', handlePortalChange);
+  }, [loadActions]);
 
   /* -----------------------------
      Filter
@@ -259,15 +256,10 @@ useEffect(() => {
       {/* Header */}
       <SidebarHeader className='gap-3 pb-2'>
         {portalsLoaded && activePortal ? (
-  <TeamSwitcher
-    teams={portals}
-    Icon={AudioWaveform}
-  />
-) : (
-  <Skeleton className="h-9 w-full rounded-md" />
-)}
-
-
+          <TeamSwitcher teams={portals} Icon={AudioWaveform} />
+        ) : (
+          <Skeleton className='h-9 w-full rounded-md' />
+        )}
 
         <div className='flex flex-col gap-2 px-1.5 pt-1'>
           <div className='flex items-center justify-between border-b pb-1'>
@@ -286,31 +278,29 @@ useEffect(() => {
             </Button>
           </div>
 
-          <div className="relative">
-  {/* Search icon */}
-  <Search
-    className="pointer-events-none absolute left-3 inset-y-0 my-auto h-4 w-4 text-muted-foreground"
-  />
+          <div className='relative'>
+            {/* Search icon */}
+            <Search className='pointer-events-none absolute left-3 inset-y-0 my-auto h-4 w-4 text-muted-foreground' />
 
-  <Input
-    id="action-search"
-    placeholder="Search actions…"
-    value={query}
-    onChange={(e) => setQuery(e.target.value)}
-    className="
+            <Input
+              id='action-search'
+              placeholder='Search actions…'
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className='
       h-9 pl-9 pr-9 text-sm
       bg-background
       focus-visible:ring-2 focus-visible:ring-ring
-    "
-  />
+    '
+            />
 
-  {/* Clear button */}
-  {query && (
-    <button
-      type="button"
-      onClick={() => setQuery('')}
-      aria-label="Clear search"
-      className="
+            {/* Clear button */}
+            {query && (
+              <button
+                type='button'
+                onClick={() => setQuery('')}
+                aria-label='Clear search'
+                className='
         absolute right-2 inset-y-0 my-auto
         inline-flex h-6 w-6 items-center justify-center
         rounded-md text-muted-foreground
@@ -318,13 +308,12 @@ useEffect(() => {
         hover:bg-accent hover:text-foreground
         focus-visible:outline-none
         focus-visible:ring-2 focus-visible:ring-ring
-      "
-    >
-      <span className="text-base leading-none">×</span>
-    </button>
-  )}
-</div>
-
+      '
+              >
+                <span className='text-base leading-none'>×</span>
+              </button>
+            )}
+          </div>
         </div>
       </SidebarHeader>
 
@@ -332,8 +321,8 @@ useEffect(() => {
       <SidebarContent className='flex h-full flex-col'>
         {/* Scrollable actions */}
         <div className='flex-1 min-h-0'>
-          <ScrollArea className='h-full pr-2 px-1'>
-            <div className='space-y-1 px-2'>
+          <ScrollArea className='h-full pr-2 px-1 overflow-x-hidden'>
+            <div className='w-full space-y-1 px-2'>
               {loading ? (
                 <ActionListSkeleton />
               ) : filteredActions.length > 0 ? (
@@ -343,7 +332,7 @@ useEffect(() => {
                   return (
                     <div key={action.id} className='relative'>
                       {active && (
-                        <span className='absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 bg-primary' />
+                        <span className='absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 bg-primary overflow-y-auto overflow-x-hidden' />
                       )}
 
                       <ActionListItem
@@ -389,7 +378,11 @@ useEffect(() => {
         {/* Footer */}
         <div className='border-t bg-muted/30 px-3 py-2'>
           <div className='flex flex-col gap-1'>
-            <SidebarFooterItem icon={Activity} label='Monitoring' badge="Coming Soon" />
+            <SidebarFooterItem
+              icon={Activity}
+              label='Monitoring'
+              badge='Coming Soon'
+            />
 
             <SidebarFooterItem
               icon={Blocks}
@@ -463,14 +456,14 @@ function SidebarFooterItem({
         emphasis && 'font-medium',
       )}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className='h-4 w-4' />
       <span>{label}</span>
 
       {badge && (
-        <Badge className="ml-auto text-muted-foreground" variant="outline">
+        <Badge className='ml-auto text-muted-foreground' variant='outline'>
           {badge}
         </Badge>
       )}
     </button>
-  )
+  );
 }

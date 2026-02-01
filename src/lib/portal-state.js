@@ -56,7 +56,6 @@ function readFromStorage() {
  */
 export function getActivePortalId() {
   const id = getActivePortalUuid()
-  log('getActivePortalId →', id)
   return id
 }
 
@@ -106,7 +105,6 @@ export function getActivePortalUuid() {
     throw new Error('Portal state not initialised')
   }
 
-  log('getActivePortalUuid →', activePortalUuid)
   return activePortalUuid
 }
 

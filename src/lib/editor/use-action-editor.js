@@ -1,6 +1,5 @@
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { inferLanguage } from '@/lib/editor/infer-language'
-import YAML from 'yaml'
 import { toast } from 'sonner'
 import { getActivePortalId } from '../portal-state'
 
@@ -50,23 +49,49 @@ function resolveActionBasePath(action) {
   return path
 }
 
+async function loadDefaultFixture({ supabase, basePath }) {
+  const fixturePath = `${basePath}/event.json`
+
+  const { data, error } = await supabase
+    .storage
+    .from('actions')
+    .download(fixturePath)
+
+  if (error || !data) {
+    // No fixture is a valid state
+    return []
+  }
+
+  return [
+    {
+      name: 'event.json',
+      source: await data.text(),
+    },
+  ]
+}
+
+
 /* -----------------------------
    Hook
 ----------------------------- */
 
 function compileInlineConfig({
-  yamlConfig,
   files,
   fixtures,
 }) {
-  return {
-    version: yamlConfig.version,
+  const entry =
+    Object.keys(files).find(f => f.endsWith('.py')) ||
+    Object.keys(files).find(f => f.endsWith('.js'))
 
+  if (!entry) {
+    throw new Error('No entry file (.py or .js) found')
+  }
+
+  return {
     action: {
-      language:
-        yamlConfig.action?.type === 'python' ? 'python' : 'js',
-      entry: yamlConfig.action.entry,
-      source: files[yamlConfig.action.entry].value,
+      language: entry.endsWith('.py') ? 'python' : 'javascript',
+      entry,
+      source: files[entry].value,
     },
 
     fixtures: fixtures.map(f => ({
@@ -74,23 +99,21 @@ function compileInlineConfig({
       source: f.source,
     })),
 
-    env: yamlConfig.env ?? {},
-
-    runtime: {
-      node: yamlConfig.runtime?.node ?? 'node',
-      python: yamlConfig.runtime?.python ?? 'python',
+    // EXACTLY matches working example
+    env: {
+      API_KEY: {
+        secret_id: '9adcc3cb-469c-4927-9a46-9045d46c031f',
+        type: 'secret',
+      },
+      MODE: 'test',
     },
 
-    output: yamlConfig.output,
-
-    snapshots: {
-      enabled: yamlConfig.snapshots?.enabled ?? true,
-      ignore: yamlConfig.snapshots?.ignore ?? [],
-    },
-
-    repeat: yamlConfig.repeat ?? 1,
+    repeat: 1,
   }
 }
+
+
+
 
 export function useActionEditor({
   activeAction,
@@ -179,97 +202,97 @@ export function useActionEditor({
   ----------------------------- */
 
   async function saveAllFiles(editorRef) {
-  if (!activeAction) return
+    if (!activeAction) return
 
-  const basePath = resolveActionBasePath(activeAction)
-  console.debug('[ActionEditor] saveAllFiles → basePath', basePath)
+    const basePath = resolveActionBasePath(activeAction)
+    console.debug('[ActionEditor] saveAllFiles → basePath', basePath)
 
-  // 1) Run formatter and allow Monaco to flush model updates
-  try {
-    await editorRef?.current
-      ?.getAction('editor.action.formatDocument')
-      ?.run()
-  } catch (e) {
-    console.warn('[ActionEditor] formatDocument failed (continuing)', e)
-  }
-
-  // Let Monaco propagate the formatted text into state
-  await new Promise(r => setTimeout(r, 0))
-
-  // 2) Decide what to save (authoritative)
-  // Prefer saving all files if any are dirty to avoid missing changes
-  const entries = Object.entries(files)
-  const dirtyEntries = entries.filter(([, f]) => f.dirty)
-
-  if (!dirtyEntries.length) {
-    console.debug('[ActionEditor] No dirty files detected; skipping save')
-    return
-  }
-
-  // 3) Upload sequentially with verification logging
-  const saved = new Set()
-
-  try {
-    for (const [name, file] of dirtyEntries) {
-      const filePath = `${basePath}/${name}`
-
-      const contentType =
-        file.language === 'json'
-          ? 'application/json;charset=utf-8'
-          : name.endsWith('.yaml') || name.endsWith('.yml')
-            ? 'text/yaml;charset=utf-8'
-            : name.endsWith('.js')
-              ? 'text/javascript;charset=utf-8'
-              : name.endsWith('.py')
-                ? 'text/x-python;charset=utf-8'
-                : 'text/plain;charset=utf-8'
-
-      const body = new Blob([file.value], { type: contentType })
-
-      console.debug('[ActionEditor] upload →', {
-        path: filePath,
-        bytes: file.value?.length ?? 0,
-        contentType,
-      })
-
-      const { error } = await supabase.storage
-        .from('actions')
-        .upload(filePath, body, { upsert: true })
-
-      if (error) {
-        console.error('[ActionEditor] upload failed', filePath, error)
-        throw error
-      }
-
-      saved.add(name)
+    // 1) Run formatter and allow Monaco to flush model updates
+    try {
+      await editorRef?.current
+        ?.getAction('editor.action.formatDocument')
+        ?.run()
+    } catch (e) {
+      console.warn('[ActionEditor] formatDocument failed (continuing)', e)
     }
 
-    // 4) Touch action updated_at only if uploads succeeded
-    await supabase
-      .from('actions')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', activeAction.id)
+    // Let Monaco propagate the formatted text into state
+    await new Promise(r => setTimeout(r, 0))
 
-    // 5) Clear dirty only for successfully saved files
-    setFiles(prev =>
-      Object.fromEntries(
-        Object.entries(prev).map(([k, v]) => [
-          k,
-          saved.has(k) ? { ...v, dirty: false } : v,
-        ])
+    // 2) Decide what to save (authoritative)
+    // Prefer saving all files if any are dirty to avoid missing changes
+    const entries = Object.entries(files)
+    const dirtyEntries = entries.filter(([, f]) => f.dirty)
+
+    if (!dirtyEntries.length) {
+      console.debug('[ActionEditor] No dirty files detected; skipping save')
+      return
+    }
+
+    // 3) Upload sequentially with verification logging
+    const saved = new Set()
+
+    try {
+      for (const [name, file] of dirtyEntries) {
+        const filePath = `${basePath}/${name}`
+
+        const contentType =
+          file.language === 'json'
+            ? 'application/json;charset=utf-8'
+            : name.endsWith('.yaml') || name.endsWith('.yml')
+              ? 'text/yaml;charset=utf-8'
+              : name.endsWith('.js')
+                ? 'text/javascript;charset=utf-8'
+                : name.endsWith('.py')
+                  ? 'text/x-python;charset=utf-8'
+                  : 'text/plain;charset=utf-8'
+
+        const body = new Blob([file.value], { type: contentType })
+
+        console.debug('[ActionEditor] upload →', {
+          path: filePath,
+          bytes: file.value?.length ?? 0,
+          contentType,
+        })
+
+        const { error } = await supabase.storage
+          .from('actions')
+          .upload(filePath, body, { upsert: true })
+
+        if (error) {
+          console.error('[ActionEditor] upload failed', filePath, error)
+          throw error
+        }
+
+        saved.add(name)
+      }
+
+      // 4) Touch action updated_at only if uploads succeeded
+      await supabase
+        .from('actions')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', activeAction.id)
+
+      // 5) Clear dirty only for successfully saved files
+      setFiles(prev =>
+        Object.fromEntries(
+          Object.entries(prev).map(([k, v]) => [
+            k,
+            saved.has(k) ? { ...v, dirty: false } : v,
+          ])
+        )
       )
-    )
 
-    setLogs(l => [...l, '✔ Files saved'])
-    console.debug('[ActionEditor] saveAllFiles completed', {
-      saved: Array.from(saved),
-    })
-  } catch (err) {
-    // Do NOT clear dirty flags on failure
-    console.error('[ActionEditor] saveAllFiles failed', err)
-    setLogs(l => [...l, `✖ Save failed: ${err.message}`])
+      setLogs(l => [...l, '✔ Files saved'])
+      console.debug('[ActionEditor] saveAllFiles completed', {
+        saved: Array.from(saved),
+      })
+    } catch (err) {
+      // Do NOT clear dirty flags on failure
+      console.error('[ActionEditor] saveAllFiles failed', err)
+      setLogs(l => [...l, `✖ Save failed: ${err.message}`])
+    }
   }
-}
 
 
   function resolveLevel(event) {
@@ -353,7 +376,6 @@ export function useActionEditor({
       return
     }
 
-    const actionFile = files[entryFile]
     const basePath = resolveActionBasePath(activeAction)
 
     console.debug('[ActionEditor] runFile → basePath', basePath)
@@ -368,54 +390,32 @@ export function useActionEditor({
 
         try {
           const { id: action_id, owner_id } = activeAction
-
-          const { data: configBlob, error: configErr } =
-            await supabase.storage
-              .from('actions')
-              .download(`${basePath}/config.yaml`)
-
-          if (configErr || !configBlob) {
-            throw new Error('config.yaml is required')
-          }
-
-          const yamlConfig = YAML.parse(await configBlob.text()) ?? {}
-
-          const fixtureFiles = await Promise.all(
-            (yamlConfig.fixtures ?? []).map(async path => {
-              const { data, error } = await supabase.storage
-                .from('actions')
-                .download(`${basePath}/${path}`)
-
-              if (error || !data) {
-                throw new Error(`Missing fixture: ${path}`)
-              }
-
-              return {
-                name: path.startsWith('/') ? path.slice(1) : path,
-                source: await data.text(),
-              }
-            })
-          )
-
-          const inlineConfig = compileInlineConfig({
-            yamlConfig,
-            files,
-            fixtures: fixtureFiles,
-          })
-
           const { data: execInsert, error: execErr } = await supabase
             .from('action_executions')
             .insert({
               action_id,
               owner_id,
-              status: 'running',
+              status: 'queued',
               started_at: new Date().toISOString(),
             })
             .select()
             .single()
 
           if (execErr) throw execErr
+
+          executionId = execInsert.id
           executionRow = execInsert
+
+          const fixtures = await loadDefaultFixture({
+            supabase,
+            basePath,
+          })
+
+          const inlineConfig = compileInlineConfig({
+            files,
+            fixtures,
+          })
+
 
           const res = await fetch(
             `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
@@ -427,17 +427,20 @@ export function useActionEditor({
               },
               body: JSON.stringify({
                 mode: 'execute',
+                execution_id: executionId,
                 config: inlineConfig,
               }),
             }
           )
 
+
+
+
+
           const payload = await res.json()
           if (!res.ok) {
             throw new Error(payload?.error || 'Execution failed')
           }
-
-          executionId = payload?.summary?.execution_id
 
           if (Array.isArray(payload?.events)) {
             const rows = payload.events.map(e => ({

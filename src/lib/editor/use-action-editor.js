@@ -2,6 +2,8 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { inferLanguage } from '@/lib/editor/infer-language'
 import { toast } from 'sonner'
 import { getActivePortalId } from '../portal-state'
+import { useEffect, useRef } from 'react'
+import { subscribeExecutionRealtime } from './realtime-logs'
 
 /* -----------------------------
    Helpers
@@ -9,26 +11,14 @@ import { getActivePortalId } from '../portal-state'
 
 function formatOutputFields(outputFields) {
   if (!outputFields || Object.keys(outputFields).length === 0) return []
-
-  return [
-    '',
-    '--- Output Fields ---',
-    JSON.stringify(outputFields, null, 2),
-  ]
+  return ['', '--- Output Fields ---', JSON.stringify(outputFields, null, 2)]
 }
 
-function formatTimestamp(ts) {
-  if (!ts) return ''
-  const ms =
-    ts.secs_since_epoch * 1000 +
-    Math.floor((ts.nanos_since_epoch || 0) / 1e6)
-  return new Date(ms).toISOString()
+function formatExecutionIdLine(executionId) {
+  const time = formatTimestamp(new Date().toISOString())
+  return `${time} [EVENT] Execution ID — ${executionId}`
 }
 
-function formatEvent(event) {
-  const ts = formatTimestamp(event.timestamp)
-  return ts ? `[${ts}] ${event.kind}` : event.kind
-}
 
 function resolveEntryFile(files) {
   return (
@@ -40,52 +30,25 @@ function resolveEntryFile(files) {
 
 function resolveActionBasePath(action) {
   if (!action?.id || !action?.portal_id) {
-    console.error('[ActionEditor] Invalid action for base path', action)
     throw new Error('Invalid action: missing id or portal_id')
   }
-
-  const path = `${action.portal_id}/${action.id}`
-  console.debug('[ActionEditor] Using storage path:', path)
-  return path
+  return `${action.portal_id}/${action.id}`
 }
 
 async function loadDefaultFixture({ supabase, basePath }) {
-  const fixturePath = `${basePath}/event.json`
-
-  const { data, error } = await supabase
-    .storage
+  const { data } = await supabase.storage
     .from('actions')
-    .download(fixturePath)
-
-  if (error || !data) {
-    // No fixture is a valid state
-    return []
-  }
-
-  return [
-    {
-      name: 'event.json',
-      source: await data.text(),
-    },
-  ]
+    .download(`${basePath}/event.json`)
+  if (!data) return []
+  return [{ name: 'event.json', source: await data.text() }]
 }
 
-
-/* -----------------------------
-   Hook
------------------------------ */
-
-function compileInlineConfig({
-  files,
-  fixtures,
-}) {
+function compileInlineConfig({ files, fixtures }) {
   const entry =
     Object.keys(files).find(f => f.endsWith('.py')) ||
     Object.keys(files).find(f => f.endsWith('.js'))
 
-  if (!entry) {
-    throw new Error('No entry file (.py or .js) found')
-  }
+  if (!entry) throw new Error('No entry file found')
 
   return {
     action: {
@@ -93,13 +56,7 @@ function compileInlineConfig({
       entry,
       source: files[entry].value,
     },
-
-    fixtures: fixtures.map(f => ({
-      name: f.name,
-      source: f.source,
-    })),
-
-    // EXACTLY matches working example
+    fixtures,
     env: {
       API_KEY: {
         secret_id: '9adcc3cb-469c-4927-9a46-9045d46c031f',
@@ -107,13 +64,80 @@ function compileInlineConfig({
       },
       MODE: 'test',
     },
-
     repeat: 1,
   }
 }
 
+/* -----------------------------
+   Canonical log formatter
+----------------------------- */
+
+function formatTimestamp(ts) {
+  if (!ts) return '--:--:--.000'
+  const d = new Date(ts)
+  const pad = n => String(n).padStart(2, '0')
+  const ms = String(d.getMilliseconds()).padStart(3, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(
+    d.getSeconds()
+  )}.${ms}`
+}
+
+function resolveLevel(kind) {
+  switch (kind) {
+    case 'Stdout':
+      return 'INFO '
+    case 'Stderr':
+    case 'ExecutionFailed':
+    case 'ExecutionTimedOut':
+      return 'ERROR'
+    default:
+      return 'EVENT'
+  }
+}
+
+function defaultMessage(kind) {
+  switch (kind) {
+    case 'ExecutionCreated':
+      return 'Execution Queued'
+    case 'ValidationStarted':
+      return 'Validating Action Configuration'
+    case 'ExecutionStarted':
+      return 'Runtime Execution Started'
+    case 'ExecutionFinished':
+      return 'Runtime Finished Processing'
+    case 'ExecutionCompleted':
+      return 'Execution Completed Successfully'
+    case 'ExecutionFailed':
+      return 'Execution Failed'
+    case 'ExecutionTimedOut':
+      return 'Execution Exceeded Time Limit'
+    default:
+      return null
+  }
+}
+
+function formatLogRow(row) {
+  const time = formatTimestamp(row.event_time ?? row.created_at)
+  const level = resolveLevel(row.kind)
+  const prefix = `${time} [${level}] ${row.kind}`
+
+  // No message → synthetic/default event
+  if (!row.message) {
+    const msg = defaultMessage(row.kind)
+    return msg ? [`${prefix} — ${msg}`] : [prefix]
+  }
+
+  // Stdout / Stderr / returns (multiline-safe)
+  return row.message
+    .split('\n')
+    .filter(Boolean)
+    .map(line => `${prefix} — ${line}`)
+}
 
 
+/* -----------------------------
+   Hook
+----------------------------- */
 
 export function useActionEditor({
   activeAction,
@@ -126,74 +150,80 @@ export function useActionEditor({
 }) {
   const supabase = createSupabaseBrowserClient()
 
+  const activeExecutionIdRef = useRef(null)
+  const resolveExecutionRef = useRef(null)
+  const subscribedRef = useRef(false)
+
+  /* -----------------------------
+     Realtime subscription
+  ----------------------------- */
+
+  useEffect(() => {
+    if (subscribedRef.current) return
+    subscribedRef.current = true
+
+    const stop = subscribeExecutionRealtime(supabase, {
+      onLog: payload => {
+        const row = payload.new ?? payload.old
+        if (!row) return
+
+        if (
+          activeExecutionIdRef.current &&
+          row.execution_fk !== activeExecutionIdRef.current
+        ) {
+          return
+        }
+
+        const lines = formatLogRow(row)
+        setLogs(prev => [...prev, ...lines])
+
+        if (
+          row.kind === 'ExecutionCompleted' ||
+          row.kind === 'ExecutionFailed' ||
+          row.kind === 'ExecutionTimedOut'
+        ) {
+          resolveExecutionRef.current?.()
+          resolveExecutionRef.current = null
+        }
+      },
+    })
+
+    return stop
+  }, [])
+
   /* -----------------------------
      Load files
   ----------------------------- */
 
   async function loadFiles() {
     if (!activeAction) return
-
-    // NOTE: still validating active portal, but path comes from action
-    try {
-      getActivePortalId()
-    } catch {
-      toast.error('No active workspace selected')
-      throw new Error('Missing active portal')
-    }
+    getActivePortalId()
 
     const basePath = resolveActionBasePath(activeAction)
-
-    console.debug('[ActionEditor] loadFiles → list', basePath)
-
     setLoadingFiles(true)
     setLogs([])
 
-    const { data, error } = await supabase
-      .storage
-      .from('actions')
-      .list(basePath)
-
-    if (error) {
-      console.error('[ActionEditor] list failed', error)
-      setLogs([`✖ Failed to load files: ${error.message}`])
-      setLoadingFiles(false)
-      return
-    }
+    const { data } = await supabase.storage.from('actions').list(basePath)
 
     const entries = await Promise.all(
-      (data ?? [])
-        .filter(o => o.name && !o.name.endsWith('/'))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(async obj => {
-          const filePath = `${basePath}/${obj.name}`
-          console.debug('[ActionEditor] download', filePath)
-
-          const { data, error } = await supabase
-            .storage
-            .from('actions')
-            .download(filePath)
-
-          if (error) {
-            console.error('[ActionEditor] download failed', filePath, error)
-            return null
-          }
-
-          return [
-            obj.name,
-            {
-              language: inferLanguage(obj.name),
-              value: await data.text(),
-              dirty: false,
-            },
-          ]
-        })
+      (data ?? []).map(async obj => {
+        const { data } = await supabase.storage
+          .from('actions')
+          .download(`${basePath}/${obj.name}`)
+        return [
+          obj.name,
+          {
+            language: inferLanguage(obj.name),
+            value: await data.text(),
+            dirty: false,
+          },
+        ]
+      })
     )
 
-    const loaded = Object.fromEntries(entries.filter(Boolean))
-    const filenames = Object.keys(loaded)
-
+    const loaded = Object.fromEntries(entries)
     setFiles(loaded)
-    setActiveFile(filenames[0] ?? null)
+    setActiveFile(Object.keys(loaded)[0] ?? null)
     setLoadingFiles(false)
   }
 
@@ -203,323 +233,106 @@ export function useActionEditor({
 
   async function saveAllFiles(editorRef) {
     if (!activeAction) return
-
     const basePath = resolveActionBasePath(activeAction)
-    console.debug('[ActionEditor] saveAllFiles → basePath', basePath)
 
-    // 1) Run formatter and allow Monaco to flush model updates
-    try {
-      await editorRef?.current
-        ?.getAction('editor.action.formatDocument')
-        ?.run()
-    } catch (e) {
-      console.warn('[ActionEditor] formatDocument failed (continuing)', e)
-    }
+    await editorRef?.current
+      ?.getAction('editor.action.formatDocument')
+      ?.run()
 
-    // Let Monaco propagate the formatted text into state
     await new Promise(r => setTimeout(r, 0))
 
-    // 2) Decide what to save (authoritative)
-    // Prefer saving all files if any are dirty to avoid missing changes
-    const entries = Object.entries(files)
-    const dirtyEntries = entries.filter(([, f]) => f.dirty)
-
-    if (!dirtyEntries.length) {
-      console.debug('[ActionEditor] No dirty files detected; skipping save')
-      return
-    }
-
-    // 3) Upload sequentially with verification logging
-    const saved = new Set()
-
-    try {
-      for (const [name, file] of dirtyEntries) {
-        const filePath = `${basePath}/${name}`
-
-        const contentType =
-          file.language === 'json'
-            ? 'application/json;charset=utf-8'
-            : name.endsWith('.yaml') || name.endsWith('.yml')
-              ? 'text/yaml;charset=utf-8'
-              : name.endsWith('.js')
-                ? 'text/javascript;charset=utf-8'
-                : name.endsWith('.py')
-                  ? 'text/x-python;charset=utf-8'
-                  : 'text/plain;charset=utf-8'
-
-        const body = new Blob([file.value], { type: contentType })
-
-        console.debug('[ActionEditor] upload →', {
-          path: filePath,
-          bytes: file.value?.length ?? 0,
-          contentType,
-        })
-
-        const { error } = await supabase.storage
-          .from('actions')
-          .upload(filePath, body, { upsert: true })
-
-        if (error) {
-          console.error('[ActionEditor] upload failed', filePath, error)
-          throw error
-        }
-
-        saved.add(name)
-      }
-
-      // 4) Touch action updated_at only if uploads succeeded
-      await supabase
+    for (const [name, file] of Object.entries(files)) {
+      if (!file.dirty) continue
+      await supabase.storage
         .from('actions')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', activeAction.id)
+        .upload(`${basePath}/${name}`, new Blob([file.value]), {
+          upsert: true,
+        })
+    }
 
-      // 5) Clear dirty only for successfully saved files
-      setFiles(prev =>
-        Object.fromEntries(
-          Object.entries(prev).map(([k, v]) => [
-            k,
-            saved.has(k) ? { ...v, dirty: false } : v,
-          ])
-        )
+    await supabase
+      .from('actions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', activeAction.id)
+
+    setFiles(prev =>
+      Object.fromEntries(
+        Object.entries(prev).map(([k, v]) => [k, { ...v, dirty: false }])
       )
+    )
 
-      setLogs(l => [...l, '✔ Files saved'])
-      console.debug('[ActionEditor] saveAllFiles completed', {
-        saved: Array.from(saved),
-      })
-    } catch (err) {
-      // Do NOT clear dirty flags on failure
-      console.error('[ActionEditor] saveAllFiles failed', err)
-      setLogs(l => [...l, `✖ Save failed: ${err.message}`])
-    }
-  }
-
-
-  function resolveLevel(event) {
-    switch (event.kind) {
-      case 'Stderr':
-        return 'ERROR'
-      case 'ExecutionCreated':
-      case 'ValidationStarted':
-      case 'ExecutionStarted':
-      case 'ExecutionFinished':
-        return 'EVENT'
-      default:
-        return 'debug'
-    }
-  }
-
-  function formatTime(ts) {
-    if (!ts) return '--:--:--:--'
-    const ms =
-      ts.secs_since_epoch * 1000 +
-      Math.floor((ts.nanos_since_epoch || 0) / 1e6)
-
-    const d = new Date(ms)
-    return d.toLocaleTimeString('en-GB', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  }
-
-  function formatEventLine(event) {
-    const time = formatTime(event.timestamp)
-    const level = resolveLevel(event).padEnd(5, ' ')
-    const prefix = `${time} [${level}]`
-
-    if (event.message) {
-      return `${prefix} ${event.message}`
-    }
-
-    return `${prefix} ${event.kind}`
-  }
-
-  function formatEvents(events) {
-    const lines = []
-
-    let bufferingErrorBlock = false
-
-    for (const e of events) {
-      if (e.kind === 'Stderr') {
-        bufferingErrorBlock = true
-        lines.push(formatEventLine(e))
-        continue
-      }
-
-      bufferingErrorBlock = false
-      lines.push(formatEventLine(e))
-    }
-
-    return lines
-  }
-
-  function eventTimestampToISO(ts) {
-    if (!ts) return null
-    const ms =
-      ts.secs_since_epoch * 1000 +
-      Math.floor((ts.nanos_since_epoch || 0) / 1e6)
-    return new Date(ms).toISOString()
+    setLogs(l => [...l, '✔ Files saved'])
   }
 
   /* -----------------------------
-     Run action (INLINE execution)
+     Run action
   ----------------------------- */
 
   async function runFile() {
     if (!activeAction) return
-
+    setLogs(l => [...l, '---------------------'])
     const entryFile = resolveEntryFile(files)
     if (!entryFile) {
-      setLogs(l => [...l, '✖ No runnable action file (.js / .py) found'])
+      setLogs(l => [...l, '✖ No runnable file'])
       return
     }
 
-    const basePath = resolveActionBasePath(activeAction)
-
-    console.debug('[ActionEditor] runFile → basePath', basePath)
-
     setRunning(true)
-    setLogs(l => [...l, '', `▶ Running ${entryFile}`])
+    setLogs(l => [...l, '', `▶ Action added to queue (${entryFile})`])
 
-    toast.promise(
-      async () => {
-        let executionRow = null
-        let executionId = null
+    return toast.promise(
+      (async () => {
+        const donePromise = new Promise(resolve => {
+          resolveExecutionRef.current = resolve
+        })
+
+        const timeout = setTimeout(
+          () => resolveExecutionRef.current?.(),
+          60_000
+        )
 
         try {
-          const { id: action_id, owner_id } = activeAction
-          const { data: execInsert, error: execErr } = await supabase
+          const { data: exec } = await supabase
             .from('action_executions')
             .insert({
-              action_id,
-              owner_id,
+              action_id: activeAction.id,
+              owner_id: activeAction.owner_id,
               status: 'queued',
               started_at: new Date().toISOString(),
             })
             .select()
             .single()
 
-          if (execErr) throw execErr
+          activeExecutionIdRef.current = exec.id
 
-          executionId = execInsert.id
-          executionRow = execInsert
+          setLogs(prev => [...prev, formatExecutionIdLine(exec.id)])
 
           const fixtures = await loadDefaultFixture({
             supabase,
-            basePath,
+            basePath: resolveActionBasePath(activeAction),
           })
 
-          const inlineConfig = compileInlineConfig({
-            files,
-            fixtures,
+          await fetch(`${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: 'Bearer dev_secret_key',
+            },
+            body: JSON.stringify({
+              mode: 'execute',
+              execution_id: exec.id,
+              config: compileInlineConfig({ files, fixtures }),
+            }),
           })
 
-
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: 'Bearer dev_secret_key',
-              },
-              body: JSON.stringify({
-                mode: 'execute',
-                execution_id: executionId,
-                config: inlineConfig,
-              }),
-            }
-          )
-
-
-
-
-
-          const payload = await res.json()
-          if (!res.ok) {
-            throw new Error(payload?.error || 'Execution failed')
-          }
-
-          if (Array.isArray(payload?.events)) {
-            const rows = payload.events.map(e => ({
-              execution_fk: executionRow.id,
-              execution_id: executionId,
-              kind: e.kind,
-              event_time: eventTimestampToISO(e.timestamp),
-              message: e.message ?? null,
-            }))
-
-            await supabase
-              .from('action_execution_events')
-              .insert(rows)
-          }
-
-          if (payload?.summary?.result) {
-            const r = payload.summary.result
-
-            await supabase
-              .from('action_executions')
-              .update({
-                execution_id: executionId,
-                status: r.ok ? 'executed' : 'failed',
-                finished_at: new Date().toISOString(),
-                duration_ms: r.max_duration_ms,
-                max_duration_ms: r.max_duration_ms,
-                max_memory_kb: r.max_memory_kb,
-                runs: r.runs,
-                failures_count: r.failures?.length ?? 0,
-                ok: r.ok,
-                snapshots_ok: r.snapshots_ok,
-                result: payload.summary,
-              })
-              .eq('id', executionRow.id)
-          }
-
-          const lines = []
-
-          if (payload?.summary?.result) {
-            const r = payload.summary.result
-            lines.push('✔ Execution completed')
-            lines.push(`Result: ${r.ok ? 'OK' : 'FAILED'}`)
-            lines.push(`Runs: ${r.runs}`)
-            lines.push(`Duration: ${r.max_duration_ms} ms`)
-            lines.push(`Snapshots: ${r.snapshots_ok ? 'OK' : 'FAILED'}`)
-
-            if (r.outputFields) {
-              lines.push(...formatOutputFields(r.outputFields))
-            }
-          }
-
-          if (Array.isArray(payload?.events)) {
-            lines.push('')
-            lines.push('--- Events ---')
-            lines.push(...formatEvents(payload.events))
-          }
-
-          setLogs(l => [...l, ...lines])
-
-          return { entryFile }
-        } catch (err) {
-          if (executionRow) {
-            await supabase
-              .from('action_executions')
-              .update({
-                status: 'failed',
-                finished_at: new Date().toISOString(),
-                ok: false,
-                error_message: err.message,
-              })
-              .eq('id', executionRow.id)
-          }
-
-          setLogs(l => [...l, `✖ ${err.message}`])
-          throw err
+          await donePromise
         } finally {
+          clearTimeout(timeout)
+          activeExecutionIdRef.current = null
+          resolveExecutionRef.current = null
           setRunning(false)
         }
-      },
+      })(),
       {
         loading: 'Running action…',
         success: 'Execution complete',
@@ -528,9 +341,5 @@ export function useActionEditor({
     )
   }
 
-  return {
-    loadFiles,
-    saveAllFiles,
-    runFile,
-  }
+  return { loadFiles, saveAllFiles, runFile }
 }

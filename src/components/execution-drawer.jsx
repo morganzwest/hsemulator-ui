@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo } from 'react';
 import {
   Sheet,
@@ -17,114 +15,142 @@ import {
   Terminal,
   PlayCircle,
 } from 'lucide-react';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+
 import { useExecutionDetails } from '@/lib/use-execution-details';
 import { formatDistanceToNowStrict } from 'date-fns';
 
-/* -------------------------------------
-   Helpers
-------------------------------------- */
-
-function statusBadge(status, ok) {
-  if (status === 'running')
-    return (
-      <Badge className='border border-amber-500/30 bg-amber-500/15 text-amber-600 animate-pulse'>
-        Running
-      </Badge>
-    );
-
-  if (status === 'executed' && ok)
-    return (
-      <Badge className='border border-emerald-600/30 bg-emerald-600/15 text-emerald-600'>
-        Success
-      </Badge>
-    );
-
-  if (status === 'failed') return <Badge variant='destructive'>Failed</Badge>;
-
-  return <Badge variant='outline'>{status}</Badge>;
-}
-
-function exportExecution({ execution, events, type }) {
-  if (!execution) return;
-
-  let content = '';
-  let mime = 'text/plain';
-  let extension = type;
-
-  switch (type) {
-    case 'json': {
-      mime = 'application/json';
-      content = JSON.stringify(
-        {
-          execution,
-          events,
-          exported_at: new Date().toISOString(),
-        },
-        null,
-        2,
+function ExecutionStatusExplainer({ status }) {
+  switch (status) {
+    case 'created':
+      return (
+        <Explainer
+          icon={<PlayCircle className='h-5 w-5' />}
+          title='Execution created'
+          description='This execution has been created but has not yet entered the queue.'
+        />
       );
-      break;
-    }
 
-    case 'txt': {
-      content = [
-        `Execution ID: ${execution.id}`,
-        `Action: ${execution.action_name}`,
-        `Status: ${execution.status}`,
-        `Created: ${execution.created_at}`,
-        '',
-        '--- EVENTS ---',
-        ...events.map(
-          (e) =>
-            `[${e.event_time}] ${e.kind}\n${e.message ?? ''}`,
-        ),
-      ].join('\n\n');
-      break;
-    }
+    case 'queued':
+      return (
+        <Explainer
+          icon={<Clock className='h-5 w-5 animate-pulse' />}
+          title='Waiting to run'
+          description='The execution is queued and will start as soon as a worker becomes available.'
+        />
+      );
+
+    case 'running':
+      return (
+        <Explainer
+          icon={<Activity className='h-5 w-5 animate-pulse' />}
+          title='Execution in progress'
+          description='The action is currently running. Logs will appear here as they are produced.'
+        />
+      );
 
     default:
-      return;
+      return null;
   }
-
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `execution-${execution.id}.${extension}`;
-
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
+
+function Explainer({ icon, title, description }) {
+  return (
+    <div className='flex gap-4 rounded-md border bg-muted/30 p-4'>
+      <div className='text-primary'>{icon}</div>
+      <div>
+        <div className='text-sm font-medium'>{title}</div>
+        <p className='text-sm text-muted-foreground leading-relaxed'>
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const EVENT_META = {
+  ExecutionCreated: {
+    label: 'Execution created',
+    icon: <PlayCircle className='h-3.5 w-3.5' />,
+    tone: 'neutral',
+  },
+  ValidationStarted: {
+    label: 'Validation started',
+    icon: <Activity className='h-3.5 w-3.5' />,
+    tone: 'info',
+  },
+  ExecutionStarted: {
+    label: 'Execution started',
+    icon: <Terminal className='h-3.5 w-3.5' />,
+    tone: 'running',
+  },
+  ExecutionCompleted: {
+    label: 'Execution finished',
+    icon: <AlertTriangle className='h-3.5 w-3.5' />,
+    tone: 'done',
+  },
+  Stderr: {
+    label: 'Error',
+    icon: <Error className='h-3.5 w-3.5' />,
+    tone: 'done',
+  },
+};
+
+function formatEventKind(kind) {
+  return EVENT_META[kind]?.label ?? kind;
+}
+
+function eventIcon(kind) {
+  return (
+    <div className='rounded-full border bg-background p-1'>
+      {EVENT_META[kind]?.icon ?? <Activity className='h-3.5 w-3.5' />}
+    </div>
+  );
+}
+
+function eventStyles(kind) {
+  switch (EVENT_META[kind]?.tone) {
+    case 'running':
+      return 'bg-amber-500/10 border-amber-500/30 text-amber-700';
+    case 'done':
+      return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700';
+    case 'info':
+      return 'bg-blue-500/10 border-blue-500/30 text-blue-700';
+    default:
+      return 'bg-muted/40';
+  }
+}
+
+/* -------------------------------------
+   Status badge (normalised)
+------------------------------------- */
 
 function ExecutionExportFooter({ execution, events }) {
   return (
-    <div className="border-t bg-background px-6 py-3">
-      <div className="flex justify-end">
+    <div className='border-t bg-background px-6 py-3'>
+      <div className='flex justify-end'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               disabled={!execution}
-              className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition hover:bg-muted disabled:opacity-50"
+              className='inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium transition hover:bg-muted disabled:opacity-50'
             >
               Export
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align='end'>
             <DropdownMenuItem
               onClick={() =>
                 exportExecution({
@@ -137,17 +163,11 @@ function ExecutionExportFooter({ execution, events }) {
               Export to JSON
             </DropdownMenuItem>
 
-            <DropdownMenuItem
-            disabled
-              onClick={() =>
-                exportExecution({
-                  execution,
-                  events,
-                  type: 'txt',
-                })
-              }
-            >
-              Export to TXT <Badge className="ml-2" variant="outline">Coming Soon</Badge>
+            <DropdownMenuItem disabled>
+              Export to TXT
+              <Badge className='ml-2' variant='outline'>
+                Coming Soon
+              </Badge>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -156,27 +176,103 @@ function ExecutionExportFooter({ execution, events }) {
   );
 }
 
+function statusBadge(status, ok) {
+  switch (status) {
+    case 'created':
+      return (
+        <Badge className='border border-slate-500/30 bg-slate-500/15 text-slate-500'>
+          Created
+        </Badge>
+      );
 
-function eventIcon(kind) {
-  if (kind === 'Stdout')
-    return <Terminal className='h-4 w-4 text-muted-foreground' />;
-  if (kind === 'Stderr')
-    return <AlertTriangle className='h-4 w-4 text-red-500' />;
-  if (kind === 'ExecutionCreated')
-    return <PlayCircle className='h-4 w-4 text-muted-foreground' />;
-  return <Activity className='h-4 w-4 text-muted-foreground' />;
+    case 'queued':
+      return (
+        <Badge className='border border-blue-500/30 bg-blue-500/15 text-blue-500'>
+          Queued
+        </Badge>
+      );
+
+    case 'running':
+      return (
+        <Badge className='border border-amber-500/30 bg-amber-500/15 text-amber-600 animate-pulse'>
+          Running
+        </Badge>
+      );
+
+    case 'completed':
+      return ok ? (
+        <Badge className='border border-emerald-600/30 bg-emerald-600/15 text-emerald-600'>
+          Success
+        </Badge>
+      ) : (
+        <Badge className='border border-red-500/30 bg-red-500/15 text-red-500'>
+          Failed
+        </Badge>
+      );
+
+    case 'failed':
+      return (
+        <Badge className='border border-red-500/30 bg-red-500/15 text-red-500'>
+          Failed
+        </Badge>
+      );
+
+    default:
+      return <Badge variant='outline'>{status}</Badge>;
+  }
 }
 
-function eventStyles(kind) {
-  if (kind === 'Stderr') return 'bg-red-500/10 border-red-500/40 text-red-400';
-  if (kind === 'Stdout') return 'bg-muted text-foreground';
-  return 'bg-muted/50 text-muted-foreground';
-}
+/* -------------------------------------
+   Helpers
+------------------------------------- */
 
-function formatMemory(kb) {
-  if (kb == null) return null;
-  if (kb > 1024) return `${(kb / 1024).toFixed(1)} MB`;
-  return `${kb} KB`;
+function exportExecution({ execution, events, type }) {
+  if (!execution) return;
+
+  let content = '';
+  let mime = 'text/plain';
+  let extension = type;
+
+  switch (type) {
+    case 'json':
+      mime = 'application/json';
+      content = JSON.stringify(
+        {
+          execution,
+          events,
+          exported_at: new Date().toISOString(),
+        },
+        null,
+        2,
+      );
+      break;
+
+    case 'txt':
+      content = [
+        `Execution ID: ${execution.id}`,
+        `Action: ${execution.action_name}`,
+        `Status: ${execution.status}`,
+        `Created: ${execution.created_at}`,
+        '',
+        '--- EVENTS ---',
+        ...events.map((e) => `[${e.event_time}] ${e.kind}\n${e.message ?? ''}`),
+      ].join('\n\n');
+      break;
+
+    default:
+      return;
+  }
+
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `execution-${execution.id}.${extension}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* -------------------------------------
@@ -193,6 +289,12 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
 
   const outputFields = execution?.result?.outputFields;
   const hasOutput = outputFields && Object.keys(outputFields).length > 0;
+
+  const showTimeline =
+    execution &&
+    (execution.status === 'running' ||
+      execution.status === 'completed' ||
+      execution.status === 'failed');
 
   const createdLabel = useMemo(() => {
     if (!execution?.created_at) return null;
@@ -297,17 +399,6 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                       <Terminal className='h-4 w-4' />
                       Execution output
                     </h3>
-
-                    <button
-                      onClick={() =>
-                        navigator.clipboard.writeText(
-                          JSON.stringify(outputFields, null, 2),
-                        )
-                      }
-                      className='text-xs text-muted-foreground hover:text-foreground'
-                    >
-                      Copy JSON
-                    </button>
                   </div>
 
                   <div className='rounded-md border divide-y overflow-hidden'>
@@ -321,34 +412,9 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                         </div>
 
                         <div className='col-span-2 font-mono select-text'>
-                          {typeof value === 'string' && (
-                            <span className='text-sky-500'>"{value}"</span>
-                          )}
-
-                          {typeof value === 'number' && (
-                            <span className='text-emerald-500'>{value}</span>
-                          )}
-
-                          {typeof value === 'boolean' && (
-                            <span className='text-violet-500'>
-                              {String(value)}
-                            </span>
-                          )}
-
-                          {value === null && (
-                            <span className='text-muted-foreground'>null</span>
-                          )}
-
-                          {typeof value === 'object' && value !== null && (
-                            <details className='mt-1'>
-                              <summary className='cursor-pointer text-muted-foreground'>
-                                Object
-                              </summary>
-                              <pre className='mt-2 rounded bg-muted/40 p-2 text-xs whitespace-pre-wrap'>
-                                {JSON.stringify(value, null, 2)}
-                              </pre>
-                            </details>
-                          )}
+                          <pre className='whitespace-pre-wrap'>
+                            {JSON.stringify(value, null, 2)}
+                          </pre>
                         </div>
                       </div>
                     ))}
@@ -358,82 +424,73 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                 </section>
               )}
 
-              {/* Action context */}
-              {execution.action_description && (
-                <div className='-mx-6 px-6'>
-                  <section className='sticky top-4 z-30 rounded-md border-l-4 border-primary bg-muted/20 p-4'>
-                    <div className='mb-1 text-xs font-medium text-muted-foreground'>
-                      Action context
-                    </div>
-                    <p className='leading-relaxed'>
-                      {execution.action_description}
-                    </p>
-                  </section>
-
-                  <Separator className='my-6' />
-                </div>
+              {/* Status explainer */}
+              {!showTimeline && (
+                <ExecutionStatusExplainer status={execution.status} />
               )}
 
               {/* Timeline */}
-              <section className='space-y-4'>
-                <h3 className='flex items-center gap-2 text-sm font-medium'>
-                  <Activity className='h-4 w-4' />
-                  Execution timeline
-                </h3>
+              {showTimeline && (
+                <section className='space-y-4'>
+                  <h3 className='flex items-center gap-2 text-sm font-medium'>
+                    <Activity className='h-4 w-4' />
+                    Execution timeline
+                  </h3>
 
-                {events.length === 0 ? (
-                  <div className='text-muted-foreground'>
-                    No events recorded
-                  </div>
-                ) : (
-                  <div className='relative space-y-5'>
-                    <div className='absolute left-[7px] top-0 bottom-0 w-px bg-border' />
+                  {events.length === 0 ? (
+                    <div className='text-muted-foreground'>
+                      No events recorded
+                    </div>
+                  ) : (
+                    <div className='relative space-y-5'>
+                      <div className='absolute left-[7px] top-0 bottom-0 w-px bg-border' />
 
-                    {events.map((ev) => (
-                      <div key={ev.id} className='relative flex gap-4'>
-                        <div className='mt-1 z-10 shrink-0'>
-                          {eventIcon(ev.kind)}
-                        </div>
-
-                        <div className='flex-1 space-y-1'>
-                          <div className='flex items-center gap-2 text-xs text-muted-foreground font-mono'>
-                            <span className='rounded border px-1.5 py-0.5 text-[10px] uppercase'>
-                              {ev.kind}
-                            </span>
-                            <span>
-                              {new Date(ev.event_time).toLocaleTimeString('en-GB', {
-  hour12: false,
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  fractionalSecondDigits: 3,
-})
-}
-                            </span>
+                      {events.map((ev) => (
+                        <div key={ev.id} className='relative flex gap-4'>
+                          <div className='mt-1 z-10 shrink-0'>
+                            {eventIcon(ev.kind)}
                           </div>
 
-                          {ev.message && (
-                            <pre
-                              className={`rounded-md border px-3 py-2 font-mono text-xs whitespace-pre-wrap ${eventStyles(
-                                ev.kind,
-                              )}`}
-                            >
-                              {ev.message}
-                            </pre>
-                          )}
+                          <div className='flex-1 space-y-1'>
+                            <div className='flex items-center gap-2 text-xs text-muted-foreground font-mono'>
+                              <span className='rounded border px-1.5 py-0.5 text-[10px] uppercase'>
+                                {formatEventKind(ev.kind)}
+                              </span>
+                              <span>
+                                {new Date(ev.event_time).toLocaleTimeString(
+                                  'en-GB',
+                                  {
+                                    hour12: false,
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                    fractionalSecondDigits: 3,
+                                  },
+                                )}
+                              </span>
+                            </div>
+
+                            {ev.message && (
+                              <pre
+                                className={`rounded-md border px-3 py-2 font-mono text-xs whitespace-pre-wrap ${eventStyles(
+                                  ev.kind,
+                                )}`}
+                              >
+                                {ev.message}
+                              </pre>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
             </div>
           )}
         </div>
-        <ExecutionExportFooter
-  execution={execution}
-  events={events}
-/>
+
+        <ExecutionExportFooter execution={execution} events={events} />
       </SheetContent>
     </Sheet>
   );

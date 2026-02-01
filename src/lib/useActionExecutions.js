@@ -34,7 +34,6 @@ export function useActionExecutions({
         .from('action_executions')
         .select(`
           id,
-          execution_id,
           action_id,
           status,
           ok,
@@ -91,7 +90,6 @@ export function useActionExecutions({
 
           return {
             id: row.id,
-            execution_id: row.execution_id,
             action_id: row.action_id,
 
             portal_id: row.actions?.portal_id ?? null,

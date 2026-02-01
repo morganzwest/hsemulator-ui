@@ -34,7 +34,6 @@ export function useExecutionDetails(executionId) {
             .from('action_executions')
             .select(`
               id,
-              execution_id,
               action_id,
               status,
               ok,
@@ -96,7 +95,6 @@ export function useExecutionDetails(executionId) {
 
         setExecution({
           id: data.id,
-          execution_id: data.execution_id,
           status: data.status,
           ok: data.ok,
 

@@ -35,3 +35,33 @@ export async function PUT(req, { params }) {
         )
     }
 }
+
+export async function DELETE(_req, { params }) {
+    try {
+        const { id } = params
+
+        console.log('[runtime][DELETE /secrets] →', { id })
+
+        const res = await fetch(`${RUNTIME_URL}/secrets/${id}`, {
+            method: 'DELETE',
+            headers: {
+                Authorization: `Bearer ${RUNTIME_SECRET}`,
+            },
+        })
+
+        const data = await res.json().catch(() => null)
+
+        console.log('[runtime][DELETE /secrets] ←', {
+            status: res.status,
+            data,
+        })
+
+        return NextResponse.json(data, { status: res.status })
+    } catch (err) {
+        console.error('[runtime][DELETE /secrets] ERROR', err)
+        return NextResponse.json(
+            { message: err.message },
+            { status: 500 },
+        )
+    }
+}

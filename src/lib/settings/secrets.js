@@ -145,6 +145,25 @@ export async function createSecret(input) {
 }
 
 /**
+ * DELETE secret (SERVER)
+ */
+export async function deleteSecret(secretId) {
+    console.log('[secrets][deleteSecret] secretId:', secretId)
+
+    if (!secretId) {
+        throw new Error('secretId is required')
+    }
+
+    const res = await apiRequest(`/api/runtime/secrets/${secretId}`, {
+        method: 'DELETE',
+        body: null,
+    })
+
+    return res
+}
+
+
+/**
  * UPDATE secret (SERVER)
  */
 export async function updateSecret(secretId, input) {

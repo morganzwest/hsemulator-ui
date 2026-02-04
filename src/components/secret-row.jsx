@@ -4,15 +4,16 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff, Pencil } from 'lucide-react';
-import { updateSecret } from '~/lib/settings/secrets';
+import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react';
+import { updateSecret, deleteSecret } from '~/lib/settings/secrets';
 import { cn } from '@/lib/utils';
 
-export function SecretRow({ secret }) {
+export function SecretRow({ secret, onDeleted }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState('');
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function save() {
     if (saving) return;
@@ -29,6 +30,18 @@ export function SecretRow({ secret }) {
       setEditing(false);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function remove() {
+    if (deleting) return;
+
+    setDeleting(true);
+    try {
+      await deleteSecret(secret.id);
+      onDeleted?.(secret.id);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -73,16 +86,22 @@ export function SecretRow({ secret }) {
         </div>
       )}
 
-      {/* Hover action */}
+      {/* Hover actions */}
       {!editing && (
-        <Button
-          size='icon'
-          variant='ghost'
-          className='opacity-0 group-hover:opacity-100'
-          onClick={() => setEditing(true)}
-        >
-          <Pencil className='h-4 w-4' />
-        </Button>
+        <div className='flex items-center gap-1 opacity-0 group-hover:opacity-100'>
+          <Button size='icon' variant='ghost' onClick={() => setEditing(true)}>
+            <Pencil className='h-4 w-4' />
+          </Button>
+
+          <Button
+            size='icon'
+            variant='ghost'
+            disabled={deleting}
+            onClick={remove}
+          >
+            <Trash2 className='h-4 w-4 text-destructive' />
+          </Button>
+        </div>
       )}
     </div>
   );

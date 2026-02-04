@@ -4,63 +4,73 @@ import * as React from 'react';
 import {
   Drawer,
   DrawerContent,
-  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { EditorSettingsPage } from '@/components/settings/pages/editor-settings';
 
-import {
-  Settings,
-  Users,
-  Shield,
-  Code2,
-  Layout,
-  Sparkles,
-  Cpu,
-  Key,
-  Terminal,
-  Plug,
-} from 'lucide-react';
-import { useEffect } from 'react';
+import { Code2, Key } from 'lucide-react';
+
+import { PortalSecretsSettingsPage } from './pages/secret-settings';
+import { getActivePortalId } from '@/lib/portal-state';
+
+/* -------------------------------------
+   Tabs
+------------------------------------- */
 
 export const SETTINGS_TABS = [
-  // { key: 'general', label: 'General', icon: Settings },
-  // { key: 'team', label: 'Team & Access', icon: Users },
-  // { key: 'security', label: 'Security', icon: Shield },
   { key: 'editor', label: 'Editor', icon: Code2, page: 'editor' },
-  // { key: 'templates', label: 'Templates', icon: Layout },
-  // { key: 'ai', label: 'AI Assistance', icon: Sparkles },
-  // { key: 'runtime', label: 'Runtime', icon: Cpu },
-  // { key: 'secrets', label: 'Secrets & Environment', icon: Key },
-  // { key: 'cli', label: 'CLI & CI', icon: Terminal },
-  // { key: 'integrations', label: 'Integrations', icon: Plug },
+  {
+    key: 'secrets',
+    label: 'Secrets & Environment',
+    icon: Key,
+    page: 'secrets',
+  },
 ];
 
 export function SettingsSheet({ children }) {
   const [open, setOpen] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState(SETTINGS_TABS[0].key);
+  const [portalId, setPortalId] = React.useState(null);
 
   const activeTabDef = SETTINGS_TABS.find((t) => t.key === activeTab);
 
-  useEffect(() => {
-  const open = () => setOpen(true)
-  window.addEventListener('settings:open', open)
-  return () => window.removeEventListener('settings:open', open)
-}, [])
+  /* ---------------------------------
+     Open listener
+  --------------------------------- */
 
+  React.useEffect(() => {
+    const openHandler = () => setOpen(true);
+    window.addEventListener('settings:open', openHandler);
+    return () => window.removeEventListener('settings:open', openHandler);
+  }, []);
+
+  /* ---------------------------------
+     Resolve active portal on open
+  --------------------------------- */
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    try {
+      const id = getActivePortalId();
+      setPortalId(id);
+    } catch (err) {
+      console.warn('[SettingsSheet] portal not ready yet');
+      setPortalId(null);
+    }
+  }, [open]);
 
   return (
     <Drawer
       direction='right'
       open={open}
       onOpenChange={setOpen}
-      dismissible={true}
+      dismissible
       closeOnOutsideClick
     >
       <DrawerTrigger asChild>
@@ -106,24 +116,19 @@ export function SettingsSheet({ children }) {
           {/* Content */}
           <section className='flex-1 overflow-y-auto'>
             <div className='w-full px-4 py-4 space-y-6'>
-              <section className="flex-1 overflow-y-auto">
-  {activeTabDef.page === 'editor' && (
-    <EditorSettingsPage />
-  )}
-</section>
+              {activeTabDef.page === 'editor' && <EditorSettingsPage />}
+
+              {activeTabDef.page === 'secrets' &&
+                (portalId ? (
+                  <PortalSecretsSettingsPage portalId={portalId} />
+                ) : (
+                  <div className='text-sm text-muted-foreground'>
+                    Loading portal…
+                  </div>
+                ))}
             </div>
           </section>
         </div>
-
-        {/* Footer */}
-        {/* <DrawerFooter className='border-t px-6 py-3'>
-          <div className='flex justify-end gap-2'>
-            <Button variant='outline' onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => setOpen(false)}>Save changes</Button>
-          </div>
-        </DrawerFooter> */}
       </DrawerContent>
     </Drawer>
   );

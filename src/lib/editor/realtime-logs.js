@@ -284,7 +284,7 @@ export function subscribeExecutionRealtime(
             }
 
             if (status === 'CHANNEL_ERROR') {
-                console.error('[Realtime] CHANNEL_ERROR — scheduling reconnect', {
+                console.warning('[Realtime] CHANNEL_ERROR — scheduling reconnect', {
                     channelName,
                 })
                 scheduleReconnect('CHANNEL_ERROR')

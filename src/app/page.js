@@ -67,14 +67,23 @@ export default function LandingPage() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <span className="text-sm font-semibold tracking-tight">
-            HSEmulator
-          </span>
+          <div className="flex items-center py-2">
+            <video
+              src="/wordmark.mp4"
+              className="h-8 w-auto"
+              autoPlay
+              muted
+              playsInline
+              loop={false}
+            />
+          </div>
+
           <Button size="sm" asChild>
             <Link href="/get-started">Get started</Link>
           </Button>
         </div>
       </header>
+
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 pt-32 pb-24">

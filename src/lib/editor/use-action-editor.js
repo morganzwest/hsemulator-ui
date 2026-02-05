@@ -292,16 +292,22 @@ export function useActionEditor({
         )
 
         try {
-          const { data: exec } = await supabase
+          const { data: { user }, error: userErr } = await supabase.auth.getUser()
+          if (userErr) throw userErr
+          if (!user) throw new Error("Not signed in")
+
+          const { data: exec, error: execErr } = await supabase
             .from('action_executions')
             .insert({
               action_id: activeAction.id,
-              owner_id: activeAction.owner_id,
+              owner_id: user.id,
               status: 'queued',
               started_at: new Date().toISOString(),
             })
             .select()
             .single()
+            
+          if (execErr) throw execErr
 
           activeExecutionIdRef.current = exec.id
 

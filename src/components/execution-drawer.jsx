@@ -6,7 +6,14 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-
+import { Switch } from '@/components/ui/switch';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useState } from 'react';
 import {
   Clock,
   User,
@@ -22,11 +29,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Copy } from 'lucide-react';
+import { toast } from 'sonner';
+import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5';
 
 import { useExecutionDetails } from '@/lib/use-execution-details';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -84,31 +94,102 @@ const EVENT_META = {
     label: 'Execution created',
     icon: <PlayCircle className='h-3.5 w-3.5' />,
     tone: 'neutral',
+    severity: 'info',
+    structural: true,
   },
+
+  ExecutionFailed: {
+    label: 'Execution failed',
+    icon: <AlertTriangle className='h-3.5 w-3.5' />,
+    tone: 'error',
+    severity: 'error',
+    structural: true,
+  },
+
   ValidationStarted: {
     label: 'Validation started',
     icon: <Activity className='h-3.5 w-3.5' />,
     tone: 'info',
+    severity: 'info',
+    structural: true,
   },
+
   ExecutionStarted: {
     label: 'Execution started',
     icon: <Terminal className='h-3.5 w-3.5' />,
     tone: 'running',
+    severity: 'info',
+    structural: true,
   },
+
   ExecutionCompleted: {
     label: 'Execution finished',
-    icon: <AlertTriangle className='h-3.5 w-3.5' />,
+    icon: <Activity className='h-3.5 w-3.5' />,
     tone: 'done',
+    severity: 'success',
+    structural: true,
   },
+
   Stderr: {
     label: 'Error',
-    icon: <Error className='h-3.5 w-3.5' />,
-    tone: 'done',
+    icon: <AlertTriangle className='h-3.5 w-3.5' />,
+    tone: 'error',
+    severity: 'error',
+    structural: false,
   },
 };
+function isStructuralErrorEvent(event) {
+  return (
+    EVENT_META[event.kind]?.structural &&
+    EVENT_META[event.kind]?.severity === 'error' &&
+    event.message
+  );
+}
+
+function isReturnEvent(event) {
+  return event.kind === 'Return' || event.kind === 'Output';
+}
 
 function formatEventKind(kind) {
   return EVENT_META[kind]?.label ?? kind;
+}
+
+function groupTimelineEvents(events) {
+  const groups = [];
+  let current = null;
+
+  for (const ev of events) {
+    const meta = EVENT_META[ev.kind];
+
+    // Structural events always start a new group
+    if (meta?.structural) {
+      current = { event: ev, logs: [] };
+      groups.push(current);
+      continue;
+    }
+
+    // Return/output events should attach to the *last completed* group
+    if (isReturnEvent(ev)) {
+      const lastCompleted = [...groups]
+        .reverse()
+        .find((g) => g.event.kind === 'ExecutionCompleted');
+
+      if (lastCompleted) {
+        lastCompleted.logs.push(ev);
+        continue;
+      }
+    }
+
+    // Default: attach to current group
+    if (!current) {
+      current = { event: ev, logs: [] };
+      groups.push(current);
+    }
+
+    current.logs.push(ev);
+  }
+
+  return groups;
 }
 
 function eventIcon(kind) {
@@ -123,10 +204,16 @@ function eventStyles(kind) {
   switch (EVENT_META[kind]?.tone) {
     case 'running':
       return 'bg-amber-500/10 border-amber-500/30 text-amber-700';
+
     case 'done':
       return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700';
+
     case 'info':
       return 'bg-blue-500/10 border-blue-500/30 text-blue-700';
+
+    case 'error':
+      return 'bg-red-500/10 border-red-500/30 text-red-600';
+
     default:
       return 'bg-muted/40';
   }
@@ -136,10 +223,51 @@ function eventStyles(kind) {
    Status badge (normalised)
 ------------------------------------- */
 
-function ExecutionExportFooter({ execution, events }) {
+function ExecutionExportFooter({
+  execution,
+  events,
+  showRawErrors,
+  setShowRawErrors,
+  errorCount,
+}) {
+  const showToggle = errorCount > 0;
+
   return (
     <div className='border-t bg-background px-6 py-3'>
-      <div className='flex justify-end'>
+      <div
+        className={`flex items-center ${
+          showToggle ? 'justify-between' : 'justify-end'
+        }`}
+      >
+        {showToggle && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className='flex items-center gap-3'>
+                  <Switch
+                    checked={showRawErrors}
+                    onCheckedChange={setShowRawErrors}
+                    id='raw-errors'
+                  />
+                  <label
+                    htmlFor='raw-errors'
+                    className='text-xs font-medium cursor-pointer'
+                  >
+                    {showRawErrors ? 'Raw' : 'Simple'} Output
+                  </label>
+                </div>
+              </TooltipTrigger>
+
+              <TooltipContent side='top'>
+                <p className='max-w-xs text-xs'>
+                  Toggle between a simplified error message and the full raw
+                  stack trace produced by the execution runtime.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -225,6 +353,58 @@ function statusBadge(status, ok) {
 /* -------------------------------------
    Helpers
 ------------------------------------- */
+function normaliseExecutionEvents(events) {
+  return events
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(a.event_time).getTime() - new Date(b.event_time).getTime(),
+    )
+    .map((e, index) => ({
+      ...e,
+      index,
+      time: new Date(e.event_time),
+      hasMessage: Boolean(e.message?.trim()),
+      isError: e.kind === 'Stderr' || e.kind === 'ExecutionFailed',
+    }));
+}
+
+export function formatExecutionError(message) {
+  if (!message || typeof message !== 'string') return message;
+
+  const lines = message.split('\n');
+
+  // ---- Extract error header ----
+  // JS SyntaxError / TypeError / Error
+  const jsHeader =
+    lines.find((l) => l.startsWith('SyntaxError')) ||
+    lines.find((l) => l.startsWith('TypeError')) ||
+    lines.find((l) => l.startsWith('ReferenceError')) ||
+    lines.find((l) => l.startsWith('Error:'));
+
+  // Python error (last line of traceback)
+  const pyHeader = lines.findLast?.((l) => /^[A-Za-z]+Error:/.test(l));
+
+  const header = jsHeader || pyHeader || lines[0];
+
+  // ---- Extract user frame ----
+  // action.js:line[:col]
+  const jsFrameMatch = message.match(/action\.js:(\d+)(?::\d+)?/);
+  if (jsFrameMatch) {
+    return [header.trim(), `    at (action.js:${jsFrameMatch[1]})`].join('\n');
+  }
+
+  // action.py:line
+  const pyFrameMatch = message.match(/action\.py", line (\d+)/);
+  if (pyFrameMatch) {
+    return [header.trim(), `  File "action.py", line ${pyFrameMatch[1]}`].join(
+      '\n',
+    );
+  }
+
+  // ---- Fallback ----
+  return header.trim();
+}
 
 function exportExecution({ execution, events, type }) {
   if (!execution) return;
@@ -275,6 +455,87 @@ function exportExecution({ execution, events, type }) {
   URL.revokeObjectURL(url);
 }
 
+function extractOutputFieldsFromReturn(event, showRawErrors) {
+  if (event.kind !== 'Return' || !event.message || showRawErrors) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(event.message);
+
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      parsed.outputFields &&
+      typeof parsed.outputFields === 'object'
+    ) {
+      return parsed.outputFields;
+    }
+  } catch {
+    // not JSON, ignore
+  }
+
+  return null;
+}
+
+function ReturnSummaryLog({ count, onShowRaw, onScrollToTable }) {
+  return (
+    <div className='flex items-center justify-between gap-3 rounded-md border bg-emerald-500/10 border-emerald-500/30 px-3 py-2'>
+      <div className='flex items-center gap-2 text-xs font-mono text-emerald-700'>
+        <Terminal className='h-3.5 w-3.5' />
+        Returned {count} output field{count !== 1 ? 's' : ''}
+      </div>
+
+      <div className='flex items-center gap-2'>
+        <button
+          onClick={onScrollToTable}
+          className='border py-1 px-1.5 hover:bg-white/10 rounded text-xs hover:underline underline-offset-2 text-muted-foreground hover:text-foreground cursor-pointer'
+        >
+          View table
+        </button>
+
+        <button
+          onClick={onShowRaw}
+          className='border py-1 px-1.5 hover:bg-white/10 rounded text-xs hover:underline underline-offset-2 text-muted-foreground hover:text-foreground cursor-pointer'
+        >
+          Show raw
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function durationTone(ms) {
+  if (ms > 5000) return 'error';
+  if (ms > 3000) return 'warning';
+  return 'default';
+}
+
+function runtimeIcon(execution) {
+  const lang = execution?.action_language;
+  const path = execution?.action_filepath;
+
+  if (lang === 'javascript' || path?.endsWith('.js')) {
+    return <IoLogoJavascript className='h-4 w-4 text-yellow-600' />;
+  }
+
+  if (lang === 'python' || path?.endsWith('.py')) {
+    return <IoLogoPython className='h-4 w-4 text-blue-400' />;
+  }
+
+  return <Terminal className='h-4 w-4 text-muted-foreground' />;
+}
+
+function resolveRuntime(actionLanguage, filepath) {
+  if (actionLanguage === 'javascript') return 'Node.js';
+  if (actionLanguage === 'python') return 'Python';
+
+  if (filepath?.endsWith('.js')) return 'Node.js';
+  if (filepath?.endsWith('.py')) return 'Python';
+
+  return 'Unknown';
+}
+
 /* -------------------------------------
    Component
 ------------------------------------- */
@@ -286,9 +547,55 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
     loading,
     error,
   } = useExecutionDetails(executionId);
+  const [showRawErrors, setShowRawErrors] = useState(false);
 
-  const outputFields = execution?.result?.outputFields;
-  const hasOutput = outputFields && Object.keys(outputFields).length > 0;
+  const language = execution?.action_language;
+  const timelineEvents = useMemo(
+    () => normaliseExecutionEvents(events),
+    [events],
+  );
+
+  const timeline = timelineEvents;
+
+  const outputFromReturn = useMemo(() => {
+    return timeline.find(
+      (e) => e.kind === 'Return' && extractOutputFieldsFromReturn(e, false),
+    );
+  }, [timeline]);
+
+  const { outputFields, hasOutput } = useMemo(() => {
+    if (
+      execution?.result?.outputFields &&
+      Object.keys(execution.result.outputFields).length > 0
+    ) {
+      return {
+        outputFields: execution.result.outputFields,
+        hasOutput: true,
+      };
+    }
+
+    if (!showRawErrors) {
+      for (const e of timeline) {
+        const extracted = extractOutputFieldsFromReturn(e, false);
+        if (extracted && Object.keys(extracted).length > 0) {
+          return {
+            outputFields: extracted,
+            hasOutput: true,
+          };
+        }
+      }
+    }
+
+    return {
+      outputFields: null,
+      hasOutput: false,
+    };
+  }, [execution, timeline, showRawErrors]);
+
+  const errorCount = useMemo(
+    () => timelineEvents.filter((e) => e.isError).length,
+    [timelineEvents],
+  );
 
   const showTimeline =
     execution &&
@@ -309,7 +616,7 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side='right'
-        className='flex w-[clamp(560px,55vw,1000px)] min-w-[560px] flex-col p-0'
+        className='flex w-[clamp(900px,55vw,1000px)] min-w-[900px] flex-col p-0'
       >
         {/* Header */}
         <SheetHeader className='border-b px-6 py-4 pr-12'>
@@ -320,12 +627,16 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
               </SheetTitle>
 
               <SheetDescription className='flex items-center gap-2 font-mono text-xs'>
-                <span>{executionId}</span>
+                {/* <span>{executionId}</span> */}
                 <button
-                  onClick={() => navigator.clipboard.writeText(executionId)}
-                  className='text-muted-foreground hover:text-foreground'
+                  onClick={() => {
+                    navigator.clipboard.writeText(executionId);
+                    toast.success('Execution ID copied');
+                  }}
+                  className='group flex items-center gap-2 rounded-md border border-white/0 hover:px-1 py-1 font-mono text-xs text-muted-foreground hover:bg-muted trnasition'
                 >
-                  Copy
+                  <span className=''>{executionId}</span>
+                  <Copy className='h-3 w-3 opacity-0 group-hover:opacity-100 transition' />
                 </button>
               </SheetDescription>
             </div>
@@ -357,62 +668,79 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                   icon={<Clock className='h-4 w-4' />}
                   label='Created'
                   value={
-                    <span title={createdLabel?.full}>
-                      {createdLabel?.relative}
-                    </span>
+                    <>
+                      <span title={createdLabel?.full}>
+                        {createdLabel?.relative}
+                      </span>
+                      <span className='pl-1 font-normal italic'>
+                        ({new Date(execution.updated_at).toLocaleString()})
+                      </span>
+                    </>
                   }
-                />
-
-                <Metric
-                  icon={<Activity className='h-4 w-4' />}
-                  label='Updated'
-                  value={new Date(execution.updated_at).toLocaleString()}
                 />
 
                 {execution.duration_ms != null && (
                   <Metric
+                    icon={<Activity className='h-4 w-4' />}
                     label='Duration'
                     value={`${execution.duration_ms} ms`}
-                  />
-                )}
-
-                {execution.max_memory_kb != null && (
-                  <Metric
-                    label='Max memory'
-                    value={formatMemory(execution.max_memory_kb)}
+                    tone={durationTone(execution.duration_ms)}
                   />
                 )}
 
                 <Metric
                   icon={<User className='h-4 w-4' />}
-                  label='Owner'
+                  label='Execution Run By'
                   value={execution.owner_name}
-                  colSpan
+                />
+
+                <Metric
+                  icon={runtimeIcon(execution)}
+                  label='Runtime'
+                  value={resolveRuntime(
+                    execution?.action_language,
+                    execution?.action_filepath,
+                  )}
                 />
               </section>
 
               {/* Output */}
               {hasOutput && (
-                <section className='space-y-3'>
+                <section id='execution-output' className='space-y-3'>
                   <div className='flex items-center justify-between'>
                     <h3 className='flex items-center gap-2 text-sm font-medium'>
                       <Terminal className='h-4 w-4' />
                       Execution output
+                      <Badge variant='secondary' className='text-[10px]'>
+                        {Object.keys(outputFields).length} fields
+                      </Badge>
                     </h3>
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          JSON.stringify(outputFields, null, 2),
+                        );
+                        toast.success('Output copied to clipboard');
+                      }}
+                    >
+                      <Copy />
+                    </Button>
                   </div>
 
                   <div className='rounded-md border divide-y overflow-hidden'>
                     {Object.entries(outputFields).map(([key, value]) => (
                       <div
                         key={key}
-                        className='grid grid-cols-3 gap-4 px-3 py-2 text-xs'
+                        className='grid grid-cols-3 gap-4 px-3 py-2 text-xs hover:bg-muted/30'
                       >
                         <div className='truncate font-mono text-muted-foreground'>
                           {key}
                         </div>
 
                         <div className='col-span-2 font-mono select-text'>
-                          <pre className='whitespace-pre-wrap'>
+                          <pre className='whitespace-pre-wrap text-foreground'>
                             {JSON.stringify(value, null, 2)}
                           </pre>
                         </div>
@@ -435,6 +763,14 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                   <h3 className='flex items-center gap-2 text-sm font-medium'>
                     <Activity className='h-4 w-4' />
                     Execution timeline
+                    {errorCount > 0 && (
+                      <Badge
+                      // onClick={() => setShowOnlyErrors((v) => !v)}
+                      // className='cursor-pointer'
+                      >
+                        {errorCount} Error{errorCount > 1 ? 's' : ''}
+                      </Badge>
+                    )}
                   </h3>
 
                   {events.length === 0 ? (
@@ -442,43 +778,75 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                       No events recorded
                     </div>
                   ) : (
-                    <div className='relative space-y-5'>
-                      <div className='absolute left-[7px] top-0 bottom-0 w-px bg-border' />
+                    <div className='relative'>
+                      <div className='absolute left-[18px] top-0 bottom-0 w-px bg-border' />
 
-                      {events.map((ev) => (
-                        <div key={ev.id} className='relative flex gap-4'>
+                      {timeline.map((event) => (
+                        <div
+                          key={event.id}
+                          className='relative flex gap-4 py-2 px-2'
+                        >
                           <div className='mt-1 z-10 shrink-0'>
-                            {eventIcon(ev.kind)}
+                            {eventIcon(event.kind)}
                           </div>
 
-                          <div className='flex-1 space-y-1'>
-                            <div className='flex items-center gap-2 text-xs text-muted-foreground font-mono'>
+                          <div className='flex-1 space-y-2'>
+                            <div className='flex items-center gap-2 text-xs font-mono text-muted-foreground'>
                               <span className='rounded border px-1.5 py-0.5 text-[10px] uppercase'>
-                                {formatEventKind(ev.kind)}
+                                {formatEventKind(event.kind)}
                               </span>
                               <span>
-                                {new Date(ev.event_time).toLocaleTimeString(
-                                  'en-GB',
-                                  {
-                                    hour12: false,
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    second: '2-digit',
-                                    fractionalSecondDigits: 3,
-                                  },
-                                )}
+                                {event.time.toLocaleTimeString('en-GB', {
+                                  hour12: false,
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                  fractionalSecondDigits: 3,
+                                })}
                               </span>
                             </div>
 
-                            {ev.message && (
-                              <pre
-                                className={`rounded-md border px-3 py-2 font-mono text-xs whitespace-pre-wrap ${eventStyles(
-                                  ev.kind,
-                                )}`}
-                              >
-                                {ev.message}
-                              </pre>
-                            )}
+                            {(() => {
+                              const extracted = extractOutputFieldsFromReturn(
+                                event,
+                                showRawErrors,
+                              );
+
+                              // SIMPLE RETURN LOG
+                              if (extracted && !showRawErrors) {
+                                return (
+                                  <ReturnSummaryLog
+                                    count={Object.keys(extracted).length}
+                                    onShowRaw={() => setShowRawErrors(true)}
+                                    onScrollToTable={() =>
+                                      document
+                                        .getElementById('execution-output')
+                                        ?.scrollIntoView({
+                                          behavior: 'smooth',
+                                          block: 'start',
+                                        })
+                                    }
+                                  />
+                                );
+                              }
+
+                              // NORMAL / RAW LOG
+                              if (event.message) {
+                                return (
+                                  <pre
+                                    className={`rounded-md border px-3 py-1.5 font-mono text-xs whitespace-pre-wrap ${eventStyles(
+                                      event.kind,
+                                    )}`}
+                                  >
+                                    {showRawErrors
+                                      ? event.message
+                                      : formatExecutionError(event.message)}
+                                  </pre>
+                                );
+                              }
+
+                              return null;
+                            })()}
                           </div>
                         </div>
                       ))}
@@ -490,7 +858,13 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
           )}
         </div>
 
-        <ExecutionExportFooter execution={execution} events={events} />
+        <ExecutionExportFooter
+          execution={execution}
+          events={events}
+          showRawErrors={showRawErrors}
+          setShowRawErrors={setShowRawErrors}
+          errorCount={errorCount}
+        />
       </SheetContent>
     </Sheet>
   );
@@ -500,18 +874,26 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
    Metric
 ------------------------------------- */
 
-function Metric({ icon, label, value, colSpan }) {
+function Metric({ icon, label, value, colSpan, tone = 'default', onClick }) {
+  const toneStyles = {
+    default: 'border-border',
+    success: 'border-emerald-500/30 bg-emerald-500/5',
+    warning: 'border-amber-500/30 bg-amber-500/5',
+    error: 'border-red-500/30 bg-red-500/5',
+  };
+
   return (
     <div
-      className={`flex gap-3 rounded-md border bg-background p-3 ${
-        colSpan ? 'col-span-2' : ''
+      onClick={onClick}
+      className={`flex gap-3 rounded-md border p-3 transition ${
+        toneStyles[tone]
+      } ${colSpan ? 'col-span-2' : ''} ${
+        onClick ? 'cursor-pointer hover:bg-muted/40' : ''
       }`}
     >
-      <div className='text-muted-foreground'>
-        {icon ?? <span className='h-4 w-4' />}
-      </div>
+      <div className='text-muted-foreground'>{icon}</div>
 
-      <div>
+      <div className='space-y-0.5'>
         <div className='text-xs text-muted-foreground'>{label}</div>
         <div className='font-medium tabular-nums'>{value}</div>
       </div>

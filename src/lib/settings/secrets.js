@@ -7,37 +7,28 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 ------------------------------------------------- */
 
 async function apiRequest(path, { method, body }) {
-    console.log('[secrets][apiRequest] →', { path, method, body })
+    const hasBody = body !== undefined && body !== null
 
     const res = await fetch(path, {
         method,
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
+        headers: hasBody
+            ? { 'Content-Type': 'application/json' }
+            : undefined,
+        body: hasBody ? JSON.stringify(body) : undefined,
     })
 
     let data = null
     try {
         data = await res.json()
-    } catch {
-        console.warn('[secrets][apiRequest] response not JSON')
-    }
-
-    console.log('[secrets][apiRequest] ←', {
-        status: res.status,
-        ok: res.ok,
-        data,
-    })
+    } catch { }
 
     if (!res.ok) {
-        throw new Error(
-            data?.message || `Request failed (${res.status})`,
-        )
+        throw new Error(data?.message || `Request failed (${res.status})`)
     }
 
     return data
 }
+
 
 /* -------------------------------------------------
    Validation (UNCHANGED)
@@ -109,7 +100,7 @@ export async function fetchPortalSecrets(portalId) {
 
     const { data, error } = await supabase
         .from('secrets')
-        .select('id, name, scope, action_id')
+        .select('id, name, scope, action_id, portal_id')
         .eq('portal_id', portalId)
         .order('created_at', { ascending: true })
 
@@ -147,20 +138,27 @@ export async function createSecret(input) {
 /**
  * DELETE secret (SERVER)
  */
-export async function deleteSecret(secretId) {
-    console.log('[secrets][deleteSecret] secretId:', secretId)
-
-    if (!secretId) {
-        throw new Error('secretId is required')
+export async function deleteSecret(secretId, ctx) {
+    if (!secretId) throw new Error('secretId is required')
+    if (!ctx?.portal_id || !ctx?.user_id) {
+        throw new Error('portal_id and user_id are required for delete')
     }
 
-    const res = await apiRequest(`/api/runtime/secrets/${secretId}`, {
-        method: 'DELETE',
-        body: null,
-    })
+    await apiRequest(
+        `/api/runtime/secrets/${secretId}`,
+        {
+            method: 'DELETE',
+            body: {
+                portal_id: ctx.portal_id,
+                user_id: ctx.user_id,
+            },
+        }
+    )
 
-    return res
+    // explicit return
+    return { secret_id: secretId }
 }
+
 
 
 /**

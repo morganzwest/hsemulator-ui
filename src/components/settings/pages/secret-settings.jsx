@@ -39,6 +39,10 @@ export function PortalSecretsSettingsPage({ portalId }) {
   const [secrets, setSecrets] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  function handleDeleted(secretId) {
+    setSecrets((prev) => prev.filter((s) => s.id !== secretId));
+  }
+
   useEffect(() => {
     if (!portalId) return;
 
@@ -98,7 +102,11 @@ export function PortalSecretsSettingsPage({ portalId }) {
 
           {!loading &&
             secrets.map((secret) => (
-              <SecretRow key={secret.id} secret={secret} />
+              <SecretRow
+                key={secret.id}
+                secret={secret}
+                onDeleted={handleDeleted}
+              />
             ))}
 
           {!loading && (

@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import { getActivePortalId } from '@/lib/portal-state'
+import { createPostCreateTour } from '../tours/postCreateTour'
 
 const MAX_NAME = 32
 const MAX_DESC = 64
@@ -111,7 +112,30 @@ export async function createAction({
 
       window.dispatchEvent(new Event('actions:resync'))
 
+      // Start the tour
+      try {
+        if (!localStorage.getItem('post_create_tour_seen')) {
+          setTimeout(() => {
+            if (window.__activeTour) return
+
+            const tour = createPostCreateTour()
+
+            window.__activeTour = tour
+
+            const waitForEditor = setInterval(() => {
+              if (document.querySelector('#editor-panel')) {
+                tour.drive();
+                clearInterval(waitForEditor);
+
+                localStorage.removeItem('action_created');
+              }
+            }, 120);
+          }, 1500)
+        }
+      } catch { }
+
       return action
+
     })(),
     {
       loading: 'Creating action…',

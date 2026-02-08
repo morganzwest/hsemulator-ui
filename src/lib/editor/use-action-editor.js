@@ -387,6 +387,13 @@ export function useActionEditor({
           activeExecutionIdRef.current = null
           resolveExecutionRef.current = null
           setRunning(false)
+
+
+          localStorage.setItem("action_ran", "true");
+          // move tour forward
+          setTimeout(() => {
+            window.__onboardingDriver?.moveNext();
+          }, 300);
         }
       })(),
       {

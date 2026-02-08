@@ -268,6 +268,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             </span>
 
             <Button
+              id='create-action-button'
               variant='ghost'
               size='icon'
               className='h-7 w-7'
@@ -322,7 +323,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         {/* Scrollable actions */}
         <div className='flex-1 min-h-0'>
           <ScrollArea className='h-full pr-2 px-1 overflow-x-hidden'>
-            <div className='w-full space-y-1 px-2'>
+            <div id='actions-sidebar' className='w-full space-y-1 px-2'>
               {loading ? (
                 <ActionListSkeleton />
               ) : filteredActions.length > 0 ? (
@@ -385,13 +386,19 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
             />
 
             <SidebarFooterItem
+              id='templates-button'
               icon={Blocks}
               label='Templates'
               onClick={() => setTemplatesOpen(true)}
             />
 
             <SettingsSheet>
-              <SidebarFooterItem icon={Settings2} label='Settings' emphasis />
+              <SidebarFooterItem
+                id='settings-button'
+                icon={Settings2}
+                label='Settings'
+                emphasis
+              />
             </SettingsSheet>
 
             <SidebarFooterItem icon={MessageCircleQuestion} label='Help' />
@@ -446,9 +453,11 @@ function SidebarFooterItem({
   onClick,
   emphasis,
   badge, // e.g. "Coming Soon" or undefined
+  ...props
 }) {
   return (
     <button
+      {...props}
       onClick={onClick}
       className={cn(
         'flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-xs text-muted-foreground transition',

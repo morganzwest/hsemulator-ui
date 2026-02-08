@@ -388,6 +388,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    id='secrets-button'
                     variant='ghost'
                     size='icon'
                     onClick={() => setOpen(true)}
@@ -402,6 +403,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                 <TooltipTrigger asChild>
                   <Button
                     variant='ghost'
+                    id='template-button'
                     size='icon'
                     onClick={handleSaveTemplate}
                     disabled={templateSaving}
@@ -429,7 +431,12 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                 Save
               </Button>
 
-              <Button size='sm' onClick={handleRun} disabled={!canRun}>
+              <Button
+                id='run-button'
+                size='sm'
+                onClick={handleRun}
+                disabled={!canRun}
+              >
                 {running ? (
                   <Spinner className='mr-2' />
                 ) : (
@@ -442,6 +449,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
 
           {/* Editor + Output */}
           <div
+            id='editor-panel'
             ref={containerRef}
             className='grid flex-1 min-w-0 overflow-hidden rounded-md border bg-background'
             style={gridStyle}

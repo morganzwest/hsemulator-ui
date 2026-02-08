@@ -322,22 +322,37 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
       ) : (
         <div className='flex h-[90vh] min-w-0 flex-col gap-3 overflow-hidden'>
           {/* Toolbar */}
-          <div className='flex items-center justify-between border-b pb-2'>
-            <Tabs value={activeFile} onValueChange={setActiveFile}>
-              <TabsList>
-                {Object.entries(files).map(([file, meta]) => (
-                  <TabsTrigger key={file} value={file}>
-                    <div className='flex items-center gap-2'>
-                      <LanguageIcon language={meta.language} />
-                      <span>{file}</span>
-                      {meta.dirty && <span className='text-primary'>●</span>}
-                    </div>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
+          <div
+            className='
+    border-b pb-2
+    flex flex-col-reverse gap-2
+    xl:flex-row xl:items-center xl:justify-between
+  '
+          >
+            {/* Tabs */}
+            <div className='xl:order-1'>
+              <Tabs value={activeFile} onValueChange={setActiveFile}>
+                <TabsList>
+                  {Object.entries(files).map(([file, meta]) => (
+                    <TabsTrigger key={file} value={file}>
+                      <div className='flex items-center gap-2'>
+                        <LanguageIcon language={meta.language} />
+                        <span>{file}</span>
+                        {meta.dirty && <span className='text-primary'>●</span>}
+                      </div>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
 
-            <div className='flex items-center gap-2'>
+            {/* Actions */}
+            <div
+              className='
+      flex flex-wrap items-center gap-2
+      xl:order-2
+    '
+            >
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -367,6 +382,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                 </TooltipTrigger>
                 <TooltipContent>Swap output orientation</TooltipContent>
               </Tooltip>
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

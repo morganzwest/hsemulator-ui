@@ -85,7 +85,6 @@ function validateUpdateSecret(input) {
 /* -------------------------------------------------
    Public API
 ------------------------------------------------- */
-
 /**
  * Supabase READ (client-safe)
  */

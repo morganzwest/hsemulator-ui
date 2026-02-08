@@ -5,7 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MonacoEditor } from '@/components/monaco-editor';
-import { Play, Save, Star, Columns, Rows, Trash2, Workflow } from 'lucide-react';
+import {
+  Play,
+  Save,
+  Star,
+  Columns,
+  Rows,
+  Trash2,
+  Workflow,
+} from 'lucide-react';
 import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5';
 import { SiYaml } from 'react-icons/si';
 import { TbJson } from 'react-icons/tb';
@@ -31,6 +39,7 @@ import { TemplatesSheet } from '~/components/template-sheet';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CICDSetupDrawer } from './cicdsetupdrawer';
+import { AssignSecretsDialog } from './assign-secrets-dialog';
 
 /* --------------------------------
    Language icon
@@ -74,8 +83,8 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState([]);
-const [cicdOpen, setCicdOpen] = useState(false);
-
+  const [cicdOpen, setCicdOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [split, setSplit] = useState('vertical');
   const [splitSize, setSplitSize] = useState(60);
@@ -112,28 +121,26 @@ const [cicdOpen, setCicdOpen] = useState(false);
   }, [logs]);
 
   useEffect(() => {
-  const openCreate = () => setCreateOpen(true)
-  const openTemplates = () => setTemplatesOpen(true)
-  const saveTemplate = () => handleSaveTemplate()
-  const saveAll = () => handleSave()
-  const run = () => handleRun()
+    const openCreate = () => setCreateOpen(true);
+    const openTemplates = () => setTemplatesOpen(true);
+    const saveTemplate = () => handleSaveTemplate();
+    const saveAll = () => handleSave();
+    const run = () => handleRun();
 
-  window.addEventListener('action:create', openCreate)
-  window.addEventListener('templates:open', openTemplates)
-  window.addEventListener('template:save', saveTemplate)
-  window.addEventListener('editor:save-all', saveAll)
-  window.addEventListener('editor:run', run)
+    window.addEventListener('action:create', openCreate);
+    window.addEventListener('templates:open', openTemplates);
+    window.addEventListener('template:save', saveTemplate);
+    window.addEventListener('editor:save-all', saveAll);
+    window.addEventListener('editor:run', run);
 
-  return () => {
-    window.removeEventListener('action:create', openCreate)
-    window.removeEventListener('templates:open', openTemplates)
-    window.removeEventListener('template:save', saveTemplate)
-    window.removeEventListener('editor:save-all', saveAll)
-    window.removeEventListener('editor:run', run)
-  }
-}, [])
-
-
+    return () => {
+      window.removeEventListener('action:create', openCreate);
+      window.removeEventListener('templates:open', openTemplates);
+      window.removeEventListener('template:save', saveTemplate);
+      window.removeEventListener('editor:save-all', saveAll);
+      window.removeEventListener('editor:run', run);
+    };
+  }, []);
 
   /* -----------------------------
      Handlers
@@ -257,12 +264,19 @@ const [cicdOpen, setCicdOpen] = useState(false);
     <>
       {/* ALWAYS mounted */}
       <CICDSetupDrawer
-  open={cicdOpen}
-  onOpenChange={setCicdOpen}
-  actionId={activeAction?.id}
-  portalId={activeAction?.portal_id}
-  sourceCode={active?.value}
-/>
+        open={cicdOpen}
+        onOpenChange={setCicdOpen}
+        actionId={activeAction?.id}
+        portalId={activeAction?.portal_id}
+        sourceCode={active?.value}
+      />
+
+      <AssignSecretsDialog
+        open={open}
+        onOpenChange={setOpen}
+        actionId={activeAction?.id}
+        portalId={activeAction?.portal_id}
+      />
 
       <TemplatesSheet
         open={templatesOpen}
@@ -329,6 +343,19 @@ const [cicdOpen, setCicdOpen] = useState(false);
                   <Button
                     variant='ghost'
                     size='icon'
+                    onClick={() => setOpen(true)}
+                  >
+                    <Workflow />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Push to HubSpot</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant='ghost'
+                    size='icon'
                     onClick={() =>
                       setSplit(
                         split === 'horizontal' ? 'vertical' : 'horizontal',
@@ -343,13 +370,12 @@ const [cicdOpen, setCicdOpen] = useState(false);
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-  variant="ghost"
-  size="icon"
-  onClick={() => setCicdOpen(true)}
->
-  <Workflow />
-</Button>
-
+                    variant='ghost'
+                    size='icon'
+                    onClick={() => setCicdOpen(true)}
+                  >
+                    <Workflow />
+                  </Button>
                 </TooltipTrigger>
                 <TooltipContent>Push to HubSpot</TooltipContent>
               </Tooltip>

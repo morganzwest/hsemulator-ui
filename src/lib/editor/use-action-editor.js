@@ -19,6 +19,40 @@ function formatExecutionIdLine(executionId) {
   return `${time} [EVENT] Execution ID — ${executionId}`
 }
 
+async function loadActionSecretsEnv({ supabase, actionId }) {
+  const { data, error } = await supabase
+    .from('action_secrets')
+    .select(`
+      secret_id,
+      secrets (
+        id,
+        name
+      )
+    `)
+    .eq('action_id', actionId)
+
+  if (error) throw error
+
+  /*
+    Result format:
+    {
+      API_KEY: {
+        type: 'secret',
+        secret_id: 'uuid'
+      }
+    }
+  */
+  return Object.fromEntries(
+    (data ?? []).map(row => [
+      row.secrets.name,
+      {
+        type: 'secret',
+        secret_id: row.secrets.id,
+      },
+    ])
+  )
+}
+
 
 function resolveEntryFile(files) {
   return (
@@ -43,7 +77,7 @@ async function loadDefaultFixture({ supabase, basePath }) {
   return [{ name: 'event.json', source: await data.text() }]
 }
 
-function compileInlineConfig({ files, fixtures }) {
+function compileInlineConfig({ files, fixtures, env }) {
   const entry =
     Object.keys(files).find(f => f.endsWith('.py')) ||
     Object.keys(files).find(f => f.endsWith('.js'))
@@ -58,15 +92,13 @@ function compileInlineConfig({ files, fixtures }) {
     },
     fixtures,
     env: {
-      API_KEY: {
-        secret_id: '9adcc3cb-469c-4927-9a46-9045d46c031f',
-        type: 'secret',
-      },
+      ...env,
       MODE: 'test',
     },
     repeat: 1,
   }
 }
+
 
 /* -----------------------------
    Canonical log formatter
@@ -306,7 +338,7 @@ export function useActionEditor({
             })
             .select()
             .single()
-            
+
           if (execErr) throw execErr
 
           activeExecutionIdRef.current = exec.id
@@ -316,6 +348,10 @@ export function useActionEditor({
           const fixtures = await loadDefaultFixture({
             supabase,
             basePath: resolveActionBasePath(activeAction),
+          })
+          const env = await loadActionSecretsEnv({
+            supabase,
+            actionId: activeAction.id,
           })
 
           await fetch(`${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`, {
@@ -327,7 +363,11 @@ export function useActionEditor({
             body: JSON.stringify({
               mode: 'execute',
               execution_id: exec.id,
-              config: compileInlineConfig({ files, fixtures }),
+              config: compileInlineConfig({
+                files,
+                fixtures,
+                env,
+              }),
             }),
           })
 

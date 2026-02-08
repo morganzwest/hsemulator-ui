@@ -388,6 +388,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
+                    id='secrets-button'
                     variant='ghost'
                     size='icon'
                     onClick={() => setOpen(true)}
@@ -402,6 +403,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                 <TooltipTrigger asChild>
                   <Button
                     variant='ghost'
+                    id='template-button'
                     size='icon'
                     onClick={handleSaveTemplate}
                     disabled={templateSaving}

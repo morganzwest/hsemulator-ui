@@ -25,6 +25,30 @@ export function createPostCreateTour() {
                         "This is where you write and test your runtime code."
                 }
             },
+            {
+                element: "#settings-button",
+                popover: {
+                    title: "Secrets and Environment",
+                    description:
+                        "Create and add secret and environment variables."
+                }
+            },
+            {
+                element: "#secrets-button",
+                popover: {
+                    title: "Assign Environment Variables",
+                    description:
+                        "Assign your secret tokens to your action."
+                }
+            },
+            {
+                element: "#template-button",
+                popover: {
+                    title: "Save your own template",
+                    description:
+                        "When you have finished your code. Save it as a template for later!"
+                }
+            },
 
             {
                 element: "#run-button",

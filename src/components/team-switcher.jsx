@@ -1,7 +1,7 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import { ChevronsUpDown, Plus, Check } from 'lucide-react'
+import * as React from 'react';
+import { ChevronsUpDown, Plus, Check } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -10,36 +10,36 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu';
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/components/ui/sidebar'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+} from '@/components/ui/sidebar';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
-import { getActivePortal, setActivePortal } from '@/lib/portal-state'
-import { resolvePortalIcon, resolvePortalColor } from '@/lib/portal-icons'
-import { CreatePortalSheet } from './createPortalSheet'
+import { getActivePortal, setActivePortal } from '@/lib/portal-state';
+import { resolvePortalIcon, resolvePortalColor } from '@/lib/portal-icons';
+import { CreatePortalSheet } from './createPortalSheet';
 
 export function TeamSwitcher({ teams }) {
-  const { isMobile } = useSidebar()
-  const [activeTeam, setActiveTeam] = React.useState(null)
-const [openCreate, setOpenCreate] = React.useState(false)
+  const { isMobile } = useSidebar();
+  const [activeTeam, setActiveTeam] = React.useState(null);
+  const [openCreate, setOpenCreate] = React.useState(false);
 
   React.useEffect(() => {
     try {
-      setActiveTeam(getActivePortal())
+      setActiveTeam(getActivePortal());
     } catch {}
-  }, [teams])
+  }, [teams]);
 
-  if (!activeTeam) return null
+  if (!activeTeam) return null;
 
-  const ActiveIcon = resolvePortalIcon(activeTeam.icon)
-  const color = resolvePortalColor(activeTeam.color)
-  const plan = activeTeam.plan || 'Free'
+  const ActiveIcon = resolvePortalIcon(activeTeam.icon);
+  const color = resolvePortalColor(activeTeam.color);
+  const plan = activeTeam.plan || 'Free';
 
   return (
     <SidebarMenu>
@@ -47,105 +47,103 @@ const [openCreate, setOpenCreate] = React.useState(false)
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
-              size="lg"
+              id='portal-switcher'
+              size='lg'
               className={cn(
                 'relative flex items-center gap-3  ',
                 'hover:bg-sidebar-accent',
                 'data-[state=open]:ring-2',
-                color.glow
+                color.glow,
               )}
             >
               <div
                 className={cn(
                   'grid size-9 place-items-center rounded-md border',
-                  color.container
+                  color.container,
                 )}
               >
-                <ActiveIcon className="size-4.5" />
+                <ActiveIcon className='size-4.5' />
               </div>
 
-              <div className="flex-1 overflow-hidden">
-                <div className="truncate text-sm font-semibold">
+              <div className='flex-1 overflow-hidden'>
+                <div className='truncate text-sm font-semibold'>
                   {activeTeam.name}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className='text-xs text-muted-foreground'>
                   {plan} workspace
                 </div>
               </div>
 
-              <ChevronsUpDown className="size-4 opacity-70" />
+              <ChevronsUpDown className='size-4 opacity-70' />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent
-            align="start"
+            align='start'
             side={isMobile ? 'bottom' : 'right'}
             sideOffset={6}
-            className="w-72 rounded-xl"
+            className='w-72 rounded-xl'
           >
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
+            <DropdownMenuLabel className='text-xs text-muted-foreground'>
               Your portals
             </DropdownMenuLabel>
 
-            <div className="space-y-1">
+            <div className='space-y-1'>
               {teams.map((team) => {
-                const Icon = resolvePortalIcon(team.icon)
-                const c = resolvePortalColor(team.color)
-                const isActive = team.uuid === activeTeam.uuid
+                const Icon = resolvePortalIcon(team.icon);
+                const c = resolvePortalColor(team.color);
+                const isActive = team.uuid === activeTeam.uuid;
 
                 return (
                   <DropdownMenuItem
                     key={team.uuid}
                     onClick={() => {
-                      setActivePortal(team.uuid)
-                      setActiveTeam(team)
+                      setActivePortal(team.uuid);
+                      setActiveTeam(team);
                       window.dispatchEvent(
-                        new CustomEvent('portal:changed', { detail: team })
-                      )
+                        new CustomEvent('portal:changed', { detail: team }),
+                      );
                     }}
                     className={cn(
                       'flex items-center gap-3 rounded-lg px-2 py-2',
-                      isActive && 'bg-muted'
+                      isActive && 'bg-muted',
                     )}
                   >
                     <div
                       className={cn(
                         'grid size-8 place-items-center rounded-md border',
-                        c.container
+                        c.container,
                       )}
                     >
-                      <Icon className="size-4 text-white/80" />
+                      <Icon className='size-4 text-white/80' />
                     </div>
 
-                    <div className="flex-1 overflow-hidden">
-                      <div className="truncate text-sm font-medium">
+                    <div className='flex-1 overflow-hidden'>
+                      <div className='truncate text-sm font-medium'>
                         {team.name}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className='text-xs text-muted-foreground'>
                         {team.plan || 'Free'}
                       </div>
                     </div>
 
-                    {isActive && (
-                      <Check className="size-4 mr-2 text-primary" />
-                    )}
+                    {isActive && <Check className='size-4 mr-2 text-primary' />}
                   </DropdownMenuItem>
-                )
+                );
               })}
             </div>
 
             <DropdownMenuSeparator />
-              <DropdownMenuItem
-  onClick={() => setOpenCreate(true)}
-  className="flex items-center gap-3"
->
-  <div className="grid size-8 place-items-center rounded-md border">
-    <Plus className="size-4" />
-  </div>
+            <DropdownMenuItem
+              onClick={() => setOpenCreate(true)}
+              className='flex items-center gap-3'
+            >
+              <div className='grid size-8 place-items-center rounded-md border'>
+                <Plus className='size-4' />
+              </div>
 
-  <span className="text-sm">Add portal</span>
-</DropdownMenuItem>
-
+              <span className='text-sm'>Add portal</span>
+            </DropdownMenuItem>
 
             {/* <DropdownMenuItem
               disabled
@@ -163,11 +161,8 @@ const [openCreate, setOpenCreate] = React.useState(false)
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
-      
-<CreatePortalSheet
-  open={openCreate}
-  onOpenChange={setOpenCreate}
-/>
+
+      <CreatePortalSheet open={openCreate} onOpenChange={setOpenCreate} />
     </SidebarMenu>
-  )
+  );
 }

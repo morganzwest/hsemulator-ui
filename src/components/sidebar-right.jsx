@@ -23,17 +23,17 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-} from '@/components/ui/dropdown-menu'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+} from '@/components/ui/dropdown-menu';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 const EXECUTION_SCOPES = [
   { key: 'all-portals', label: 'All portals' },
   { key: 'this-portal', label: 'This portal' },
   { key: 'this-action', label: 'This action' },
-]
+];
 
 function scopeLabel(key) {
-  return EXECUTION_SCOPES.find(s => s.key === key)?.label ?? key
+  return EXECUTION_SCOPES.find((s) => s.key === key)?.label ?? key;
 }
 
 const supabase = createSupabaseBrowserClient();
@@ -47,29 +47,21 @@ export function SidebarRight({ activeAction, ...props }) {
      State
   ----------------------------- */
   let portalId = null;
-let actionId = null;
+  let actionId = null;
 
-if (
-  executionScope === 'this-portal' ||
-  executionScope === 'this-action'
-) {
-  try {
-    portalId = getActivePortalId();
-  } catch {
-    portalId = null;
+  if (executionScope === 'this-portal' || executionScope === 'this-action') {
+    try {
+      portalId = getActivePortalId();
+    } catch {
+      portalId = null;
+    }
   }
-}
 
-if (
-  executionScope === 'this-action' &&
-  activeAction
-) {
-  actionId = activeAction.id;
-}
-
+  if (executionScope === 'this-action' && activeAction) {
+    actionId = activeAction.id;
+  }
 
   const [user, setUser] = React.useState(null);
-
 
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [openExecution, setOpenExecution] = React.useState(null);
@@ -145,7 +137,10 @@ if (
 
           {/* Content */}
           <ScrollArea className='flex-1 h-0'>
-            <SidebarContent className='flex-1 space-y-3 py-3 px-4 overflow-y-auto overflow-x-hidden min-w-0'>
+            <SidebarContent
+              id='execution-list'
+              className='flex-1 space-y-3 py-3 px-4 overflow-y-auto overflow-x-hidden min-w-0'
+            >
               <div
                 className='
   sticky top-1 z-10
@@ -192,47 +187,46 @@ if (
           {/* Footer */}
           <SidebarFooter className='border-t px-3 py-2'>
             {/* Scope toggle */}
-            <div className="flex items-center justify-between text-xs">
-  <span className="text-muted-foreground">Execution scope</span>
+            <div className='flex items-center justify-between text-xs'>
+              <span className='text-muted-foreground'>Execution scope</span>
 
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button
-        className="
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className='
           flex items-center gap-1
           rounded-md border px-2 py-1
           text-xs font-medium
           transition-colors
           hover:bg-sidebar-accent/60
-        "
-      >
-        {scopeLabel(executionScope)}
-        <ChevronUp className="h-3 w-3 opacity-60" />
-      </button>
-    </DropdownMenuTrigger>
+        '
+                  >
+                    {scopeLabel(executionScope)}
+                    <ChevronUp className='h-3 w-3 opacity-60' />
+                  </button>
+                </DropdownMenuTrigger>
 
-    <DropdownMenuContent
-      side="top"
-      align="end"
-      className="min-w-[140px]"
-    >
-      {EXECUTION_SCOPES.filter(
-        s =>
-          s.key !== executionScope &&
-          (s.key !== 'this-action' || activeAction)
-      ).map(scope => (
-        <DropdownMenuItem
-          key={scope.key}
-          onClick={() => setExecutionScope(scope.key)}
-          className="text-xs cursor-pointer"
-        >
-          {scope.label}
-        </DropdownMenuItem>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-</div>
-
+                <DropdownMenuContent
+                  side='top'
+                  align='end'
+                  className='min-w-[140px]'
+                >
+                  {EXECUTION_SCOPES.filter(
+                    (s) =>
+                      s.key !== executionScope &&
+                      (s.key !== 'this-action' || activeAction),
+                  ).map((scope) => (
+                    <DropdownMenuItem
+                      key={scope.key}
+                      onClick={() => setExecutionScope(scope.key)}
+                      className='text-xs cursor-pointer'
+                    >
+                      {scope.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* Status filter */}
             <div className='flex items-center justify-between text-xs'>

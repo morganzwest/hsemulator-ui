@@ -1,5 +1,6 @@
 @import "tailwindcss";
 /* @import "tw-animate-css"; */
+@import "driver.js/dist/driver.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -119,7 +120,164 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.driver-popover-footer .driver-popover-prev-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: var(--foreground);
+}
+
+
+/* Popover card */
+.driver-popover {
+  background: var(--popover);
+  color: var(--popover-foreground);
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+
+  padding: 16px;
+  min-width: 280px;
+  max-width: 340px;
+
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.25);
+
+  backdrop-filter: blur(10px);
+}
+
+
+/* Title */
+.driver-popover-title {
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+
+
+/* Description */
+.driver-popover-description {
+  color: var(--muted-foreground);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.driver-popover-footer {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.driver-popover-footer button {
+  height: 32px;
+  padding: 0 10px;
+
+  line-height: 1;
+
+  border-radius: var(--radius-md);
+
+  font-size: 12px;
+  font-weight: 500;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.15s ease;
+}
+
+
+
+/* Buttons */
+.driver-popover-next-btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  text-shadow: none;
+}
+
+.driver-popover-next-btn:hover {
+  opacity: 0.9;
+}
+
+.driver-popover-close-btn {
+  width: 28px;
+  height: 28px;
+
+  border-radius: var(--radius-sm);
+
+  background: transparent;
+  color: var(--muted-foreground);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.driver-popover-close-btn:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.driver-popover {
+  animation: driverFade 0.18s ease;
+}
+
+@keyframes driverFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.driver-popover-arrow {
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top: 9px solid var(--border);
+
+}
+
+.driver-popover-footer .driver-popover-prev-btn {
+  background: transparent;
+  color: var(--foreground);
+
+  border: 1px solid var(--border);
+
+  text-shadow: none !important;
+  box-shadow: none;
+}
+
+.driver-popover-footer .driver-popover-prev-btn:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.driver-popover-footer .driver-popover-prev-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+
+
+.driver-popover-arrow::after {
+  content: "";
+  position: absolute;
+  left: -9px;
+  top: -9px;
+
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--popover);
 }

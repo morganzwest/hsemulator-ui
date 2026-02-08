@@ -1,15 +1,13 @@
-'use client'
+'use client';
 
-import { useEffect } from 'react'
+import { useEffect } from 'react';
+import { Plus, Shuffle, Pencil, LayoutTemplate, Settings } from 'lucide-react';
 import {
-  Plus,
-  Shuffle,
-  Pencil,
-  LayoutTemplate,
-  Settings,
-} from 'lucide-react'
-import { CommandProvider, useCommandStore } from '@/components/command-palette/command-store'
-import { CommandPalette } from '@/components/command-palette/command-palette'
+  CommandProvider,
+  useCommandStore,
+} from '@/components/command-palette/command-store';
+import { CommandPalette } from '@/components/command-palette/command-palette';
+import OnboardingTourLauncher from '~/components/onboardingTourLauncher';
 
 // export const metadata = { title: 'Action Editor' }
 
@@ -18,7 +16,7 @@ import { CommandPalette } from '@/components/command-palette/command-palette'
 ------------------------------------- */
 
 export function RegisterCoreCommands() {
-  const { registerCommand } = useCommandStore()
+  const { registerCommand } = useCommandStore();
 
   useEffect(() => {
     /* ---------------------------------
@@ -32,9 +30,9 @@ export function RegisterCoreCommands() {
       icon: Plus,
       groupId: 'actions',
       action: () => {
-        window.dispatchEvent(new Event('action:create'))
+        window.dispatchEvent(new Event('action:create'));
       },
-    })
+    });
 
     registerCommand({
       id: 'action:edit-current',
@@ -43,9 +41,9 @@ export function RegisterCoreCommands() {
       icon: Pencil,
       groupId: 'actions',
       action: () => {
-        window.dispatchEvent(new Event('action:edit-current'))
+        window.dispatchEvent(new Event('action:edit-current'));
       },
-    })
+    });
 
     registerCommand({
       id: 'action:switch',
@@ -54,9 +52,9 @@ export function RegisterCoreCommands() {
       icon: Shuffle,
       groupId: 'actions',
       action: () => {
-        window.dispatchEvent(new Event('action:change'))
+        window.dispatchEvent(new Event('action:change'));
       },
-    })
+    });
 
     /* ---------------------------------
        Templates & reuse
@@ -69,9 +67,9 @@ export function RegisterCoreCommands() {
       icon: LayoutTemplate,
       groupId: 'templates',
       action: () => {
-        window.dispatchEvent(new Event('templates:open'))
+        window.dispatchEvent(new Event('templates:open'));
       },
-    })
+    });
 
     // Future:
     // - Save as template
@@ -89,17 +87,17 @@ export function RegisterCoreCommands() {
       icon: Settings,
       groupId: 'settings',
       action: () => {
-        window.dispatchEvent(new Event('settings:open'))
+        window.dispatchEvent(new Event('settings:open'));
       },
-    })
+    });
 
     // Future:
     // - Workspace switcher
     // - Portal settings
     // - Environment variables
-  }, [registerCommand])
+  }, [registerCommand]);
 
-  return null
+  return null;
 }
 
 /* -------------------------------------
@@ -108,10 +106,13 @@ export function RegisterCoreCommands() {
 
 export default function DashboardLayout({ children }) {
   return (
-    <CommandProvider>
-      <RegisterCoreCommands />
-      {children}
-      <CommandPalette />
-    </CommandProvider>
-  )
+    <>
+      <CommandProvider>
+        <RegisterCoreCommands />
+        {children}
+        <CommandPalette />
+      </CommandProvider>
+      <OnboardingTourLauncher />
+    </>
+  );
 }

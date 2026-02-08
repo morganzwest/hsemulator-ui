@@ -45,6 +45,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "driver.js": "^1.4.0",
     "framer-motion": "^12.27.1",
     "lucide-react": "^0.562.0",
     "monaco-themes": "^0.4.8",

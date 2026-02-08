@@ -8,6 +8,13 @@ import { subscribeExecutionRealtime } from './realtime-logs'
 /* -----------------------------
    Helpers
 ----------------------------- */
+const EXCLUDED_FILES = new Set([
+  'config.yaml',
+  'config.yml',
+  '.env',
+])
+
+
 
 function formatOutputFields(outputFields) {
   if (!outputFields || Object.keys(outputFields).length === 0) return []
@@ -238,19 +245,22 @@ export function useActionEditor({
     const { data } = await supabase.storage.from('actions').list(basePath)
 
     const entries = await Promise.all(
-      (data ?? []).map(async obj => {
-        const { data } = await supabase.storage
-          .from('actions')
-          .download(`${basePath}/${obj.name}`)
-        return [
-          obj.name,
-          {
-            language: inferLanguage(obj.name),
-            value: await data.text(),
-            dirty: false,
-          },
-        ]
-      })
+      (data ?? [])
+        .filter(obj => !EXCLUDED_FILES.has(obj.name))
+        .map(async obj => {
+          const { data } = await supabase.storage
+            .from('actions')
+            .download(`${basePath}/${obj.name}`)
+
+          return [
+            obj.name,
+            {
+              language: inferLanguage(obj.name),
+              value: await data.text(),
+              dirty: false,
+            },
+          ]
+        })
     )
 
     const loaded = Object.fromEntries(entries)

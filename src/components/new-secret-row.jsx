@@ -58,7 +58,7 @@ export function NewSecretRow({ portalId, onCreated }) {
 
   return (
     <div className='rounded-md border border-dashed p-3 space-y-2'>
-      <div className='flex items-center gap-3'>
+      <div className='flex items-center gap-3 mb-0'>
         <Input
           placeholder='KEY_NAME'
           value={name}
@@ -94,8 +94,9 @@ export function NewSecretRow({ portalId, onCreated }) {
         </Button>
       </div>
 
+      {/* TODO: Add Description input to DB and API route */}
       {/* Description */}
-      <div className='space-y-1'>
+      {/* <div className='space-y-1'>
         <Input
           placeholder='Description (optional)'
           value={description}
@@ -114,7 +115,7 @@ export function NewSecretRow({ portalId, onCreated }) {
             {description.length}/{MAX_DESC_LENGTH}
           </span>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import YAML from 'yaml'
 import { toast } from 'sonner'
 
 const MAX_NAME = 64
@@ -11,8 +10,8 @@ const MAX_DESC = 256
  * - js_action
  * - py_action
  * - event_json
- * - config_yaml_js
- * - config_yaml_py
+ *
+ * ⛔ NO config
  */
 export async function createActionFromTemplate({
   supabase,
@@ -58,7 +57,7 @@ export async function createActionFromTemplate({
   }
 
   /* -------------------------------------
-     Resolve template files
+     Resolve template sources ONLY
   ------------------------------------- */
 
   const actionSource =
@@ -66,19 +65,9 @@ export async function createActionFromTemplate({
       ? template.js_action
       : template.py_action
 
-  const configYaml =
-    language === 'javascript'
-      ? template.config_yaml_js
-      : template.config_yaml_py
-
   if (!actionSource) {
     toast.error(`Template does not support ${language}`)
     throw new Error(`Unsupported language: ${language}`)
-  }
-
-  if (!configYaml) {
-    toast.error(`Template is missing config for ${language}`)
-    throw new Error(`Missing config for ${language}`)
   }
 
   if (!template.event_json) {
@@ -87,24 +76,11 @@ export async function createActionFromTemplate({
   }
 
   /* -------------------------------------
-     Parse config.yaml safely
-  ------------------------------------- */
-
-  let parsedConfig
-  try {
-    parsedConfig = YAML.parse(configYaml)
-  } catch {
-    toast.error('Template config.yaml is invalid')
-    throw new Error('Invalid config.yaml')
-  }
-
-  /* -------------------------------------
      Create action (Promise Toast)
   ------------------------------------- */
 
   return toast.promise(
     (async () => {
-
       const { data: action, error } = await supabase
         .from('actions')
         .insert({
@@ -113,8 +89,7 @@ export async function createActionFromTemplate({
           name,
           description,
           language,
-          filepath: '',
-          config: parsedConfig,
+          filepath: '', // resolved dynamically at runtime
           template_id: template.id ?? null,
         })
         .select()
@@ -127,7 +102,6 @@ export async function createActionFromTemplate({
       const basePath = `${portalId}/${action.id}`
 
       const files = {
-        'config.yaml': configYaml,
         'event.json': JSON.stringify(template.event_json, null, 2),
         [language === 'javascript' ? 'action.js' : 'action.py']: actionSource,
       }
@@ -136,7 +110,9 @@ export async function createActionFromTemplate({
         const { error: uploadError } = await supabase.storage
           .from('actions')
           .upload(`${basePath}/${path}`, contents, {
-            contentType: 'text/plain',
+            contentType: path.endsWith('.json')
+              ? 'application/json'
+              : 'text/plain',
             upsert: false,
           })
 

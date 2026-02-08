@@ -1,39 +1,15 @@
-import YAML from 'yaml'
 import slugify from 'slugify'
 import { toast } from 'sonner'
 
 const MAX_NAME = 64
 const MAX_DESC = 256
 
-/* -------------------------------------
-   BASE CONFIG (AUTHORITATIVE)
-------------------------------------- */
-
-function buildBaseConfig(language) {
-  return {
-    version: 1,
-    action: {
-      type: language === 'javascript' ? 'js' : 'python',
-      entry: language === 'javascript' ? 'action.js' : 'action.py',
-    },
-    fixtures: ['event.json'],
-    env: {
-      HUBSPOT_TOKEN: 'pat-your-token-here',
-      HUBSPOT_BASE_URL: 'https://api.hubapi.com',
-    },
-    runtime: {
-      node: 'node',
-      python: 'python',
-    },
-    repeat: 1,
-  }
-}
-
 /**
  * Create a PRIVATE template from editor code.
  *
- * - NEVER reads editor config.yaml
- * - ALWAYS uses BASE CONFIG
+ * - NEVER reads config.yaml
+ * - NEVER creates or stores config
+ * - Templates contain source + fixtures only
  */
 export async function createPrivateTemplate({
   supabase,
@@ -101,24 +77,15 @@ export async function createPrivateTemplate({
   }
 
   /* -------------------------------------
-     Build BASE configs (per language)
-  ------------------------------------- */
-
-  const configYamlJs = languages.includes('javascript')
-    ? YAML.stringify(buildBaseConfig('javascript'))
-    : null
-
-  const configYamlPy = languages.includes('python')
-    ? YAML.stringify(buildBaseConfig('python'))
-    : null
-
-  /* -------------------------------------
      Insert template (Promise Toast)
   ------------------------------------- */
 
   return toast.promise(
     (async () => {
-      const slug = slugify(ownerId + '_' + name, { lower: true, strict: true })
+      const slug = slugify(`${ownerId}_${name}`, {
+        lower: true,
+        strict: true,
+      })
 
       const { data: template, error } = await supabase
         .from('action_templates')
@@ -131,8 +98,6 @@ export async function createPrivateTemplate({
           js_action: jsAction,
           py_action: pyAction,
           event_json: parsedEventJson,
-          config_yaml_js: configYamlJs,
-          config_yaml_py: configYamlPy,
         })
         .select()
         .single()

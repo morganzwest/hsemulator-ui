@@ -8,6 +8,7 @@ import {
 } from '@/components/command-palette/command-store';
 import { CommandPalette } from '@/components/command-palette/command-palette';
 import OnboardingTourLauncher from '~/components/onboardingTourLauncher';
+import { GlobalUpgradeDialog } from '~/components/upgrade-dialog';
 
 // export const metadata = { title: 'Action Editor' }
 
@@ -113,6 +114,7 @@ export default function DashboardLayout({ children }) {
         <CommandPalette />
       </CommandProvider>
       <OnboardingTourLauncher />
+      <GlobalUpgradeDialog />
     </>
   );
 }

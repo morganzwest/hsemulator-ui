@@ -26,7 +26,11 @@ import {
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { Sparkles } from 'lucide-react';
-import { setActivePortal, getAvailablePortals, addAvailablePortal } from '~/lib/portal-state';
+import {
+  setActivePortal,
+  getAvailablePortals,
+  addAvailablePortal,
+} from '~/lib/portal-state';
 
 const supabase = createSupabaseBrowserClient();
 
@@ -44,7 +48,7 @@ export function CreatePortalSheet({ open, onOpenChange }) {
   const isPremiumColor = Boolean(c?.premium);
   const isPro = plan.toLowerCase() === 'pro';
 
-  // 🔑 single gate
+  // single gate
   const allowedToProgress = !isPremiumColor || isPro;
 
   /* ---------------------------------
@@ -131,13 +135,13 @@ export function CreatePortalSheet({ open, onOpenChange }) {
     setLoading(false);
 
     addAvailablePortal({
-        uuid: portal.uuid,
-        name,
-        type,
-        icon,
-        color,
-        plan,
-        });
+      uuid: portal.uuid,
+      name,
+      type,
+      icon,
+      color,
+      plan,
+    });
 
     setActivePortal(portal.uuid);
     window.dispatchEvent(new CustomEvent('portal:created', { detail: portal }));

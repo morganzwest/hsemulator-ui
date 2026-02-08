@@ -40,6 +40,7 @@ import { CreateActionDialog } from '@/components/create-action-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CICDSetupDrawer } from './cicdsetupdrawer';
 import { AssignSecretsDialog } from './assign-secrets-dialog';
+import { Key } from 'lucide-react';
 
 /* --------------------------------
    Language icon
@@ -358,19 +359,6 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                   <Button
                     variant='ghost'
                     size='icon'
-                    onClick={() => setOpen(true)}
-                  >
-                    <Workflow />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Push to HubSpot</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='icon'
                     onClick={() =>
                       setSplit(
                         split === 'horizontal' ? 'vertical' : 'horizontal',
@@ -383,7 +371,8 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                 <TooltipContent>Swap output orientation</TooltipContent>
               </Tooltip>
 
-              <Tooltip>
+              {/* TODO: Renable with new CICD drawer and secret management */}
+              {/* <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant='ghost'
@@ -393,7 +382,20 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                     <Workflow />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Push to HubSpot</TooltipContent>
+                <TooltipContent>Update action on HubSpot</TooltipContent>
+              </Tooltip> */}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    onClick={() => setOpen(true)}
+                  >
+                    <Key />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Select Environment Variables</TooltipContent>
               </Tooltip>
 
               <Tooltip>

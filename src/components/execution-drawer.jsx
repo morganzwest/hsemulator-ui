@@ -22,7 +22,7 @@ import {
   Terminal,
   PlayCircle,
 } from 'lucide-react';
-
+import { Card, CardHeader, CardContent } from './ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Copy } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { IoLogoJavascript, IoLogoPython } from 'react-icons/io5';
 
@@ -548,12 +548,13 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
     error,
   } = useExecutionDetails(executionId);
   const [showRawErrors, setShowRawErrors] = useState(false);
-
+  const [copied, setCopied] = useState(false);
   const language = execution?.action_language;
   const timelineEvents = useMemo(
     () => normaliseExecutionEvents(events),
     [events],
   );
+  const [copiedOutput, setCopiedOutput] = useState(false);
 
   const timeline = timelineEvents;
 
@@ -562,7 +563,14 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
       (e) => e.kind === 'Return' && extractOutputFieldsFromReturn(e, false),
     );
   }, [timeline]);
+  function handleCopyOutput() {
+    navigator.clipboard.writeText(JSON.stringify(outputFields, null, 2));
 
+    setCopiedOutput(true);
+    toast.success('Output copied to clipboard');
+
+    setTimeout(() => setCopiedOutput(false), 1200);
+  }
   const { outputFields, hasOutput } = useMemo(() => {
     if (
       execution?.result?.outputFields &&
@@ -596,12 +604,24 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
     () => timelineEvents.filter((e) => e.isError).length,
     [timelineEvents],
   );
+  function handleCopy() {
+    navigator.clipboard.writeText(executionId);
+    setCopied(true);
+    toast.success('Execution ID copied');
 
+    setTimeout(() => setCopied(false), 1200);
+  }
   const showTimeline =
     execution &&
     (execution.status === 'running' ||
       execution.status === 'completed' ||
       execution.status === 'failed');
+
+  function getTypeLabel(value) {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'array';
+    return typeof value; // string, number, boolean, object, undefined, function
+  }
 
   const createdLabel = useMemo(() => {
     if (!execution?.created_at) return null;
@@ -626,17 +646,26 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
                 {execution?.action_name ?? 'Execution'}
               </SheetTitle>
 
-              <SheetDescription className='flex items-center gap-2 font-mono text-xs'>
+              <SheetDescription className='flex items-center -ml-2 gap-2 font-mono text-xs'>
                 {/* <span>{executionId}</span> */}
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(executionId);
-                    toast.success('Execution ID copied');
-                  }}
-                  className='group flex items-center gap-2 rounded-md border border-white/0 hover:px-1 py-1 font-mono text-xs text-muted-foreground hover:bg-muted trnasition'
+                  onClick={handleCopy}
+                  className='
+    group inline-flex items-center gap-1.5
+    rounded-md px-2 py-1
+    font-mono text-xs
+    text-muted-foreground
+    hover:bg-muted
+    transition-colors
+  '
                 >
-                  <span className=''>{executionId}</span>
-                  <Copy className='h-3 w-3 opacity-0 group-hover:opacity-100 transition' />
+                  <span className='truncate'>{executionId}</span>
+
+                  {copied ? (
+                    <Check className='h-3.5 w-3.5 text-green-500' />
+                  ) : (
+                    <Copy className='h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity' />
+                  )}
                 </button>
               </SheetDescription>
             </div>
@@ -706,47 +735,66 @@ export function ExecutionSheet({ executionId, open, onOpenChange }) {
 
               {/* Output */}
               {hasOutput && (
-                <section id='execution-output' className='space-y-3'>
-                  <div className='flex items-center justify-between'>
-                    <h3 className='flex items-center gap-2 text-sm font-medium'>
-                      <Terminal className='h-4 w-4' />
-                      Execution output
-                      <Badge variant='secondary' className='text-[10px]'>
-                        {Object.keys(outputFields).length} fields
-                      </Badge>
-                    </h3>
-                    <Button
-                      variant='ghost'
-                      size='sm'
-                      onClick={() => {
-                        navigator.clipboard.writeText(
-                          JSON.stringify(outputFields, null, 2),
-                        );
-                        toast.success('Output copied to clipboard');
-                      }}
-                    >
-                      <Copy />
-                    </Button>
-                  </div>
+                <section id='execution-output' className='space-y-0'>
+                  <Card className='border shadow-sm py-0 gap-0'>
+                    <CardHeader className='py-2'>
+                      <div className='flex items-center justify-between'>
+                        <h3 className='flex items-center gap-2 text-sm font-medium'>
+                          <Terminal className='h-4 w-4 text-primary' />
+                          Execution output
+                          <Badge variant='secondary' className='text-[10px]'>
+                            {Object.keys(outputFields).length} fields
+                          </Badge>
+                        </h3>
 
-                  <div className='rounded-md border divide-y overflow-hidden'>
-                    {Object.entries(outputFields).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className='grid grid-cols-3 gap-4 px-3 py-2 text-xs hover:bg-muted/30'
-                      >
-                        <div className='truncate font-mono text-muted-foreground'>
-                          {key}
-                        </div>
+                        <Button
+                          variant='secondary'
+                          size='sm'
+                          className='h-8 gap-2'
+                          onClick={handleCopyOutput}
+                        >
+                          {copiedOutput ? (
+                            <Check className='h-3.5 w-3.5 text-emerald-500' />
+                          ) : (
+                            <Copy className='h-3.5 w-3.5 opacity-70' />
+                          )}
 
-                        <div className='col-span-2 font-mono select-text'>
-                          <pre className='whitespace-pre-wrap text-foreground'>
-                            {JSON.stringify(value, null, 2)}
-                          </pre>
-                        </div>
+                          {/* Hiding copy button for cleaner UI */}
+                          {/* {copiedOutput ? 'Copied' : 'Copy'} */}
+                        </Button>
                       </div>
-                    ))}
-                  </div>
+                    </CardHeader>
+
+                    <CardContent className='p-0'>
+                      <div className='divide-y'>
+                        {Object.entries(outputFields).map(([key, value]) => {
+                          const type = getTypeLabel(value);
+
+                          return (
+                            <div
+                              key={key}
+                              className='grid grid-cols-3 gap-4 px-3 py-2 text-xs transition-colors hover:bg-muted/40'
+                            >
+                              {/* Key + Type */}
+                              <div className='truncate font-mono text-muted-foreground/80'>
+                                {key}
+                                <span className='ml-1 text-muted-foreground/50 italic'>
+                                  ({type})
+                                </span>
+                              </div>
+
+                              {/* Value */}
+                              <div className='col-span-2 font-mono select-text'>
+                                <pre className='whitespace-pre-wrap rounded-md border bg-background px-3 py-2 text-[11px] leading-relaxed shadow-sm'>
+                                  {JSON.stringify(value, null, 2)}
+                                </pre>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
 
                   <Separator />
                 </section>

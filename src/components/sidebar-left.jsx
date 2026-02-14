@@ -109,38 +109,45 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
 
   useEffect(() => {
     async function loadPortals() {
-      let { data, error } = await supabase
-        .from('portals')
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('portal_members')
         .select(
           `
-    uuid,
-    name,
-    icon,
-    color,
-    created_at,
-    created_by,
-    profiles:created_by (
-      plan
-    )
-  `,
+        portal:portal_uuid (
+          uuid,
+          name,
+          icon,
+          color,
+          created_at,
+          created_by
+        ),
+        role
+      `,
         )
-        .order('created_at', { ascending: true });
-
-      data =
-        data?.map((portal) => ({
-          ...portal,
-          plan: portal.profiles?.plan === 'pro' ? 'Professional' : null,
-        })) ?? [];
+        .eq('profile_id', user.id)
+        .order('created_at', { ascending: true, foreignTable: 'portal' });
 
       if (error) {
         console.error('[SidebarLeft] Failed to load portals:', error);
         return;
       }
 
-      const activeUuid = initPortalState(data);
-      const active = data.find((p) => p.uuid === activeUuid);
+      const portals =
+        data?.map((row) => ({
+          ...row.portal,
+          role: row.role,
+        })) ?? [];
 
-      setPortals(data);
+      const activeUuid = initPortalState(portals);
+      const active = portals.find((p) => p.uuid === activeUuid);
+
+      setPortals(portals);
       setActivePortalState(active);
       setPortalsLoaded(true);
     }

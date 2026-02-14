@@ -92,8 +92,8 @@ export function CreatePortalSheet({ open, onOpenChange }) {
     }
 
     /* -------------------------------
-       1. Create portal
-    -------------------------------- */
+     1. Create portal
+  -------------------------------- */
 
     const { data: portal, error: insertError } = await supabase
       .from('portals')
@@ -115,19 +115,19 @@ export function CreatePortalSheet({ open, onOpenChange }) {
     }
 
     /* -------------------------------
-       2. Append portal UUID to profile
-    -------------------------------- */
+     2. Insert membership (NEW)
+  -------------------------------- */
 
-    const { error: appendError } = await supabase.rpc(
-      'append_portal_uuid_to_profile',
-      {
-        p_user_id: user.id,
-        p_portal_uuid: portal.uuid,
-      },
-    );
+    const { error: membershipError } = await supabase
+      .from('portal_members')
+      .insert({
+        portal_uuid: portal.uuid,
+        profile_id: user.id,
+        role: 'owner',
+      });
 
-    if (appendError) {
-      console.error(appendError);
+    if (membershipError) {
+      console.error(membershipError);
       setLoading(false);
       return;
     }
@@ -144,6 +144,7 @@ export function CreatePortalSheet({ open, onOpenChange }) {
     });
 
     setActivePortal(portal.uuid);
+
     window.dispatchEvent(new CustomEvent('portal:created', { detail: portal }));
 
     onOpenChange(false);

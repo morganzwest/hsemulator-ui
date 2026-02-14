@@ -62,6 +62,19 @@ export function InstallCommand() {
 
 
 export default function LandingPage() {
+
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        window.location.replace('/dashboard');
+      }
+    };
+
+    checkSession();
+  }, []);
   return (
     <main className="relative min-h-screen bg-background">
       {/* Header */}

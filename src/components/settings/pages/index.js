@@ -1,7 +1,9 @@
 import { EditorSettingsPage } from './editor-settings';
 import { PortalSecretsSettingsPage } from './secret-settings';
+import { TeamMembersSettingsPage } from './team-settings';
 
 export const SETTINGS_PAGES = {
   editor: EditorSettingsPage,
-  secrets: PortalSecretsSettingsPage
+  secrets: PortalSecretsSettingsPage,
+  team: TeamMembersSettingsPage
 };

@@ -22,20 +22,29 @@ function log(...args) {
 ------------------------------------- */
 
 export function addAvailablePortal(portal) {
-  if (!portal?.uuid) {
-    throw new Error('Invalid portal')
-  }
+  if (!portal?.uuid) throw new Error('Invalid portal')
 
   const exists = availablePortals.some(p => p.uuid === portal.uuid)
   if (exists) return
 
   availablePortals.push(portal)
+
+  // Reconcile active portal
+  if (!activePortalUuid) {
+    activePortalUuid = portal.uuid
+    syncToStorage(portal.uuid)
+  }
 }
+
 
 
 function isValidUuid(uuid) {
-  return typeof uuid === 'string' && uuid.length > 0
+  return (
+    typeof uuid === 'string' &&
+    /^[0-9a-f-]{36}$/i.test(uuid)
+  )
 }
+
 
 function syncToStorage(uuid) {
   if (typeof window === 'undefined') return
@@ -58,6 +67,7 @@ export function getActivePortalId() {
   const id = getActivePortalUuid()
   return id
 }
+
 
 /* -------------------------------------
    Public API
@@ -97,16 +107,25 @@ export function initPortalState(portals) {
  * Guaranteed non-null after init
  */
 export function getActivePortalUuid() {
-  if (!isValidUuid(activePortalUuid)) {
-    log('getActivePortalUuid FAILED → state not initialised', {
-      activePortalUuid,
-      availablePortals,
-    })
-    throw new Error('Portal state not initialised')
+  if (isValidUuid(activePortalUuid)) {
+    return activePortalUuid
   }
 
-  return activePortalUuid
+  const stored =
+    typeof window !== 'undefined'
+      ? localStorage.getItem(STORAGE_KEY)
+      : null
+
+  if (isValidUuid(stored)) {
+    activePortalUuid = stored
+    log('hydrated from storage →', stored)
+    return stored
+  }
+
+  log('getActivePortalUuid FAILED → no state')
+  throw new Error('Portal state not initialised')
 }
+
 
 /**
  * Change active portal

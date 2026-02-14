@@ -19,17 +19,9 @@ export function useActionExecutions({
     let mounted = true
     let intervalId = null
 
-    // Scope change = new stream
     seenIdsRef.current.clear()
 
     async function load(reason = 'poll') {
-      console.debug('[useActionExecutions] load', {
-        reason,
-        actionId,
-        portalId,
-        limit,
-      })
-
       let query = supabase
         .from('action_executions')
         .select(`
@@ -40,7 +32,7 @@ export function useActionExecutions({
           max_duration_ms,
           created_at,
 
-          actions!inner (
+          action:actions!inner (
             portal_id
           ),
           owner:profiles (
@@ -56,7 +48,7 @@ export function useActionExecutions({
       }
 
       if (portalId) {
-        query = query.eq('actions.portal_id', portalId)
+        query = query.eq('action.portal_id', portalId)
       }
 
       const { data, error } = await query
@@ -64,21 +56,14 @@ export function useActionExecutions({
       if (!mounted) return
 
       if (error) {
-        console.error('[useActionExecutions] load failed', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-        })
-
-        const message =
-          error.message || 'Failed to load action executions'
+        const message = error.message || 'Failed to load action executions'
 
         if (lastErrorRef.current !== message) {
           toast.error(message)
           lastErrorRef.current = message
         }
 
+        console.error('[useActionExecutions]', error)
         return
       }
 
@@ -92,7 +77,7 @@ export function useActionExecutions({
             id: row.id,
             action_id: row.action_id,
 
-            portal_id: row.actions?.portal_id ?? null,
+            portal_id: row.action?.portal_id ?? null,
 
             status: row.status,
             ok: row.ok,
@@ -137,18 +122,12 @@ export function useActionExecutions({
       startPolling()
     }
 
-    document.addEventListener(
-      'visibilitychange',
-      handleVisibilityChange
-    )
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       mounted = false
       stopPolling()
-      document.removeEventListener(
-        'visibilitychange',
-        handleVisibilityChange
-      )
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [limit, actionId, portalId])
 

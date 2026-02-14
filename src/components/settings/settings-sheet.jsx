@@ -17,6 +17,8 @@ import { Code2, Key } from 'lucide-react';
 
 import { PortalSecretsSettingsPage } from './pages/secret-settings';
 import { getActivePortalId } from '@/lib/portal-state';
+import { IoPeople } from 'react-icons/io5';
+import { TeamMembersSettingsPage } from './pages/team-settings';
 
 /* -------------------------------------
    Tabs
@@ -29,6 +31,12 @@ export const SETTINGS_TABS = [
     label: 'Secrets & Environment',
     icon: Key,
     page: 'secrets',
+  },
+  {
+    key: 'team',
+    label: 'Team',
+    icon: IoPeople,
+    page: 'team',
   },
 ];
 
@@ -121,6 +129,15 @@ export function SettingsSheet({ children }) {
               {activeTabDef.page === 'secrets' &&
                 (portalId ? (
                   <PortalSecretsSettingsPage portalId={portalId} />
+                ) : (
+                  <div className='text-sm text-muted-foreground'>
+                    Loading portal…
+                  </div>
+                ))}
+
+              {activeTabDef.page === 'team' &&
+                (portalId ? (
+                  <TeamMembersSettingsPage portalId={portalId} />
                 ) : (
                   <div className='text-sm text-muted-foreground'>
                     Loading portal…

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -8,6 +9,8 @@ import { ArrowRight } from "lucide-react"
 import { CodePreview } from "@/components/code-preview"
 import { useState } from "react"
 import { Copy, Check } from "lucide-react"
+import { createSupabaseBrowserClient } from "~/lib/supabase/browser"
+
 
 export function InstallCommand() {
   const command = "winget install novocy.hsemulator"
@@ -66,14 +69,29 @@ export default function LandingPage() {
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
 
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+    const handleHashAuth = async () => {
+      const hash = window.location.hash;
+
+      if (!hash || !hash.includes('access_token')) return;
+
+      const params = new URLSearchParams(hash.substring(1));
+
+      const access_token = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+
+      if (!access_token || !refresh_token) return;
+
+      const { error } = await supabase.auth.setSession({
+        access_token,
+        refresh_token,
+      });
+
+      if (!error) {
         window.location.replace('/dashboard');
       }
     };
 
-    checkSession();
+    handleHashAuth();
   }, []);
   return (
     <main className="relative min-h-screen bg-background">

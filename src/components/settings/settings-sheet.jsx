@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { Users, X } from 'lucide-react';
 import { EditorSettingsPage } from '@/components/settings/pages/editor-settings';
 
 import { Code2, Key } from 'lucide-react';
@@ -35,7 +35,7 @@ export const SETTINGS_TABS = [
   {
     key: 'team',
     label: 'Team',
-    icon: IoPeople,
+    icon: Users,
     page: 'team',
   },
 ];

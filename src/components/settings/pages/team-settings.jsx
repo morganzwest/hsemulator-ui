@@ -14,6 +14,16 @@ import {
 } from '@/components/ui/select';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 /* -------------------------------------------------- */
 
@@ -76,6 +86,10 @@ function Avatar({ profile }) {
 
 export function TeamMembersSettingsPage({ portalId }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [removingId, setRemovingId] = useState(null);
+  const [memberToRemove, setMemberToRemove] = useState(null);
+  const [inviteToRevoke, setInviteToRevoke] = useState(null);
+  const [revokingId, setRevokingId] = useState(null);
 
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -88,6 +102,52 @@ export function TeamMembersSettingsPage({ portalId }) {
   const [members, setMembers] = useState([]);
   const [invites, setInvites] = useState([]);
   const [updatingId, setUpdatingId] = useState(null);
+
+  async function confirmRemove() {
+    if (!memberToRemove) return;
+
+    try {
+      setRemovingId(memberToRemove.profile_id);
+
+      const { error } = await supabase
+        .from('portal_members')
+        .delete()
+        .eq('portal_uuid', portalId)
+        .eq('profile_id', memberToRemove.profile_id);
+
+      if (error) throw error;
+
+      await loadData();
+      toast.success('User removed');
+    } catch (err) {
+      toast.error(err.message ?? 'Failed to remove user');
+    }
+
+    setRemovingId(null);
+    setMemberToRemove(null);
+  }
+  async function confirmRevokeInvite() {
+    if (!inviteToRevoke) return;
+
+    try {
+      setRevokingId(inviteToRevoke.id);
+
+      const { error } = await supabase
+        .from('portal_invites')
+        .delete()
+        .eq('id', inviteToRevoke.id);
+
+      if (error) throw error;
+
+      await loadData();
+      toast.success('Invite revoked');
+    } catch (err) {
+      toast.error(err.message ?? 'Failed to revoke invite');
+    }
+
+    setRevokingId(null);
+    setInviteToRevoke(null);
+  }
 
   async function resolveCurrentUserRole() {
     if (!portalId) return;
@@ -302,7 +362,7 @@ export function TeamMembersSettingsPage({ portalId }) {
               return (
                 <div
                   key={m.profile.id}
-                  className='flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted/40'
+                  className='group flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted/40'
                 >
                   <div className='flex items-center gap-3 min-w-0'>
                     <Avatar profile={m.profile} />
@@ -324,35 +384,47 @@ export function TeamMembersSettingsPage({ portalId }) {
                     </div>
                   </div>
 
-                  {isOwner && !isSelf ? (
-                    <Select
-                      value={m.role}
-                      onValueChange={(value) =>
-                        handleRoleChange(m.profile_id, value)
-                      }
-                    >
-                      <SelectTrigger
-                        className='h-8 w-32 text-xs capitalize'
-                        disabled={updatingId === m.profile_id}
+                  <div className='flex items-center gap-2'>
+                    {isOwner && !isSelf && (
+                      <button
+                        onClick={() => setMemberToRemove(m)}
+                        disabled={removingId === m.profile_id}
+                        className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
                       >
-                        <SelectValue />
-                      </SelectTrigger>
+                        Remove
+                      </button>
+                    )}
 
-                      <SelectContent>
-                        {ROLES.slice()
-                          .sort()
-                          .map((r) => (
-                            <SelectItem key={r} value={r}>
-                              {r}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className='text-xs text-muted-foreground capitalize'>
-                      {m.role}
-                    </span>
-                  )}
+                    {isOwner && !isSelf ? (
+                      <Select
+                        value={m.role}
+                        onValueChange={(value) =>
+                          handleRoleChange(m.profile_id, value)
+                        }
+                      >
+                        <SelectTrigger
+                          className='h-8 w-32 text-xs capitalize'
+                          disabled={updatingId === m.profile_id}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          {ROLES.slice()
+                            .sort()
+                            .map((r) => (
+                              <SelectItem key={r} value={r}>
+                                {r.charAt(0).toUpperCase() + r.slice(1)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className='text-xs text-muted-foreground capitalize'>
+                        {m.role}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -370,21 +442,87 @@ export function TeamMembersSettingsPage({ portalId }) {
             {sortedInvites.map((invite) => (
               <div
                 key={invite.id}
-                className='flex items-center justify-between rounded-md border border-dashed px-3 py-2'
+                className='group flex items-center justify-between rounded-md border border-dashed px-3 py-2'
               >
                 <div className='min-w-0'>
                   <p className='text-sm truncate'>{invite.email}</p>
                   <StatusBadge>Invite sent</StatusBadge>
                 </div>
 
-                <span className='text-xs text-muted-foreground capitalize'>
-                  {invite.role}
-                </span>
+                <div className='flex items-center gap-4'>
+                  {isOwner && (
+                    <button
+                      onClick={() => setInviteToRevoke(invite)}
+                      disabled={revokingId === invite.id}
+                      className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
+                    >
+                      Revoke
+                    </button>
+                  )}
+
+                  <span className='text-xs text-muted-foreground capitalize'>
+                    {invite.role}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
         )}
       </section>
+      <AlertDialog
+        open={!!inviteToRevoke}
+        onOpenChange={() => setInviteToRevoke(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke invite</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will invalidate the invite for{' '}
+              <span className='font-medium'>{inviteToRevoke?.email}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRevokeInvite}
+              disabled={revokingId === inviteToRevoke?.id}
+              className='bg-red-500 text-white hover:bg-red-700'
+            >
+              Revoke
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!memberToRemove}
+        onOpenChange={() => setMemberToRemove(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove team member</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately revoke workspace access for{' '}
+              <span className='font-medium'>
+                {memberToRemove?.profile.full_name ??
+                  memberToRemove?.profile.email}
+              </span>
+              . This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmRemove}
+              className='bg-red-500 text-white hover:bg-red-700'
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SettingsPage>
   );
 }

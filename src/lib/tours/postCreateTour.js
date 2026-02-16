@@ -42,6 +42,14 @@ export function createPostCreateTour() {
                 }
             },
             {
+                element: "#cicd-button",
+                popover: {
+                    title: "CI/CD",
+                    description:
+                        "Set up CI/CD for your action, to update HubSpot automatically."
+                }
+            },
+            {
                 element: "#template-button",
                 popover: {
                     title: "Save your own template",

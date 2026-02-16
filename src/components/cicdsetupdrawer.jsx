@@ -35,7 +35,6 @@ import {
   Rocket,
   Lock,
   Unlock,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -357,19 +356,12 @@ export function CICDSetupDrawer({
           <div className='flex flex-col h-full'>
             {/* Header */}
             <SheetHeader className='px-6 py-4 border-b bg-background/95 backdrop-blur-sm'>
-              <div className='flex items-center justify-between'>
-                <SheetTitle className='flex items-center gap-3 text-xl'>
-                  <div className='p-2 bg-primary/10 rounded-lg'>
-                    <Workflow className='h-6 w-6 text-primary' />
-                  </div>
-                  CI/CD Configuration
-                </SheetTitle>
-                <SheetClose asChild>
-                  <Button variant='ghost' size='icon' className='h-8 w-8'>
-                    <X className='h-4 w-4' />
-                  </Button>
-                </SheetClose>
-              </div>
+              <SheetTitle className='flex items-center gap-3 text-xl'>
+                <div className='p-2 bg-primary/10 rounded-lg'>
+                  <Workflow className='h-6 w-6 text-primary' />
+                </div>
+                CI/CD Configuration
+              </SheetTitle>
             </SheetHeader>
 
             {/* Scrollable Content */}

@@ -371,8 +371,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                 <TooltipContent>Swap output orientation</TooltipContent>
               </Tooltip>
 
-              {/* TODO: Renable with new CICD drawer and secret management */}
-              {/* <Tooltip>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant='ghost'
@@ -383,7 +382,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Update action on HubSpot</TooltipContent>
-              </Tooltip> */}
+              </Tooltip>
 
               <Tooltip>
                 <TooltipTrigger asChild>

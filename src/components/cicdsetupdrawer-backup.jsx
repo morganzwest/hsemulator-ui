@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -38,8 +38,6 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { logger } from '@/lib/logger';
-import { ERROR_MESSAGES } from '@/lib/errors';
 import {
   fetchCICDConfig,
   saveCICDConfig,
@@ -65,7 +63,6 @@ export function CICDSetupDrawer({
   const [statusLoading, setStatusLoading] = useState(false);
   const [showForceConfirm, setShowForceConfirm] = useState(false);
   const [statusChecked, setStatusChecked] = useState(false);
-  const statusCheckControllerRef = useRef(null);
 
   const [loading, setLoading] = useState(false);
   const [pushing, setPushing] = useState(false);
@@ -99,7 +96,7 @@ export function CICDSetupDrawer({
         setStatusChecked(false); // Reset status check state
       })
       .catch(() => {
-        toast.error(ERROR_MESSAGES.FAILED_TO_LOAD_CONFIG);
+        toast.error('Failed to load CI/CD configuration');
       })
       .finally(() => setLoading(false));
   }, [open, actionId, portalId]);
@@ -111,7 +108,7 @@ export function CICDSetupDrawer({
   const canSave =
     workflowId.trim() &&
     secretName.trim() &&
-    (hasCicdSecret || replaceToken || token.length) &&
+    (!hasCicdSecret && !replaceToken ? false : true) &&
     (!replaceToken || token.length);
 
   const canPush =
@@ -141,17 +138,22 @@ export function CICDSetupDrawer({
       setReplaceToken(false);
       setIsEditing(false);
     } catch (err) {
-      toast.error(ERROR_MESSAGES.FAILED_TO_SAVE_CONFIG);
+      toast.error('Failed to save CI/CD configuration');
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    // Cancel any pending status check
-    if (statusCheckControllerRef.current) {
-      statusCheckControllerRef.current.abort();
-    }
+    console.debug('=== CICD Sheet useEffect Check ===');
+    console.debug('workflowId.trim():', workflowId.trim());
+    console.debug('secretName.trim():', secretName.trim());
+    console.debug('cicdSecret?.id:', cicdSecret?.id);
+    console.debug('isEditing:', isEditing);
+    console.debug(
+      'Condition result:',
+      workflowId.trim() && secretName.trim() && cicdSecret?.id && !isEditing,
+    );
 
     // Only check status if we have all required fields AND we're not currently editing
     if (
@@ -160,21 +162,28 @@ export function CICDSetupDrawer({
       cicdSecret?.id &&
       !isEditing
     ) {
-      const controller = new AbortController();
-      statusCheckControllerRef.current = controller;
-
+      console.debug('✓ Condition passed, setting timeout...');
       const timeoutId = setTimeout(async () => {
-        // Double-check conditions haven't changed and we weren't aborted
+        // Final check before making the call
+        console.debug('About to call checkWorkflowStatus with:', {
+          workflowId,
+          cicdSecretId: cicdSecret.id,
+          searchKey: secretName,
+        });
+
         if (
-          controller.signal.aborted ||
           !workflowId.trim() ||
           !secretName.trim() ||
           !cicdSecret?.id ||
           isEditing
         ) {
+          console.debug('✗ Pre-call validation failed, returning');
           return;
         }
 
+        console.debug(
+          '✓ Pre-call validation passed, calling checkWorkflowStatus...',
+        );
         setStatusLoading(true);
         try {
           const status = await checkWorkflowStatus({
@@ -183,37 +192,24 @@ export function CICDSetupDrawer({
             searchKey: secretName,
             sourceCode,
           });
-
-          // Only update if we weren't aborted during the call
-          if (!controller.signal.aborted) {
-            setWorkflowStatus(status);
-            setStatusChecked(true);
-          }
+          console.log('✓ checkWorkflowStatus succeeded:', status);
+          setWorkflowStatus(status);
+          setStatusChecked(true);
         } catch (err) {
-          // Only show error if we weren't aborted
-          if (!controller.signal.aborted) {
-            logger.error('Failed to check workflow status:', err);
-            // Don't show toast for validation errors, just log them
-            if (!err.message.includes('Missing required parameters')) {
-              toast.error(ERROR_MESSAGES.FAILED_TO_CHECK_STATUS);
-            }
+          console.error('Failed to check workflow status:', err);
+          // Don't show toast for validation errors, just log them
+          if (!err.message.includes('Missing required parameters')) {
+            toast.error('Failed to check workflow status');
           }
         } finally {
-          // Only update loading state if we weren't aborted
-          if (!controller.signal.aborted) {
-            setStatusLoading(false);
-          }
+          setStatusLoading(false);
         }
       }, 500); // Debounce
-
-      return () => {
-        clearTimeout(timeoutId);
-        controller.abort();
-      };
+      return () => clearTimeout(timeoutId);
     } else {
+      console.debug('✗ Condition failed, clearing status');
       // Clear status when fields are incomplete or we're editing
       setWorkflowStatus(null);
-      setStatusChecked(false);
     }
   }, [workflowId, secretName, cicdSecret?.id, sourceCode, isEditing]);
 
@@ -244,16 +240,16 @@ export function CICDSetupDrawer({
       });
 
       if (res.status === 'noop') {
-        toast.info(ERROR_MESSAGES.WORKFLOW_ALREADY_UP_TO_DATE);
+        toast.info('Workflow already up to date');
       } else {
-        toast.success(ERROR_MESSAGES.ACTION_PROMOTED_SUCCESSFULLY);
+        toast.success('Action promoted to HubSpot');
         // Refresh status after successful promotion
         setStatusChecked(false);
         setWorkflowStatus(null);
       }
       setShowForceConfirm(false);
     } catch (err) {
-      toast.error(err.message || ERROR_MESSAGES.PROMOTION_FAILED);
+      toast.error(err.message || 'Promotion failed');
     } finally {
       setPushing(false);
     }

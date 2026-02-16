@@ -1,4 +1,6 @@
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
+import { logger } from '@/lib/logger'
+import { ERROR_MESSAGES } from '@/lib/errors'
 
 /* ----------------------------------------
    Fetch existing CI/CD config
@@ -7,7 +9,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 export async function fetchCICDConfig(actionId, portalId) {
   const supabase = createSupabaseBrowserClient()
 
-  const [{ data: action }, { data: portal }] = await Promise.all([
+  const [{ data: action, error: actionError }, { data: portal, error: portalError }, { data: secrets, error: secretsError }] = await Promise.all([
     supabase
       .from('actions')
       .select('workflow_id, cicd_search_token')
@@ -19,12 +21,39 @@ export async function fetchCICDConfig(actionId, portalId) {
       .select('cicd_token')
       .eq('uuid', portalId)
       .single(),
+
+    supabase
+      .from('secrets')
+      .select('id, name, scope')
+      .eq('portal_id', portalId)
+      .eq('scope', 'cicd')
+      .single(),
   ])
+
+  // Handle errors appropriately
+  if (actionError) {
+    logger.error('Failed to fetch action config:', actionError)
+    // Don't throw for action errors, just return empty values
+  }
+
+  if (portalError) {
+    logger.error('Failed to fetch portal config:', portalError)
+    // Don't throw for portal errors, just return empty values
+  }
+
+  if (secretsError) {
+    logger.error('Failed to fetch secrets:', secretsError)
+    // Don't throw for secrets errors, just return empty values
+  }
+
+  // Find CICD-scoped secret (only if query succeeded)
+  const cicdSecret = secretsError ? null : secrets
 
   return {
     workflowId: action?.workflow_id || '',
     secretName: action?.cicd_search_token || '',
     token: portal?.cicd_token || null, // never expose raw value
+    cicdSecret: cicdSecret || null,
   }
 }
 
@@ -87,52 +116,74 @@ function inferRuntimeFromSource(sourceCode) {
 /* ----------------------------------------
    Promote to runtime
 ---------------------------------------- */
+export async function checkWorkflowStatus({
+  workflowId,
+  cicdSecretId,
+  searchKey,
+  sourceCode,
+}) {
+  // Validate required parameters
+  if (!workflowId || !cicdSecretId || !searchKey) {
+    throw new Error(ERROR_MESSAGES.MISSING_PARAMETERS(['workflow_id', 'cicd_secret_id', 'search_key']))
+  }
+
+  const requestBody = {
+    cicd_secret_id: cicdSecretId,
+    search_key: searchKey,
+    workflow_id: workflowId,
+  }
+
+  if (sourceCode) {
+    requestBody.source_code = sourceCode
+  }
+
+  const res = await fetch(`/api/cicd/workflow/${workflowId}/status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  })
+
+  const json = await res.json()
+
+  if (!res.ok) {
+    throw new Error(json.error || ERROR_MESSAGES.FAILED_TO_CHECK_STATUS)
+  }
+
+  return json
+}
+
 export async function promoteAction({
   workflowId,
   secretName,
   hubspotToken,
   sourceCode,
+  cicdSecretId,
   runtime, // optional override
   force = false,
   dryRun = false,
 }) {
-  if (!hubspotToken) {
-    throw new Error('hubspot_token is required for promotion')
-  }
-
-  const resolvedRuntime =
-    runtime ?? inferRuntimeFromSource(sourceCode)
-
-  const apiKey =
-    process.env.NEXT_SECRET_RUNTIME_API_KEY || 'dev_secret_key'
-
-  const res = await fetch(
-    'https://hsemulator-712737660959.europe-west1.run.app/promote',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        hubspot_token: hubspotToken,
-        workflow_id: workflowId,
-        selector: {
-          type: 'secret',
-          value: secretName,
-        },
-        runtime: resolvedRuntime,
-        source_code: sourceCode,
-        force,
-        dry_run: dryRun,
-      }),
-    }
-  )
+  // Use new API route that proxies to runtime service
+  const res = await fetch('/api/cicd/promote', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      source_code: sourceCode,
+      cicd_secret_id: cicdSecretId,
+      workflow_id: workflowId,
+      search_key: secretName,
+      force,
+      dry_run: dryRun,
+    }),
+  })
 
   const json = await res.json()
 
-  if (!res.ok || json.ok === false) {
-    throw new Error(json.error || 'Promotion failed')
+  if (!res.ok) {
+    throw new Error(json.error || ERROR_MESSAGES.PROMOTION_FAILED)
   }
 
   return json

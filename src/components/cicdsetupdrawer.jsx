@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useWorkflowStatus } from '@/hooks/useWorkflowStatus';
 import {
   Sheet,
   SheetContent,
@@ -46,6 +47,38 @@ import {
   checkWorkflowStatus,
 } from '@/lib/cicd/cicd';
 
+/* --------------------------------
+   Retry Utility with Exponential Backoff
+-------------------------------- */
+
+async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      // Don't retry on authentication errors or client errors (4xx)
+      if (error.status >= 400 && error.status < 500) {
+        throw error;
+      }
+
+      // If this is the last attempt, throw the error
+      if (attempt === maxRetries) {
+        throw error;
+      }
+
+      // Calculate exponential backoff delay
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}
+
 export function CICDSetupDrawer({
   open,
   onOpenChange,
@@ -60,19 +93,135 @@ export function CICDSetupDrawer({
   const [replaceToken, setReplaceToken] = useState(false);
   const [cicdSecret, setCicdSecret] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [workflowStatus, setWorkflowStatus] = useState(null);
-  const [statusLoading, setStatusLoading] = useState(false);
   const [showForceConfirm, setShowForceConfirm] = useState(false);
-  const [statusChecked, setStatusChecked] = useState(false);
-  const statusCheckControllerRef = useRef(null);
+  const [manualStatusTrigger, setManualStatusTrigger] = useState(0);
+  const [pushCompleted, setPushCompleted] = useState(false);
+  const pushCompletedTimeoutRef = useRef(null);
+
+  // Use custom hook for status checking
+  const {
+    workflowStatus,
+    statusLoading,
+    statusChecked,
+    resetStatus,
+    triggerStatusCheck,
+  } = useWorkflowStatus({
+    workflowId,
+    secretName,
+    cicdSecretId: cicdSecret?.id,
+    sourceCode,
+    isEditing,
+    manualTrigger: manualStatusTrigger,
+    debounceMs: 1500, // Use improved debouncing
+  });
+
+  // Validation states
+  const [workflowIdError, setWorkflowIdError] = useState('');
+  const [secretNameError, setSecretNameError] = useState('');
+
+  // Refs for focus management
+  const firstFocusableRef = useRef(null);
+  const lastFocusableRef = useRef(null);
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback(
+    (event) => {
+      if (event.key === 'Escape' && open && !showForceConfirm) {
+        onOpenChange(false);
+      }
+    },
+    [open, showForceConfirm, onOpenChange],
+  );
+
+  // Focus trap for accessibility
+  const handleFocusTrap = useCallback((event) => {
+    if (event.key === 'Tab') {
+      if (event.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstFocusableRef.current) {
+          event.preventDefault();
+          lastFocusableRef.current?.focus();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastFocusableRef.current) {
+          event.preventDefault();
+          firstFocusableRef.current?.focus();
+        }
+      }
+    }
+  }, []);
+
+  // Add keyboard event listeners
+  useEffect(() => {
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keydown', handleFocusTrap);
+
+      // Focus first element when drawer opens
+      setTimeout(() => {
+        firstFocusableRef.current?.focus();
+      }, 100);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleFocusTrap);
+    };
+  }, [open, handleKeyDown, handleFocusTrap]);
 
   const [loading, setLoading] = useState(false);
   const [pushing, setPushing] = useState(false);
 
   const hasExistingToken = Boolean(maskedToken);
   const hasCicdSecret = Boolean(cicdSecret);
-  const hasAllFields = workflowId.trim() && secretName.trim();
+  const hasAllFields =
+    workflowId.trim() &&
+    secretName.trim() &&
+    !workflowIdError &&
+    !secretNameError;
   const isReadonly = hasAllFields && !isEditing;
+
+  /* --------------------------------
+     Validation Functions
+  -------------------------------- */
+
+  const validateWorkflowId = (value) => {
+    if (!value.trim()) {
+      setWorkflowIdError('Workflow ID is required');
+      return false;
+    }
+    if (!/^\d+$/.test(value.trim())) {
+      setWorkflowIdError('Workflow ID must be numeric');
+      return false;
+    }
+    if (value.trim().length < 6) {
+      setWorkflowIdError('Workflow ID appears to be too short');
+      return false;
+    }
+    setWorkflowIdError('');
+    return true;
+  };
+
+  const validateSecretName = (value) => {
+    if (!value.trim()) {
+      setSecretNameError('Secret name is required');
+      return false;
+    }
+    // Allow alphanumeric, underscores, and hyphens
+    if (!/^[A-Za-z0-9_-]+$/.test(value.trim())) {
+      setSecretNameError(
+        'Secret name can only contain letters, numbers, underscores, and hyphens',
+      );
+      return false;
+    }
+    if (value.trim().length > 100) {
+      setSecretNameError('Secret name must be 100 characters or less');
+      return false;
+    }
+    setSecretNameError('');
+    return true;
+  };
 
   /* --------------------------------
      Load config on open
@@ -94,14 +243,16 @@ export function CICDSetupDrawer({
         setToken('');
         setReplaceToken(false);
         setIsEditing(false);
-        setWorkflowStatus(null);
-        setStatusChecked(false); // Reset status check state
+        resetStatus(); // Use hook's reset function
+        // Clear validation errors on load
+        setWorkflowIdError('');
+        setSecretNameError('');
       })
       .catch(() => {
         toast.error(ERROR_MESSAGES.FAILED_TO_LOAD_CONFIG);
       })
       .finally(() => setLoading(false));
-  }, [open, actionId, portalId]);
+  }, [open, actionId, portalId, resetStatus]);
 
   /* --------------------------------
      Derived state
@@ -117,13 +268,46 @@ export function CICDSetupDrawer({
     workflowId.trim() &&
     secretName.trim() &&
     (hasCicdSecret || hasExistingToken) &&
-    statusChecked; // Only allow push after status is checked
+    statusChecked &&
+    !pushCompleted; // Disable when push was just completed
+
+  // Debug canPush logic
+  useEffect(() => {
+    logger.log('canPush debug:', {
+      canPush,
+      workflowId: workflowId.trim(),
+      secretName: secretName.trim(),
+      hasCicdSecret,
+      hasExistingToken,
+      statusChecked,
+      pushCompleted,
+      workflowStatus,
+    });
+  }, [
+    canPush,
+    workflowId,
+    secretName,
+    hasCicdSecret,
+    hasExistingToken,
+    statusChecked,
+    pushCompleted,
+    workflowStatus,
+  ]);
 
   /* --------------------------------
      Actions
   -------------------------------- */
 
   async function handleSave() {
+    // Validate inputs before saving
+    const isWorkflowIdValid = validateWorkflowId(workflowId);
+    const isSecretNameValid = validateSecretName(secretName);
+
+    if (!isWorkflowIdValid || !isSecretNameValid) {
+      toast.error('Please fix validation errors before saving');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -146,76 +330,6 @@ export function CICDSetupDrawer({
     }
   }
 
-  useEffect(() => {
-    // Cancel any pending status check
-    if (statusCheckControllerRef.current) {
-      statusCheckControllerRef.current.abort();
-    }
-
-    // Only check status if we have all required fields AND we're not currently editing
-    if (
-      workflowId.trim() &&
-      secretName.trim() &&
-      cicdSecret?.id &&
-      !isEditing
-    ) {
-      const controller = new AbortController();
-      statusCheckControllerRef.current = controller;
-
-      const timeoutId = setTimeout(async () => {
-        // Double-check conditions haven't changed and we weren't aborted
-        if (
-          controller.signal.aborted ||
-          !workflowId.trim() ||
-          !secretName.trim() ||
-          !cicdSecret?.id ||
-          isEditing
-        ) {
-          return;
-        }
-
-        setStatusLoading(true);
-        try {
-          const status = await checkWorkflowStatus({
-            workflowId,
-            cicdSecretId: cicdSecret.id,
-            searchKey: secretName,
-            sourceCode,
-          });
-
-          // Only update if we weren't aborted during the call
-          if (!controller.signal.aborted) {
-            setWorkflowStatus(status);
-            setStatusChecked(true);
-          }
-        } catch (err) {
-          // Only show error if we weren't aborted
-          if (!controller.signal.aborted) {
-            logger.error('Failed to check workflow status:', err);
-            // Don't show toast for validation errors, just log them
-            if (!err.message.includes('Missing required parameters')) {
-              toast.error(ERROR_MESSAGES.FAILED_TO_CHECK_STATUS);
-            }
-          }
-        } finally {
-          // Only update loading state if we weren't aborted
-          if (!controller.signal.aborted) {
-            setStatusLoading(false);
-          }
-        }
-      }, 500); // Debounce
-
-      return () => {
-        clearTimeout(timeoutId);
-        controller.abort();
-      };
-    } else {
-      // Clear status when fields are incomplete or we're editing
-      setWorkflowStatus(null);
-      setStatusChecked(false);
-    }
-  }, [workflowId, secretName, cicdSecret?.id, sourceCode, isEditing]);
-
   async function handlePush() {
     // Check if this is first-time setup and needs force
     if (
@@ -231,32 +345,130 @@ export function CICDSetupDrawer({
 
   async function performPush() {
     setPushing(true);
+    logger.log('Starting deployment process');
 
     try {
-      const res = await promoteAction({
-        workflowId,
-        secretName,
-        hubspotToken: hasCicdSecret ? null : token,
-        sourceCode,
-        cicdSecretId: cicdSecret?.id,
-        force: showForceConfirm,
-      });
+      const res = await retryWithBackoff(
+        async () => {
+          return await promoteAction({
+            workflowId,
+            secretName,
+            hubspotToken: hasCicdSecret ? null : token,
+            sourceCode,
+            cicdSecretId: cicdSecret?.id,
+            force: showForceConfirm,
+          });
+        },
+        2,
+        1000,
+      ); // 2 retries with 1s base delay
 
       if (res.status === 'noop') {
         toast.info(ERROR_MESSAGES.WORKFLOW_ALREADY_UP_TO_DATE);
+        logger.log('Deployment completed with noop status');
+        setPushCompleted(true);
+        // Reset immediately since we don't need to check status again
+        setTimeout(() => {
+          logger.log(
+            'Resetting pushCompleted state immediately after noop deployment',
+          );
+          setPushCompleted(false);
+        }, 500);
       } else {
         toast.success(ERROR_MESSAGES.ACTION_PROMOTED_SUCCESSFULLY);
-        // Refresh status after successful promotion
-        setStatusChecked(false);
-        setWorkflowStatus(null);
+        logger.log('Deployment completed successfully');
+        setPushCompleted(true);
+        // Reset immediately since deployment was successful
+        setTimeout(() => {
+          logger.log(
+            'Resetting pushCompleted state immediately after successful deployment',
+          );
+          setPushCompleted(false);
+        }, 500);
       }
       setShowForceConfirm(false);
     } catch (err) {
-      toast.error(err.message || ERROR_MESSAGES.PROMOTION_FAILED);
+      logger.error('Push failed:', err);
+
+      // Provide more specific error messages
+      let errorMessage = err.message || ERROR_MESSAGES.PROMOTION_FAILED;
+      if (err.status === 401) {
+        errorMessage = 'Authentication failed. Please check your credentials.';
+      } else if (err.status === 403) {
+        errorMessage =
+          'Access denied. You may not have permission to perform this action.';
+      } else if (err.status === 404) {
+        errorMessage = 'Workflow not found. Please verify the workflow ID.';
+      } else if (err.status === 429) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (err.status >= 500) {
+        errorMessage = 'Server error. Please try again in a few moments.';
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        errorMessage =
+          'Network error. Please check your connection and try again.';
+      }
+
+      toast.error(errorMessage);
+      // Don't set pushCompleted on error to allow immediate retry
     } finally {
       setPushing(false);
     }
   }
+
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (pushCompletedTimeoutRef.current) {
+        clearTimeout(pushCompletedTimeoutRef.current);
+        pushCompletedTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // Clear push completed state when status check completes after push
+  useEffect(() => {
+    if (pushCompleted && !statusLoading && workflowStatus) {
+      logger.log(
+        'Resetting pushCompleted state due to successful status check',
+      );
+      logger.log(
+        'Current state - pushCompleted:',
+        pushCompleted,
+        'statusLoading:',
+        statusLoading,
+        'statusChecked:',
+        statusChecked,
+        'workflowStatus:',
+        workflowStatus,
+      );
+      setPushCompleted(false);
+      // Clear any pending timeout
+      if (pushCompletedTimeoutRef.current) {
+        clearTimeout(pushCompletedTimeoutRef.current);
+        pushCompletedTimeoutRef.current = null;
+      }
+    }
+  }, [pushCompleted, statusLoading, workflowStatus, statusChecked]);
+
+  // Fallback timeout to reset pushCompleted state
+  useEffect(() => {
+    if (pushCompleted) {
+      // Set a fallback timeout to reset the button state after 8 seconds
+      pushCompletedTimeoutRef.current = setTimeout(() => {
+        logger.log('Resetting pushCompleted state due to timeout fallback');
+        setPushCompleted(false);
+        pushCompletedTimeoutRef.current = null;
+      }, 8000);
+
+      // Cleanup function to clear timeout if component unmounts or state changes
+      return () => {
+        if (pushCompletedTimeoutRef.current) {
+          clearTimeout(pushCompletedTimeoutRef.current);
+          pushCompletedTimeoutRef.current = null;
+        }
+      };
+    }
+  }, [pushCompleted]);
 
   function getStatusColor(status) {
     switch (status) {
@@ -267,6 +479,8 @@ export function CICDSetupDrawer({
       case 'unmanaged':
       case 'not_found':
         return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800';
+      case 'deploying':
+        return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800';
       default:
         return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800';
     }
@@ -281,12 +495,22 @@ export function CICDSetupDrawer({
       case 'unmanaged':
       case 'not_found':
         return <AlertCircle className='h-5 w-5' />;
+      case 'deploying':
+        return <Loader2 className='h-5 w-5 animate-spin' />;
       default:
         return <Info className='h-5 w-5' />;
     }
   }
 
   function getButtonText() {
+    if (pushing) {
+      return 'Deploying...';
+    }
+
+    if (pushCompleted) {
+      return 'Updating Status...';
+    }
+
     if (!statusChecked) {
       return 'Checking Status...';
     }
@@ -405,20 +629,30 @@ export function CICDSetupDrawer({
                       </div>
                       <div className='relative'>
                         <Input
+                          ref={firstFocusableRef}
                           disabled={loading || isReadonly}
                           className={`h-11 px-4 pr-10 font-mono text-sm transition-all duration-200 ${
                             isReadonly
                               ? 'bg-muted/50 border-muted-300 text-muted-foreground cursor-not-allowed'
-                              : 'bg-background border-input focus:ring-2 focus:ring-primary focus:border-primary'
+                              : workflowIdError
+                                ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                                : 'bg-background border-input focus:ring-2 focus:ring-primary focus:border-primary'
                           }`}
                           inputMode='numeric'
                           placeholder='123456789'
                           value={workflowId}
-                          onChange={(e) =>
-                            setWorkflowId(e.target.value.replace(/\D/g, ''))
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            setWorkflowId(value);
+                            if (value) validateWorkflowId(value);
+                          }}
+                          onBlur={() => validateWorkflowId(workflowId)}
+                          aria-invalid={!!workflowIdError}
+                          aria-describedby={
+                            workflowIdError ? 'workflow-id-error' : undefined
                           }
                         />
-                        {workflowId.trim() && (
+                        {workflowId.trim() && !workflowIdError && (
                           <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
                             <div className='w-5 h-5 rounded-full bg-green-500 flex items-center justify-center'>
                               <Check className='h-3 w-3 text-white' />
@@ -426,6 +660,15 @@ export function CICDSetupDrawer({
                           </div>
                         )}
                       </div>
+                      {workflowIdError && (
+                        <p
+                          id='workflow-id-error'
+                          className='text-xs text-red-600 dark:text-red-400 ml-1 flex items-center gap-1'
+                        >
+                          <AlertCircle className='h-3 w-3' />
+                          {workflowIdError}
+                        </p>
+                      )}
                       <p className='text-xs text-muted-foreground ml-1'>
                         Numeric HubSpot workflow identifier
                       </p>
@@ -456,13 +699,24 @@ export function CICDSetupDrawer({
                           className={`h-11 px-4 pr-10 font-mono text-sm transition-all duration-200 ${
                             isReadonly
                               ? 'bg-muted/50 border-muted-300 text-muted-foreground cursor-not-allowed'
-                              : 'bg-background border-input focus:ring-2 focus:ring-primary focus:border-primary'
+                              : secretNameError
+                                ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                                : 'bg-background border-input focus:ring-2 focus:ring-primary focus:border-primary'
                           }`}
                           placeholder='HUBSPOT_PRIVATE_APP_TOKEN'
                           value={secretName}
-                          onChange={(e) => setSecretName(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setSecretName(value);
+                            if (value) validateSecretName(value);
+                          }}
+                          onBlur={() => validateSecretName(secretName)}
+                          aria-invalid={!!secretNameError}
+                          aria-describedby={
+                            secretNameError ? 'secret-name-error' : undefined
+                          }
                         />
-                        {secretName.trim() && (
+                        {secretName.trim() && !secretNameError && (
                           <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
                             <div className='w-5 h-5 rounded-full bg-green-500 flex items-center justify-center'>
                               <Check className='h-3 w-3 text-white' />
@@ -470,6 +724,15 @@ export function CICDSetupDrawer({
                           </div>
                         )}
                       </div>
+                      {secretNameError && (
+                        <p
+                          id='secret-name-error'
+                          className='text-xs text-red-600 dark:text-red-400 ml-1 flex items-center gap-1'
+                        >
+                          <AlertCircle className='h-3 w-3' />
+                          {secretNameError}
+                        </p>
+                      )}
                       <p className='text-xs text-muted-foreground ml-1'>
                         Secret name to locate the target action
                       </p>
@@ -651,6 +914,7 @@ export function CICDSetupDrawer({
                 </Button>
 
                 <Button
+                  ref={lastFocusableRef}
                   disabled={!canPush || pushing}
                   onClick={handlePush}
                   className='h-11 px-6'

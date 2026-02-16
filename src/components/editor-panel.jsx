@@ -375,6 +375,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
                 <TooltipTrigger asChild>
                   <Button
                     variant='ghost'
+                    id='cicd-button'
                     size='icon'
                     onClick={() => setCicdOpen(true)}
                   >

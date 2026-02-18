@@ -5,204 +5,184 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { PurchaseButton } from './PurchaseButton';
 
 const detailedFeatures = [
   {
-    category: 'Core Runtime',
+    category: 'User & Portal Limits',
     items: [
       {
-        name: 'Local Runtime Environment',
-        professional: '✓',
-        enterprise: '✓',
-        description: 'Full local development environment',
+        name: 'Users',
+        professional: 'Only 1',
+        enterprise: 'Up to 5',
+        description: 'Number of user accounts',
       },
       {
-        name: 'Code Execution & Validation',
-        professional: '✓',
-        enterprise: '✓',
-        description: 'Execute and validate code securely',
-      },
-      {
-        name: 'Basic Debugging Tools',
-        professional: '✓',
-        enterprise: '✓',
-        description: 'Essential debugging capabilities',
-      },
-      {
-        name: 'Advanced Debugging Tools',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Advanced debugging and profiling',
+        name: 'Portals',
+        professional: 'Only 1',
+        enterprise: 'Up to 3',
+        description: 'Number of active portals',
       },
     ],
   },
   {
-    category: 'Usage Limits',
+    category: 'AI & Credits',
     items: [
       {
-        name: 'Monthly Executions',
-        professional: '1,000',
-        enterprise: 'Unlimited',
-        description: 'Code executions per month',
-      },
-      {
-        name: 'Team Members',
-        professional: '1',
-        enterprise: 'Unlimited',
-        description: 'Number of team members',
-      },
-      {
-        name: 'Projects',
-        professional: '5',
-        enterprise: 'Unlimited',
-        description: 'Active projects limit',
-      },
-      {
-        name: 'Storage',
-        professional: '1 GB',
-        enterprise: '100 GB',
-        description: 'Cloud storage for projects',
-      },
-      {
-        name: 'API Calls',
-        professional: '10,000',
-        enterprise: 'Unlimited',
-        description: 'Monthly API call limit',
+        name: 'AI credits (writing code, reviewing code, reviewing logs and proposing fixes, adapting templates)',
+        professional: '15 per month',
+        enterprise: '75 per month',
+        description: 'Monthly AI credit allowance',
       },
     ],
   },
   {
-    category: 'Collaboration',
+    category: 'Core Features',
     items: [
       {
-        name: 'Team Collaboration',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Real-time team collaboration',
-      },
-      {
-        name: 'Shared Workspaces',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Shared team workspaces',
-      },
-      {
-        name: 'Real-time Collaboration',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Live collaboration features',
-      },
-      {
-        name: 'Version Control Integration',
-        professional: 'Basic',
-        enterprise: 'Advanced',
-        description: 'Git integration level',
-      },
-      {
-        name: 'Team Permissions',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Granular user permissions',
-      },
-    ],
-  },
-  {
-    category: 'Analytics & Support',
-    items: [
-      {
-        name: 'Basic Analytics',
+        name: 'Manual Execution testing',
         professional: '✓',
         enterprise: '✓',
-        description: 'Usage analytics and insights',
+        description: 'Manual testing capabilities',
       },
       {
-        name: 'Advanced Analytics & Reporting',
-        professional: 'Optional Add-on',
+        name: 'Hosted emulator runtime',
+        professional: '✓',
         enterprise: '✓',
-        description: 'Advanced analytics dashboard',
+        description: 'Cloud-based emulator environment',
       },
       {
-        name: 'Custom Reports',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Custom report generation',
+        name: 'Infrastructure',
+        professional: 'Shared',
+        enterprise: 'Priority',
+        description: 'Infrastructure tier level',
       },
       {
-        name: 'Priority Support',
-        professional: '✗',
+        name: 'Test execution logs',
+        professional: '✓',
         enterprise: '✓',
-        description: 'Priority customer support',
+        description: 'Detailed execution logs',
       },
       {
-        name: '24/7 Support',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Round-the-clock support',
-      },
-      {
-        name: 'Phone Support',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Direct phone support',
-      },
-      {
-        name: 'Dedicated Account Manager',
-        professional: '✗',
-        enterprise: '✓',
-        description: 'Personal account manager',
+        name: 'Execution history and retention',
+        professional: 'Limited',
+        enterprise: 'FULL',
+        description: 'Execution data retention period',
       },
     ],
   },
   {
-    category: 'Enterprise Features',
+    category: 'Templates & Security',
     items: [
       {
-        name: 'Custom Integrations',
+        name: 'Access to Code Templates',
+        professional: '✓',
+        enterprise: '✓',
+        description: 'Pre-built code templates',
+      },
+      {
+        name: 'Save your own templates',
+        professional: '✓',
+        enterprise: '✓',
+        description: 'Custom template creation',
+      },
+      {
+        name: 'Store Secrets securely',
+        professional: '✓',
+        enterprise: '✓',
+        description: 'Secure secret management',
+      },
+    ],
+  },
+  {
+    category: 'HubSpot Integration',
+    items: [
+      {
+        name: 'CI/CD deployment directly to hubspot',
         professional: '✗',
         enterprise: '✓',
-        description: 'Custom API integrations',
+        description: 'Automated deployment to HubSpot',
       },
       {
-        name: 'SLA Guarantee',
-        professional: '✗',
-        enterprise: '99.9%',
-        description: 'Service level agreement',
+        name: 'Import code from HubSpot',
+        professional: '✓',
+        enterprise: '✓',
+        description: 'Code import functionality',
+      },
+    ],
+  },
+  {
+    category: 'Advanced Features',
+    items: [
+      {
+        name: 'Action executions',
+        professional: 'Up to 1,000 per month',
+        enterprise: 'Up to 10,000 per month',
+        description: 'Monthly action execution limit',
       },
       {
-        name: 'Advanced Security',
+        name: 'Version control',
         professional: '✗',
         enterprise: '✓',
-        description: 'Enterprise-grade security',
+        description: 'Version control system',
       },
       {
-        name: 'Custom Contracts',
-        professional: '✗',
-        enterprise: 'Available',
-        description: 'Custom contract terms',
-      },
-      {
-        name: 'SSO/SAML',
+        name: 'SSO',
         professional: '✗',
         enterprise: '✓',
-        description: 'Single sign-on integration',
+        description: 'Single sign-on authentication',
       },
+    ],
+  },
+  {
+    category: 'Monitoring & Analytics',
+    items: [
       {
-        name: 'Audit Logs',
+        name: 'Live log streaming from production',
         professional: '✗',
         enterprise: '✓',
-        description: 'Comprehensive audit trails',
+        description: 'Real-time log streaming',
       },
       {
-        name: 'Custom Branding',
+        name: 'Real-time execution telemetry',
         professional: '✗',
         enterprise: '✓',
-        description: 'White-label options',
+        description: 'Live execution metrics',
+      },
+      {
+        name: 'Automatic error alerting',
+        professional: '✗',
+        enterprise: '✓',
+        description: 'Automated error notifications',
+      },
+      {
+        name: 'Metrics dashboards & trends',
+        professional: '✗',
+        enterprise: '✓',
+        description: 'Analytics dashboards',
+      },
+    ],
+  },
+  {
+    category: 'Support & Training',
+    items: [
+      {
+        name: 'Guided Onboarding',
+        professional: '✓',
+        enterprise: '✓',
+        description: 'Onboarding assistance',
+      },
+      {
+        name: 'Video Knowledge base',
+        professional: '✓',
+        enterprise: '✓',
+        description: 'Video tutorials and documentation',
       },
     ],
   },
 ];
 
-export function DetailedComparison({ isAnnual }) {
+export function DetailedComparison() {
   const tableVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
@@ -234,19 +214,19 @@ export function DetailedComparison({ isAnnual }) {
       className='overflow-hidden rounded-2xl border bg-card shadow-sm'
     >
       {/* Header */}
-      <div className='grid grid-cols-4 border-b bg-muted/30 p-6'>
+      <div className='grid grid-cols-4 border-b bg-muted/30 p-6 z-99 gap-8'>
         <div className='font-medium text-muted-foreground'>Features</div>
         <div className='text-center'>
           <div className='font-semibold'>Professional</div>
           <div className='text-2xl font-bold mt-2'>
-            £{isAnnual ? 23 : 29}
+            £50
             <span className='text-sm font-normal text-muted-foreground'>
               /month
             </span>
           </div>
-          {isAnnual && (
-            <div className='text-xs text-muted-foreground'>Billed annually</div>
-          )}
+          <div className='mt-7'>
+            <PurchaseButton planId='professional' size='sm' />
+          </div>
         </div>
         <div className='text-center relative'>
           <div className=''>
@@ -256,14 +236,14 @@ export function DetailedComparison({ isAnnual }) {
           </div>
           <div className='font-semibold'>Enterprise</div>
           <div className='text-2xl font-bold mt-2'>
-            £{isAnnual ? 150 : 120}
+            £120
             <span className='text-sm font-normal text-muted-foreground'>
               /month
             </span>
           </div>
-          {isAnnual && (
-            <div className='text-xs text-muted-foreground'>Billed annually</div>
-          )}
+          <div className='mt-7'>
+            <PurchaseButton planId='enterprise' size='sm' />
+          </div>
         </div>
         <div className='text-center'>
           <div className='font-semibold'>Custom</div>
@@ -273,6 +253,14 @@ export function DetailedComparison({ isAnnual }) {
           <div className='text-xs text-muted-foreground'>
             Tailored solutions
           </div>
+          <div className='mt-4'>
+            <Button size='sm' variant='outline' className='w-full' asChild>
+              <Link href='/contact-sales'>
+                Contact Sales
+                <ArrowRight className='ml-2 h-4 w-4' />
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -280,7 +268,7 @@ export function DetailedComparison({ isAnnual }) {
       {detailedFeatures.map((category, categoryIndex) => (
         <motion.div key={categoryIndex} variants={rowVariants}>
           {/* Category Header */}
-          <div className='grid grid-cols-4 border-b bg-muted/10 p-4'>
+          <div className='grid grid-cols-4 border-b bg-muted/10 p-4 mt-2'>
             <div className='font-semibold text-sm uppercase tracking-wide text-muted-foreground'>
               {category.category}
             </div>
@@ -295,35 +283,43 @@ export function DetailedComparison({ isAnnual }) {
               className='grid grid-cols-4 border-b hover:bg-muted/20 transition-colors'
             >
               <div className='p-4'>
-                <div className='font-medium text-sm'>{feature.name}</div>
-                <div className='text-xs text-muted-foreground mt-1'>
+                <div className='font-medium text-sm text-muted-foreground'>
+                  {feature.name}
+                </div>
+                <div className='text-xs text-muted-foreground/70 mt-1'>
                   {feature.description}
                 </div>
               </div>
               <div className='p-4 text-center border-l'>
                 {feature.professional === '✓' ? (
-                  <Check className='h-5 w-5 text-green-500 mx-auto' />
+                  <Check className='h-5 w-5 text-white mx-auto' />
                 ) : feature.professional === '✗' ? (
                   <X className='h-5 w-5 text-muted-foreground/30 mx-auto' />
                 ) : (
-                  <span className='text-sm font-medium'>
+                  <span className='text-sm font-medium text-muted-foreground'>
                     {feature.professional}
                   </span>
                 )}
               </div>
               <div className='p-4 text-center border-l'>
                 {feature.enterprise === '✓' ? (
-                  <Check className='h-5 w-5 text-green-500 mx-auto' />
+                  <Check className='h-5 w-5 text-white mx-auto' />
                 ) : feature.enterprise === '✗' ? (
                   <X className='h-5 w-5 text-muted-foreground/30 mx-auto' />
                 ) : (
-                  <span className='text-sm font-medium'>
+                  <span className='text-sm font-medium text-muted-foreground'>
                     {feature.enterprise}
                   </span>
                 )}
               </div>
               <div className='p-4 text-center border-l'>
-                <span className='text-sm font-medium text-primary'>✓</span>
+                {feature.professional === '✓' || feature.enterprise === '✓' ? (
+                  <Check className='h-5 w-5 text-white mx-auto' />
+                ) : (
+                  <span className='text-sm font-medium text-muted-foreground'>
+                    Custom
+                  </span>
+                )}
               </div>
             </motion.div>
           ))}
@@ -334,20 +330,10 @@ export function DetailedComparison({ isAnnual }) {
       <div className='grid grid-cols-4 border-t bg-muted/30 p-6 gap-4'>
         <div></div>
         <div className='text-center'>
-          <Button size='sm' className='w-full' asChild>
-            <Link href='/get-started?plan=professional'>
-              Get Professional
-              <ArrowRight className='ml-2 h-4 w-4' />
-            </Link>
-          </Button>
+          <PurchaseButton planId='professional' size='sm' />
         </div>
         <div className='text-center'>
-          <Button size='sm' className='w-full' asChild>
-            <Link href='/get-started?plan=enterprise'>
-              Get Enterprise
-              <ArrowRight className='ml-2 h-4 w-4' />
-            </Link>
-          </Button>
+          <PurchaseButton planId='enterprise' size='sm' />
         </div>
         <div className='text-center'>
           <Button size='sm' variant='outline' className='w-full' asChild>

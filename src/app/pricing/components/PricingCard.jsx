@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Check, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { PurchaseButton } from './PurchaseButton';
 
-export function PricingCard({ plan, isAnnual, index }) {
+export function PricingCard({ plan, index }) {
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
@@ -29,22 +30,11 @@ export function PricingCard({ plan, isAnnual, index }) {
     },
   };
 
-  const formatPrice = (price, isAnnual) => {
-    if (isAnnual && plan.monthlyPrice) {
-      return {
-        main: plan.monthlyPrice,
-        period: '/month',
-        billing: `billed annually (${plan.price}/year)`,
-      };
-    }
-    return {
-      main: price,
-      period: isAnnual ? '/year' : '/month',
-      billing: '',
-    };
+  const priceDisplay = {
+    main: plan.price,
+    period: '/month',
+    billing: '',
   };
-
-  const priceDisplay = formatPrice(plan.price, isAnnual);
 
   return (
     <motion.div
@@ -123,20 +113,7 @@ export function PricingCard({ plan, isAnnual, index }) {
         ))}
       </div>
 
-      <Button
-        size='lg'
-        className={`w-full transition-all duration-300 ${
-          plan.popular
-            ? 'bg-primary hover:bg-primary/90'
-            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-        }`}
-        asChild
-      >
-        <Link href={`/get-started?plan=${plan.id}`}>
-          {plan.cta}
-          <ArrowRight className='ml-2 h-4 w-4' />
-        </Link>
-      </Button>
+      <PurchaseButton planId={plan.id} size='lg' />
     </motion.div>
   );
 }

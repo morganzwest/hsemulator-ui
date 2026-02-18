@@ -49,9 +49,7 @@ function CTASection() {
 }
 
 function PricingSection() {
-  const [isAnnual, setIsAnnual] = useState(false)
-
-  const currentPlans = isAnnual ? pricingPlans.annual : pricingPlans.monthly
+  const currentPlans = pricingPlans.monthly
 
   return (
     <section id="pricing" className="py-20">
@@ -68,8 +66,6 @@ function PricingSection() {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
             Start with our simple plans or compare detailed features below
           </p>
-
-          <BillingToggle onToggle={setIsAnnual} />
         </motion.div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-20">
@@ -77,7 +73,6 @@ function PricingSection() {
             <PricingCard
               key={plan.id}
               plan={plan}
-              isAnnual={isAnnual}
               index={index}
             />
           ))}
@@ -122,8 +117,6 @@ function TrialCTA() {
 }
 
 function DetailedPricingSection() {
-  const [isAnnual, setIsAnnual] = useState(false)
-
   return (
     <section id="detailed-pricing" className="py-20">
       <div className="mx-auto max-w-7xl px-6">
@@ -139,11 +132,9 @@ function DetailedPricingSection() {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
             Compare every feature and limit to find the perfect plan for your needs
           </p>
-
-          <BillingToggle onToggle={setIsAnnual} />
         </motion.div>
 
-        <DetailedComparison isAnnual={isAnnual} />
+        <DetailedComparison />
       </div>
     </section>
   )

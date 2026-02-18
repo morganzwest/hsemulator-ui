@@ -1,18 +1,18 @@
-"use client"
+'use client';
 
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState } from 'react';
+import { motion } from 'framer-motion';
 
 export function ViewToggle({ onViewChange }) {
-  const [view, setView] = useState('simplified')
+  const [view, setView] = useState('simplified');
 
   const handleViewChange = (newView) => {
-    setView(newView)
-    onViewChange(newView)
-  }
+    setView(newView);
+    onViewChange(newView);
+  };
 
   return (
-    <div className="flex items-center justify-center gap-2 mb-8">
+    <div className='flex items-center justify-center gap-2 mb-8'>
       <button
         onClick={() => handleViewChange('simplified')}
         className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
@@ -34,5 +34,5 @@ export function ViewToggle({ onViewChange }) {
         Detailed Comparison
       </button>
     </div>
-  )
+  );
 }

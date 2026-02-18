@@ -11,6 +11,7 @@ import { PricingCard } from "./components/PricingCard"
 import { TrustBadges } from "./components/TrustBadges"
 import { Testimonials } from "./components/Testimonials"
 import { DetailedComparison } from "./components/DetailedComparison"
+import { AddOnsTable } from "./components/AddOnsTable"
 import { pricingPlans, trustBadges, testimonials } from "./data/pricing-config"
 
 
@@ -140,6 +141,30 @@ function DetailedPricingSection() {
   )
 }
 
+function AddOnsSection() {
+  return (
+    <section className="py-20">
+      <div className="mx-auto max-w-7xl px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-16"
+        >
+          <h2 className="mb-6 text-5xl font-bold tracking-tight">
+            Add-ons & Extras
+          </h2>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+            Enhance your plan with additional resources and features
+          </p>
+        </motion.div>
+
+        <AddOnsTable />
+      </div>
+    </section>
+  )
+}
+
 export default function PricingPage() {
   return (
     <main className="relative min-h-screen bg-background">
@@ -173,6 +198,9 @@ export default function PricingPage() {
 
       {/* Detailed Pricing */}
       <DetailedPricingSection />
+
+      {/* Add-ons */}
+      <AddOnsSection />
 
       {/* Testimonials */}
       <Testimonials testimonials={testimonials} />

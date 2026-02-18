@@ -67,7 +67,7 @@ export function PricingCard({ plan, index }) {
 
         <div className='mb-4'>
           <div className='flex items-baseline justify-center gap-1'>
-            <span className='text-5xl font-bold'>${priceDisplay.main}</span>
+            <span className='text-5xl font-bold'>£{priceDisplay.main}</span>
             <span className='text-lg text-muted-foreground'>
               {priceDisplay.period}
             </span>

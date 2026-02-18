@@ -218,7 +218,7 @@ export function DetailedComparison() {
         <div className='font-medium text-muted-foreground'>Features</div>
         <div className='text-center'>
           <div className='font-semibold'>Professional</div>
-          <div className='text-2xl font-bold mt-2'>
+          <div className='text-2xl font-bold '>
             £50
             <span className='text-sm font-normal text-muted-foreground'>
               /month
@@ -235,7 +235,7 @@ export function DetailedComparison() {
             </Badge> */}
           </div>
           <div className='font-semibold'>Enterprise</div>
-          <div className='text-2xl font-bold mt-2'>
+          <div className='text-2xl font-bold '>
             £120
             <span className='text-sm font-normal text-muted-foreground'>
               /month
@@ -247,7 +247,7 @@ export function DetailedComparison() {
         </div>
         <div className='text-center'>
           <div className='font-semibold'>Custom</div>
-          <div className='text-lg font-medium mt-2 text-muted-foreground'>
+          <div className='text-lg font-medium  text-muted-foreground'>
             Contact Us
           </div>
           <div className='text-xs text-muted-foreground'>
@@ -268,7 +268,7 @@ export function DetailedComparison() {
       {detailedFeatures.map((category, categoryIndex) => (
         <motion.div key={categoryIndex} variants={rowVariants}>
           {/* Category Header */}
-          <div className='grid grid-cols-4 border-b bg-muted/10 p-4 mt-2'>
+          <div className='grid grid-cols-4 border-b bg-muted/10 p-4 '>
             <div className='font-semibold text-sm uppercase tracking-wide text-muted-foreground'>
               {category.category}
             </div>

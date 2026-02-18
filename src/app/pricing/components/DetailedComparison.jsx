@@ -29,7 +29,7 @@ const detailedFeatures = [
     category: 'AI & Credits',
     items: [
       {
-        name: 'AI credits (writing code, reviewing code, reviewing logs and proposing fixes, adapting templates)',
+        name: 'AI credits - Access AI tools for building, reviewing, and troubleshooting actions',
         professional: '15 per month',
         enterprise: '75 per month',
         description: 'Monthly AI credit allowance',

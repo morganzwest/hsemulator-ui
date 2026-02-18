@@ -110,7 +110,11 @@ export function PortalSecretsSettingsPage({ portalId }) {
             ))}
 
           {!loading && (
-            <NewSecretRow portalId={portalId} onCreated={addSecret} />
+            <NewSecretRow
+              portalId={portalId}
+              onCreated={addSecret}
+              secrets={secrets}
+            />
           )}
         </div>
       </section>

@@ -4,18 +4,29 @@
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Eye, EyeOff, Plus } from 'lucide-react';
 import { createSecret } from '~/lib/settings/secrets';
 import { cn } from '@/lib/utils';
 
 const MAX_DESC_LENGTH = 128;
 
-export function NewSecretRow({ portalId, onCreated }) {
+export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
   const [name, setName] = useState('');
   const [value, setValue] = useState('');
   const [description, setDescription] = useState('');
+  const [scope, setScope] = useState('portal');
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Check if a CICD secret already exists
+  const hasCicdSecret = secrets.some((secret) => secret.scope === 'cicd');
 
   async function save() {
     if (saving) return;
@@ -28,11 +39,17 @@ export function NewSecretRow({ portalId, onCreated }) {
     if (!portalId) throw new Error('portalId is required');
     if (desc.length > MAX_DESC_LENGTH) return;
 
+    // Prevent creating CICD secret if one already exists
+    if (scope === 'cicd' && hasCicdSecret) {
+      alert('Only one CICD secret is allowed per portal');
+      return;
+    }
+
     setSaving(true);
 
     try {
       const res = await createSecret({
-        scope: 'portal',
+        scope,
         portal_id: portalId,
         name: key,
         value: val,
@@ -43,7 +60,7 @@ export function NewSecretRow({ portalId, onCreated }) {
         id: res.secret_id,
         name: key,
         description: desc || null,
-        scope: 'portal',
+        scope,
         action_id: null,
       });
 
@@ -51,6 +68,9 @@ export function NewSecretRow({ portalId, onCreated }) {
       setValue('');
       setDescription('');
       setVisible(false);
+    } catch (error) {
+      console.error('[NewSecretRow] Error creating secret:', error);
+      alert(`Failed to create secret: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -59,6 +79,18 @@ export function NewSecretRow({ portalId, onCreated }) {
   return (
     <div className='rounded-md border border-dashed p-3 space-y-2'>
       <div className='flex items-center gap-3 mb-0'>
+        <Select value={scope} onValueChange={setScope} disabled={saving}>
+          <SelectTrigger className='w-30'>
+            <SelectValue placeholder='Scope' />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value='cicd' disabled={hasCicdSecret}>
+              CICD {hasCicdSecret && '(already exists)'}
+            </SelectItem>
+            <SelectItem value='portal'>Portal</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Input
           placeholder='KEY_NAME'
           value={name}

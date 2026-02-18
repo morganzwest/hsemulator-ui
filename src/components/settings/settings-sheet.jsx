@@ -13,12 +13,13 @@ import { cn } from '@/lib/utils';
 import { Users, X } from 'lucide-react';
 import { EditorSettingsPage } from '@/components/settings/pages/editor-settings';
 
-import { Code2, Key } from 'lucide-react';
+import { Code2, Key, DownloadCloud } from 'lucide-react';
 
 import { PortalSecretsSettingsPage } from './pages/secret-settings';
 import { getActivePortalId } from '@/lib/portal-state';
 import { IoPeople } from 'react-icons/io5';
 import { TeamMembersSettingsPage } from './pages/team-settings';
+import { ImportSettingsPage } from './pages/import-settings';
 
 /* -------------------------------------
    Tabs
@@ -31,6 +32,12 @@ export const SETTINGS_TABS = [
     label: 'Secrets & Environment',
     icon: Key,
     page: 'secrets',
+  },
+  {
+    key: 'import',
+    label: 'Import',
+    icon: DownloadCloud,
+    page: 'import',
   },
   {
     key: 'team',
@@ -129,6 +136,15 @@ export function SettingsSheet({ children }) {
               {activeTabDef.page === 'secrets' &&
                 (portalId ? (
                   <PortalSecretsSettingsPage portalId={portalId} />
+                ) : (
+                  <div className='text-sm text-muted-foreground'>
+                    Loading portal…
+                  </div>
+                ))}
+
+              {activeTabDef.page === 'import' &&
+                (portalId ? (
+                  <ImportSettingsPage portalId={portalId} />
                 ) : (
                   <div className='text-sm text-muted-foreground'>
                     Loading portal…

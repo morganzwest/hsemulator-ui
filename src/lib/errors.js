@@ -3,7 +3,7 @@ export const ERROR_MESSAGES = {
   // Validation errors
   MISSING_REQUIRED_FIELDS: (fields) => `Missing required fields: ${fields.join(', ')}`,
   MISSING_PARAMETERS: (params) => `Missing required parameters: ${params.join(', ')}`,
-  
+
   // CI/CD specific errors
   FAILED_TO_LOAD_CONFIG: 'Failed to load CI/CD configuration',
   FAILED_TO_SAVE_CONFIG: 'Failed to save CI/CD configuration',
@@ -11,13 +11,16 @@ export const ERROR_MESSAGES = {
   PROMOTION_FAILED: 'Promotion failed',
   WORKFLOW_ALREADY_UP_TO_DATE: 'Workflow already up to date',
   ACTION_PROMOTED_SUCCESSFULLY: 'Action promoted to HubSpot',
-  
+
+  // Import/Discovery specific errors
+  FAILED_TO_DISCOVER_WORKFLOWS: 'Failed to discover workflows',
+
   // Request errors
   REQUEST_TOO_LARGE: 'Request too large. Maximum size is 1MB.',
-  
+
   // Environment errors
   MISSING_ENV_VAR: (varName) => `${varName} environment variable is required`,
-  
+
   // Network/API errors
   NETWORK_ERROR: 'Network error occurred',
   API_ERROR: 'API request failed',

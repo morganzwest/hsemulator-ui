@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight } from "lucide-react"
 import { CodePreview } from "@/components/code-preview"
+import { PageHeader } from "@/components/page-header"
 import { useState } from "react"
 import { Copy, Check } from "lucide-react"
 import { createSupabaseBrowserClient } from "~/lib/supabase/browser"
@@ -95,26 +96,7 @@ export default function LandingPage() {
   }, []);
   return (
     <main className="relative min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center py-2">
-            <video
-              src="/wordmark.mp4"
-              className="h-8 w-auto"
-              autoPlay
-              muted
-              playsInline
-              loop={false}
-            />
-          </div>
-
-          <Button size="sm" asChild>
-            <Link href="/get-started">Get started</Link>
-          </Button>
-        </div>
-      </header>
-
+      <PageHeader />
 
       {/* Hero */}
       <section className="mx-auto max-w-6xl px-6 pt-32 pb-24">

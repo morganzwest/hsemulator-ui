@@ -13,6 +13,7 @@ import { Testimonials } from "./components/Testimonials"
 import { DetailedComparison } from "./components/DetailedComparison"
 import { AddOnsTable } from "./components/AddOnsTable"
 import { pricingPlans, trustBadges, testimonials } from "./data/pricing-config"
+import { PageHeader } from "@/components/page-header"
 
 
 function CTASection() {
@@ -168,24 +169,7 @@ function AddOnsSection() {
 export default function PricingPage() {
   return (
     <main className="relative min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center py-2">
-            <video
-              src="/wordmark.mp4"
-              className="h-8 w-auto"
-              autoPlay
-              muted
-              playsInline
-              loop={false}
-            />
-          </div>
-          <Button size="sm" asChild>
-            <Link href="/get-started">Get started</Link>
-          </Button>
-        </div>
-      </header>
+      <PageHeader />
 
       {/* Hero CTA */}
       <CTASection />

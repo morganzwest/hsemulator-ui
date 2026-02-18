@@ -48,7 +48,6 @@ export const pricingPlans = {
         'Secure secrets management',
         'Version control',
         'Priority infrastructure',
-        'Expanded action executions',
         'Included AI credits',
         'Multi-user access',
         'Multiple portals',

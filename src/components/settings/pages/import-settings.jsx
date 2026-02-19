@@ -173,7 +173,7 @@ export function ImportSettingsPage({ portalId }) {
             .select('id, name, scope')
             .eq('portal_id', portalId)
             .eq('scope', 'cicd')
-            .single(),
+            .maybeSingle(),
         ]);
 
         if (!cancelled) {

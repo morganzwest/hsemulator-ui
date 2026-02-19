@@ -27,7 +27,7 @@ export async function fetchCICDConfig(actionId, portalId) {
       .select('id, name, scope')
       .eq('portal_id', portalId)
       .eq('scope', 'cicd')
-      .single(),
+      .maybeSingle(),
   ])
 
   // Handle errors appropriately

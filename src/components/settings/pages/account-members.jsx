@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/select';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { toast } from 'sonner';
-import { getActiveAccountId } from '~/lib/account-state';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,18 +24,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { getActiveAccountId } from '~/lib/account-state';
 
 /* -------------------------------------------------- */
 
-const ROLES = ['client', 'consultant', 'developer', 'owner'];
+const ROLES = ['member', 'admin', 'owner'];
 
 const ROLE_DESCRIPTIONS = {
-  owner: 'Full administrative control, billing, and workspace management.',
-  consultant:
-    'Can manage client data, workflows, and operational configuration.',
-  developer:
-    'Can create and modify actions, automations, and technical settings.',
-  client: 'Limited visibility. Can view permitted data and updates only.',
+  owner: 'Full administrative control, billing, and account management.',
+  admin:
+    'Can manage users, portals, and most account settings.',
+  member:
+    'Can access assigned portals and view account information.',
 };
 
 function StatusBadge({ children }) {
@@ -51,9 +50,9 @@ function StatusBadge({ children }) {
 function EmptyMembersState() {
   return (
     <div className='rounded-md border border-dashed p-10 text-center space-y-2'>
-      <p className='text-sm font-medium'>No team members</p>
+      <p className='text-sm font-medium'>No account members</p>
       <p className='text-xs text-muted-foreground'>
-        Users and pending invitations will appear here.
+        Account members will appear here.
       </p>
     </div>
   );
@@ -85,7 +84,7 @@ function Avatar({ profile }) {
 
 /* -------------------------------------------------- */
 
-export function TeamMembersSettingsPage({ portalId }) {
+export function AccountMembersSettingsPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [removingId, setRemovingId] = useState(null);
   const [memberToRemove, setMemberToRemove] = useState(null);
@@ -97,7 +96,7 @@ export function TeamMembersSettingsPage({ portalId }) {
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('client');
+  const [role, setRole] = useState('member');
 
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
@@ -110,18 +109,18 @@ export function TeamMembersSettingsPage({ portalId }) {
     if (!memberToRemove) return;
 
     try {
-      setRemovingId(memberToRemove.profile_id);
+      setRemovingId(memberToRemove.user_id);
 
       const { error } = await supabase
-        .from('portal_members')
+        .from('account_users')
         .delete()
-        .eq('portal_uuid', portalId)
-        .eq('profile_id', memberToRemove.profile_id);
+        .eq('account_id', accountId)
+        .eq('user_id', memberToRemove.user_id);
 
       if (error) throw error;
 
       await loadData();
-      toast.success('User removed');
+      toast.success('User removed from account');
     } catch (err) {
       toast.error(err.message ?? 'Failed to remove user');
     }
@@ -129,6 +128,7 @@ export function TeamMembersSettingsPage({ portalId }) {
     setRemovingId(null);
     setMemberToRemove(null);
   }
+
   async function confirmRevokeInvite() {
     if (!inviteToRevoke) return;
 
@@ -136,7 +136,7 @@ export function TeamMembersSettingsPage({ portalId }) {
       setRevokingId(inviteToRevoke.id);
 
       const { error } = await supabase
-        .from('portal_invites')
+        .from('account_invites')
         .delete()
         .eq('id', inviteToRevoke.id);
 
@@ -153,7 +153,7 @@ export function TeamMembersSettingsPage({ portalId }) {
   }
 
   async function resolveCurrentUserRole() {
-    if (!portalId) return;
+    if (!accountId) return;
 
     const { data: authData } = await supabase.auth.getUser();
     if (!authData?.user) return;
@@ -162,10 +162,10 @@ export function TeamMembersSettingsPage({ portalId }) {
     setCurrentUserId(userId);
 
     const { data, error } = await supabase
-      .from('portal_members')
+      .from('account_users')
       .select('role')
-      .eq('portal_uuid', portalId)
-      .eq('profile_id', userId)
+      .eq('account_id', accountId)
+      .eq('user_id', userId)
       .single();
 
     if (error) return;
@@ -174,61 +174,47 @@ export function TeamMembersSettingsPage({ portalId }) {
   }
 
   async function loadData() {
-    if (!portalId) return;
+    if (!accountId) return;
 
     const { data: membersData, error: membersError } = await supabase
-      .from('portal_members')
-      .select(
-        `
-        portal_uuid,
+      .from('account_users')
+      .select(`
+        account_id,
         role,
-        profile_id,
+        user_id,
         profile:profiles (
           id,
           email,
           full_name,
           avatar_url
         )
-      `,
-      )
-      .eq('portal_uuid', portalId);
+      `)
+      .eq('account_id', accountId);
 
     if (membersError) {
       toast.error(membersError.message);
       return;
     }
 
-    const { data: invitesData, error: invitesError } = await supabase
-      .from('portal_invites')
-      .select('*')
-      .eq('portal_uuid', portalId)
-      .is('accepted_at', null);
-
-    if (invitesError) {
-      toast.error(invitesError.message);
-      return;
-    }
-
     setMembers(membersData ?? []);
-    setInvites(invitesData ?? []);
   }
 
   useEffect(() => {
     resolveCurrentUserRole();
     loadData();
-  }, [portalId]);
+  }, [accountId]);
 
   async function handleInvite() {
-    if (!email || !portalId) return;
+    if (!email || !accountId) return;
 
     setLoading(true);
 
     try {
       const { error } = await supabase.functions.invoke(
-        'invite-portal-member',
+        'invite-account-member',
         {
           body: {
-            portal_uuid: portalId,
+            account_id: accountId,
             email: email.trim().toLowerCase(),
             full_name: fullName.trim() || null,
             role,
@@ -240,7 +226,7 @@ export function TeamMembersSettingsPage({ portalId }) {
 
       setFullName('');
       setEmail('');
-      setRole('client');
+      setRole('member');
 
       await loadData();
       toast.success('Invite sent');
@@ -251,15 +237,15 @@ export function TeamMembersSettingsPage({ portalId }) {
     setLoading(false);
   }
 
-  async function handleRoleChange(profileId, newRole) {
+  async function handleRoleChange(userId, newRole) {
     try {
-      setUpdatingId(profileId);
+      setUpdatingId(userId);
 
       const { data, error } = await supabase
-        .from('portal_members')
+        .from('account_users')
         .update({ role: newRole })
-        .eq('portal_uuid', portalId)
-        .eq('profile_id', profileId)
+        .eq('account_id', accountId)
+        .eq('user_id', userId)
         .select();
 
       if (error) throw error;
@@ -281,23 +267,19 @@ export function TeamMembersSettingsPage({ portalId }) {
     return nameA.localeCompare(nameB);
   });
 
-  const sortedInvites = [...invites].sort((a, b) =>
-    a.email.localeCompare(b.email),
-  );
-
-  const hasData = sortedMembers.length || sortedInvites.length;
+  const hasData = sortedMembers.length;
   const isOwner = currentUserRole === 'owner';
 
   return (
     <SettingsPage
-      title='Team members'
-      description='Manage workspace users and permissions.'
+      title='Account members'
+      description='Manage account users and permissions.'
     >
       <section className='space-y-6 rounded-lg border p-6'>
         {/* Invite Bar */}
 
         <div className='space-y-2'>
-          <Label>Invite user</Label>
+          <Label>Invite user to account</Label>
 
           <div className='rounded-md border bg-muted/40 p-3'>
             <div className='flex gap-2'>
@@ -355,16 +337,16 @@ export function TeamMembersSettingsPage({ portalId }) {
         {sortedMembers.length > 0 && (
           <div className='space-y-2'>
             <p className='text-xs font-medium text-muted-foreground'>
-              Active Members
+              Account Members
             </p>
 
             {sortedMembers.map((m) => {
               const displayName = m.profile.full_name ?? m.profile.email;
-              const isSelf = m.profile_id === currentUserId;
+              const isSelf = m.user_id === currentUserId;
 
               return (
                 <div
-                  key={m.profile.id}
+                  key={m.user_id}
                   className='group flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted/40'
                 >
                   <div className='flex items-center gap-3 min-w-0'>
@@ -391,7 +373,7 @@ export function TeamMembersSettingsPage({ portalId }) {
                     {isOwner && !isSelf && (
                       <button
                         onClick={() => setMemberToRemove(m)}
-                        disabled={removingId === m.profile_id}
+                        disabled={removingId === m.user_id}
                         className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
                       >
                         Remove
@@ -402,12 +384,12 @@ export function TeamMembersSettingsPage({ portalId }) {
                       <Select
                         value={m.role}
                         onValueChange={(value) =>
-                          handleRoleChange(m.profile_id, value)
+                          handleRoleChange(m.user_id, value)
                         }
                       >
                         <SelectTrigger
                           className='h-8 w-32 text-xs capitalize'
-                          disabled={updatingId === m.profile_id}
+                          disabled={updatingId === m.user_id}
                         >
                           <SelectValue />
                         </SelectTrigger>
@@ -433,80 +415,18 @@ export function TeamMembersSettingsPage({ portalId }) {
             })}
           </div>
         )}
-
-        {/* Pending Invites */}
-
-        {sortedInvites.length > 0 && (
-          <div className='space-y-2'>
-            <p className='text-xs font-medium text-muted-foreground'>
-              Pending Invites
-            </p>
-
-            {sortedInvites.map((invite) => (
-              <div
-                key={invite.id}
-                className='group flex items-center justify-between rounded-md border border-dashed px-3 py-2'
-              >
-                <div className='min-w-0'>
-                  <p className='text-sm truncate'>{invite.email}</p>
-                  <StatusBadge>Invite sent</StatusBadge>
-                </div>
-
-                <div className='flex items-center gap-4'>
-                  {isOwner && (
-                    <button
-                      onClick={() => setInviteToRevoke(invite)}
-                      disabled={revokingId === invite.id}
-                      className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
-                    >
-                      Revoke
-                    </button>
-                  )}
-
-                  <span className='text-xs text-muted-foreground capitalize'>
-                    {invite.role}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </section>
-      <AlertDialog
-        open={!!inviteToRevoke}
-        onOpenChange={() => setInviteToRevoke(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke invite</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will invalidate the invite for{' '}
-              <span className='font-medium'>{inviteToRevoke?.email}</span>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRevokeInvite}
-              disabled={revokingId === inviteToRevoke?.id}
-              className='bg-red-500 text-white hover:bg-red-700'
-            >
-              Revoke
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
+      {/* Remove Member Dialog */}
       <AlertDialog
         open={!!memberToRemove}
         onOpenChange={() => setMemberToRemove(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove team member</AlertDialogTitle>
+            <AlertDialogTitle>Remove account member</AlertDialogTitle>
             <AlertDialogDescription>
-              This will immediately revoke workspace access for{' '}
+              This will immediately revoke account access for{' '}
               <span className='font-medium'>
                 {memberToRemove?.profile.full_name ??
                   memberToRemove?.profile.email}

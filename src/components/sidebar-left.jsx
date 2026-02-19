@@ -155,7 +155,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         return;
       }
 
-      // FIX:
+      // FIX: MUST FIX THE PLAN STATE
       // Combine portal data with account information
       const portals =
         portalData?.map((portal) => {

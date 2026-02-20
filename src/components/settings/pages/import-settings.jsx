@@ -275,27 +275,25 @@ export function ImportSettingsPage({ portalId }) {
       description='Discover and import workflows from external portals using portal credentials.'
     >
       <div className='space-y-6'>
-        {/* Portal Configuration Card */}
-        <Card className='bg-transparent'>
-          <CardHeader>
-            <div className='flex items-center justify-between'>
-              <div>
-                <CardTitle className='text-base'>
-                  Portal Configuration
-                </CardTitle>
-                <CardDescription>
-                  Enter portal credentials to discover available workflows
-                </CardDescription>
-              </div>
-              {isReadonly && (
-                <Button variant='outline' size='sm' onClick={handleEdit}>
-                  <Edit3 className='h-4 w-4 mr-2' />
-                  Change
-                </Button>
-              )}
+        {/* Portal Configuration */}
+        <section className='space-y-6 rounded-lg border p-4 md:p-6'>
+          <div className='space-y-1'>
+            <h3 className='text-sm font-semibold'>Portal Configuration</h3>
+            <p className='text-xs text-muted-foreground'>
+              Enter portal credentials to discover available workflows
+            </p>
+          </div>
+
+          {isReadonly && (
+            <div className='flex justify-end'>
+              <Button variant='outline' size='sm' onClick={handleEdit}>
+                <Edit3 className='h-4 w-4 mr-2' />
+                Change
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent className='space-y-4'>
+          )}
+
+          <div className='space-y-4'>
             {/* Portal ID Field */}
             <div className='space-y-2'>
               <div className='flex items-center justify-between'>
@@ -314,7 +312,7 @@ export function ImportSettingsPage({ portalId }) {
                 placeholder='12345678'
                 value={portalIdInput}
                 onChange={(e) => setPortalIdInput(e.target.value)}
-                className='bg-muted/50'
+                className='bg-muted/40'
                 style={{
                   MozAppearance: 'textfield',
                   WebkitAppearance: 'none',
@@ -326,7 +324,7 @@ export function ImportSettingsPage({ portalId }) {
             <div className='space-y-2'>
               <Label htmlFor='secret-select'>Authentication Secret</Label>
               {hasCicdSecret && !isEditing ? (
-                <div className='flex items-center justify-between p-3 border rounded-md bg-muted/30'>
+                <div className='flex items-center justify-between p-3 border rounded-md bg-muted/40'>
                   <span className='font-mono text-sm'>{cicdSecret.name}</span>
                   <Badge variant='secondary' className='text-xs'>
                     CICD
@@ -339,7 +337,7 @@ export function ImportSettingsPage({ portalId }) {
                     onValueChange={setSelectedSecretId}
                     disabled={isReadonly}
                   >
-                    <SelectTrigger className={isReadonly ? 'bg-muted/50' : ''}>
+                    <SelectTrigger className={isReadonly ? 'bg-muted/40' : ''}>
                       <SelectValue placeholder='Select a secret for authentication' />
                     </SelectTrigger>
                     <SelectContent>
@@ -411,21 +409,22 @@ export function ImportSettingsPage({ portalId }) {
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         {/* Results Table */}
         {results && (
-          <Card>
-            <CardHeader>
-              <CardTitle className='text-base'>
+          <section className='space-y-6 rounded-lg border p-4 md:p-6'>
+            <div className='space-y-1'>
+              <h3 className='text-sm font-semibold'>
                 Discovery Results ({results.total_workflows} workflows)
-              </CardTitle>
-              <CardDescription>
+              </h3>
+              <p className='text-xs text-muted-foreground'>
                 {results.total_code_actions} code actions found
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+
+            <div className='space-y-4'>
               {importing ? (
                 <ResultsSkeleton />
               ) : results.actions?.length > 0 ? (
@@ -470,8 +469,8 @@ export function ImportSettingsPage({ portalId }) {
               ) : (
                 <EmptyResultsState />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         )}
       </div>
     </SettingsPage>

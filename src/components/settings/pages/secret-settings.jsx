@@ -79,7 +79,6 @@ export function PortalSecretsSettingsPage({ portalId }) {
       description='Encrypted values injected into all actions in this portal.'
     >
       <section className='space-y-6 rounded-lg border p-4 md:p-6'>
-        {/* Header */}
         <div className='space-y-1'>
           <h3 className='text-sm font-semibold'>Secrets</h3>
           <div className='flex items-center gap-2 text-xs text-muted-foreground'>
@@ -88,8 +87,7 @@ export function PortalSecretsSettingsPage({ portalId }) {
           </div>
         </div>
 
-        {/* Content */}
-        <div className='space-y-2'>
+        <div className='space-y-4'>
           {loading && (
             <>
               <SecretSkeleton />

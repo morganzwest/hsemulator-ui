@@ -5,6 +5,8 @@ import { Toaster } from "@/components/ui/sonner"
 import { SettingsProvider } from '@/lib/settings/settings-provider';
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import '@/sentry.client.config'
+import '@/lib/global-error-handler'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -44,7 +46,7 @@ export default function RootLayout({ children }) {
           'bg-background text-foreground antialiased',
         ].join(' ')}
       >
-        <Analytics/>
+        <Analytics />
         <SpeedInsights />
         <ThemeProvider
           attribute="class"
@@ -52,12 +54,12 @@ export default function RootLayout({ children }) {
           enableSystem
           disableTransitionOnChange
         >
-        <SettingsProvider>
+          <SettingsProvider>
 
-          {children}
-        </SettingsProvider>
+            {children}
+          </SettingsProvider>
 
-        <Toaster position="top-center" />
+          <Toaster position="top-center" />
         </ThemeProvider>
       </body>
     </html>

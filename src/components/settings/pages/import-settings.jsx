@@ -276,7 +276,7 @@ export function ImportSettingsPage({ portalId }) {
     >
       <div className='space-y-6'>
         {/* Portal Configuration Card */}
-        <Card>
+        <Card className='bg-transparent'>
           <CardHeader>
             <div className='flex items-center justify-between'>
               <div>

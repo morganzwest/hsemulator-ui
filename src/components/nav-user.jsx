@@ -9,6 +9,7 @@ import {
   Sparkles,
   MessageCircleQuestion,
   Settings2,
+  ActivityIcon,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -30,6 +31,7 @@ import {
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { AccountSwitcher } from '@/components/account-switcher';
+import { Activity } from 'react';
 
 function handleOpenSettings() {
   window.dispatchEvent(new Event('settings:open'));
@@ -172,9 +174,9 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              {/* <DropdownMenuItem>
                 <AccountSwitcher />
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
 
               <DropdownMenuItem>
                 <BadgeCheck />
@@ -189,6 +191,16 @@ export function NavUser({ user }) {
               <DropdownMenuItem onClick={handleOpenSettings}>
                 <Settings2 />
                 Settings
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  // Open status page in new tab
+                  window.open('https://novocode.betteruptime.com/', '_blank');
+                }}
+              >
+                <ActivityIcon />
+                Status
               </DropdownMenuItem>
 
               <DropdownMenuItem>

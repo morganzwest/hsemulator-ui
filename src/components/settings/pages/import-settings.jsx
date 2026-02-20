@@ -438,7 +438,7 @@ export function ImportSettingsPage({ portalId }) {
                   </div>
                   {results.actions.map((action, index) => (
                     <div
-                      key={action.id || index}
+                      key={`${action.id}-${index}`}
                       className='grid grid-cols-12 gap-3 p-3 border-b last:border-b-0 items-center hover:bg-muted/20 transition-colors'
                     >
                       <div

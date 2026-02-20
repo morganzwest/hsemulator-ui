@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/sidebar';
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { AccountSwitcher } from '@/components/account-switcher';
 
 function handleOpenSettings() {
   window.dispatchEvent(new Event('settings:open'));
@@ -171,6 +172,10 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
+              <DropdownMenuItem>
+                <AccountSwitcher />
+              </DropdownMenuItem>
+
               <DropdownMenuItem>
                 <BadgeCheck />
                 Account

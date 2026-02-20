@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { SettingsPage } from '../settings-page';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -104,7 +104,21 @@ export function TeamMembersSettingsPage({ portalId }) {
   const [invites, setInvites] = useState([]);
   const [updatingId, setUpdatingId] = useState(null);
 
-  const accountId = getActiveAccountId();
+  const [accountId, setAccountId] = useState(null);
+  const [accountError, setAccountError] = useState(null);
+
+  // Initialize account ID safely
+  useEffect(() => {
+    try {
+      const id = getActiveAccountId();
+      setAccountId(id);
+      setAccountError(null);
+    } catch (error) {
+      console.error('Account state not initialized:', error.message);
+      setAccountError(error.message);
+      setAccountId(null);
+    }
+  }, []);
 
   async function confirmRemove() {
     if (!memberToRemove) return;
@@ -152,7 +166,7 @@ export function TeamMembersSettingsPage({ portalId }) {
     setInviteToRevoke(null);
   }
 
-  async function resolveCurrentUserRole() {
+  const resolveCurrentUserRole = useCallback(async () => {
     if (!portalId) return;
 
     const { data: authData } = await supabase.auth.getUser();
@@ -171,9 +185,9 @@ export function TeamMembersSettingsPage({ portalId }) {
     if (error) return;
 
     if (data) setCurrentUserRole(data.role);
-  }
+  }, [portalId, supabase]);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     if (!portalId) return;
 
     const { data: membersData, error: membersError } = await supabase
@@ -211,12 +225,15 @@ export function TeamMembersSettingsPage({ portalId }) {
 
     setMembers(membersData ?? []);
     setInvites(invitesData ?? []);
-  }
+  }, [portalId, supabase]);
 
+  // Load data when account ID is available
   useEffect(() => {
-    resolveCurrentUserRole();
-    loadData();
-  }, [portalId]);
+    if (accountId && portalId) {
+      resolveCurrentUserRole();
+      loadData();
+    }
+  }, [accountId, portalId, resolveCurrentUserRole, loadData]);
 
   async function handleInvite() {
     if (!email || !portalId) return;
@@ -287,6 +304,41 @@ export function TeamMembersSettingsPage({ portalId }) {
 
   const hasData = sortedMembers.length || sortedInvites.length;
   const isOwner = currentUserRole === 'owner';
+
+  // Show loading state while account is being initialized
+  if (accountError) {
+    return (
+      <SettingsPage
+        title='Team members'
+        description='Manage workspace users and permissions.'
+      >
+        <div className='rounded-md border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 p-6 text-center'>
+          <p className='text-sm text-red-800 dark:text-red-200'>
+            Account information is not available. Please refresh the page or try
+            relogging.
+          </p>
+          <p className='text-xs text-red-600 dark:text-red-400 mt-2'>
+            Error: {accountError}
+          </p>
+        </div>
+      </SettingsPage>
+    );
+  }
+
+  if (!accountId) {
+    return (
+      <SettingsPage
+        title='Team members'
+        description='Manage workspace users and permissions.'
+      >
+        <div className='rounded-md border p-6 text-center'>
+          <p className='text-sm text-muted-foreground'>
+            Loading account information...
+          </p>
+        </div>
+      </SettingsPage>
+    );
+  }
 
   return (
     <SettingsPage

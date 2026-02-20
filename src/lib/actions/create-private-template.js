@@ -1,7 +1,7 @@
 import slugify from 'slugify'
 import { toast } from 'sonner'
 
-const MAX_NAME = 64
+const MAX_NAME = 128
 const MAX_DESC = 256
 
 /**

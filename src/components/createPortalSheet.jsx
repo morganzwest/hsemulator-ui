@@ -31,6 +31,7 @@ import {
   getAvailablePortals,
   addAvailablePortal,
 } from '~/lib/portal-state';
+import { getActiveAccountId, getAvailableAccounts } from '~/lib/account-state';
 
 const supabase = createSupabaseBrowserClient();
 
@@ -41,10 +42,30 @@ export function CreatePortalSheet({ open, onOpenChange }) {
   const [icon, setIcon] = React.useState('briefcase');
   const [color, setColor] = React.useState('blue');
   const [loading, setLoading] = React.useState(false);
-  const [plan, setPlan] = React.useState('Free');
+  const [plan, setPlan] = React.useState(() => {
+    // Try to get cached plan from localStorage
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('user_plan');
+      return cached || 'Free';
+    }
+    return 'Free';
+  });
+  const [accountReady, setAccountReady] = React.useState(false);
+  const [planLoading, setPlanLoading] = React.useState(false);
 
-  const Icon = resolvePortalIcon(icon);
-  const c = resolvePortalColor(color);
+  // Cache plan changes to localStorage
+  React.useEffect(() => {
+    console.log('[CreatePortalSheet] Plan state changed to:', plan);
+    if (typeof window !== 'undefined' && plan !== 'Free') {
+      localStorage.setItem('user_plan', plan);
+    }
+  }, [plan]);
+
+  // Force re-render when plan changes by updating a key
+  const sheetKey = React.useMemo(() => `portal-sheet-${plan}`, [plan]);
+
+  // Memoize color and other values
+  const c = React.useMemo(() => resolvePortalColor(color), [color]);
   const isPremiumColor = Boolean(c?.premium);
   const isPro = plan.toLowerCase() === 'pro';
 
@@ -52,7 +73,43 @@ export function CreatePortalSheet({ open, onOpenChange }) {
   const allowedToProgress = !isPremiumColor || isPro;
 
   /* ---------------------------------
-     Load user plan
+     Check account state on mount
+  --------------------------------- */
+
+  React.useEffect(() => {
+    async function checkAccountState() {
+      try {
+        const accountId = getActiveAccountId();
+        if (accountId) {
+          setAccountReady(true);
+        }
+      } catch {
+        // Account state not initialized, try to initialize
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+          const { data: accountData } = await supabase
+            .from('account_users')
+            .select('account_id')
+            .eq('user_id', user.id)
+            .limit(1);
+
+          if (accountData && accountData.length > 0) {
+            setAccountReady(true);
+          }
+        }
+      }
+    }
+
+    if (open) {
+      checkAccountState();
+    }
+  }, [open]);
+
+  /* ---------------------------------
+     Load user plan from account
   --------------------------------- */
 
   React.useEffect(() => {
@@ -63,22 +120,118 @@ export function CreatePortalSheet({ open, onOpenChange }) {
 
       if (!user) return;
 
-      const { data } = await supabase
-        .from('profiles')
-        .select('plan')
-        .eq('id', user.id)
-        .single();
+      // Try to get plan from initialized state first
+      try {
+        const availableAccounts = getAvailableAccounts();
+        if (availableAccounts.length > 0) {
+          const accountId = getActiveAccountId();
+          console.log(
+            '[CreatePortalSheet] Loading plan for account:',
+            accountId,
+          );
+          const { data } = await supabase
+            .from('accounts')
+            .select('plan')
+            .eq('id', accountId)
+            .single();
 
-      if (data?.plan) {
-        setPlan(data.plan === 'pro' ? 'Pro' : 'Free');
+          console.log('[CreatePortalSheet] Plan data from DB:', data);
+          if (data?.plan) {
+            const planDisplay = data.plan === 'pro' ? 'Pro' : 'Free';
+            console.log(
+              '[CreatePortalSheet] Setting plan display to:',
+              planDisplay,
+            );
+            setPlan(planDisplay);
+          }
+          return;
+        }
+      } catch {
+        console.log(
+          '[CreatePortalSheet] Account state not ready, using direct lookup',
+        );
+      }
+
+      // Fallback: Direct account lookup if state not ready
+      const { data: accountData } = await supabase
+        .from('account_users')
+        .select(
+          `
+          account_id,
+          account:accounts (
+            plan
+          )
+        `,
+        )
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .limit(1);
+
+      if (accountData && accountData.length > 0) {
+        const plan = accountData[0].account.plan;
+        const planDisplay = plan === 'pro' ? 'Pro' : 'Free';
+        console.log(
+          '[CreatePortalSheet] Direct lookup - setting plan to:',
+          planDisplay,
+        );
+        setPlan(planDisplay);
+        setPlanLoading(false);
+
+        // Also update cache immediately
+        if (typeof window !== 'undefined' && planDisplay !== 'Free') {
+          localStorage.setItem('user_plan', planDisplay);
+        }
       }
     }
 
     loadPlan();
-  }, []);
+  }, [open]); // Re-run when sheet opens to ensure fresh data
+
+  // Additional immediate plan loading on first mount
+  React.useEffect(() => {
+    async function loadPlanImmediately() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      // Force immediate plan check
+      const { data: accountData } = await supabase
+        .from('account_users')
+        .select(
+          `
+          account_id,
+          account:accounts (
+            plan
+          )
+        `,
+        )
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .limit(1);
+
+      if (accountData && accountData.length > 0) {
+        const plan = accountData[0].account.plan;
+        const planDisplay = plan === 'pro' ? 'Pro' : 'Free';
+        console.log(
+          '[CreatePortalSheet] IMMEDIATE lookup - setting plan to:',
+          planDisplay,
+        );
+        setPlan(planDisplay);
+
+        // Also update cache immediately
+        if (typeof window !== 'undefined' && planDisplay !== 'Free') {
+          localStorage.setItem('user_plan', planDisplay);
+        }
+      }
+    }
+
+    loadPlanImmediately();
+  }, []); // Run once on mount
 
   async function handleCreate() {
-    if (!name || !allowedToProgress) return;
+    if (!name || !allowedToProgress || !accountReady) return;
 
     setLoading(true);
 
@@ -89,6 +242,34 @@ export function CreatePortalSheet({ open, onOpenChange }) {
     if (!user) {
       setLoading(false);
       return;
+    }
+
+    // Get the active account for the current user
+    let accountId;
+    try {
+      accountId = getActiveAccountId();
+    } catch (error) {
+      console.error(
+        'Account state not initialized, trying to get account directly:',
+        error,
+      );
+
+      // Fallback: Get user's account directly
+      const { data: accountData } = await supabase
+        .from('account_users')
+        .select('account_id')
+        .eq('user_id', user.id)
+        .eq('role', 'owner')
+        .limit(1)
+        .single();
+
+      if (accountData) {
+        accountId = accountData.account_id;
+      } else {
+        console.error('No account found for user');
+        setLoading(false);
+        return;
+      }
     }
 
     /* -------------------------------
@@ -103,31 +284,13 @@ export function CreatePortalSheet({ open, onOpenChange }) {
         id: type === 'portal' ? Number(portalId) : null,
         icon,
         color,
-        created_by: user.id,
+        account_id: accountId,
       })
       .select('uuid')
       .single();
 
     if (insertError) {
       console.error(insertError);
-      setLoading(false);
-      return;
-    }
-
-    /* -------------------------------
-     2. Insert membership (NEW)
-  -------------------------------- */
-
-    const { error: membershipError } = await supabase
-      .from('portal_members')
-      .insert({
-        portal_uuid: portal.uuid,
-        profile_id: user.id,
-        role: 'owner',
-      });
-
-    if (membershipError) {
-      console.error(membershipError);
       setLoading(false);
       return;
     }
@@ -302,7 +465,9 @@ export function CreatePortalSheet({ open, onOpenChange }) {
                       c.container,
                     )}
                   >
-                    <Icon className='size-4' />
+                    {React.createElement(resolvePortalIcon(icon), {
+                      className: 'size-4',
+                    })}
                   </div>
 
                   <div className='min-w-0'>
@@ -333,7 +498,11 @@ export function CreatePortalSheet({ open, onOpenChange }) {
 
                 <div className='flex items-center justify-between rounded-md border bg-muted/30 px-3 py-2.5'>
                   <div className='flex items-center gap-3'>
-                    {plan === 'Pro' ? (
+                    {planLoading ? (
+                      <div className='grid size-8 place-items-center rounded-md bg-muted text-muted-foreground'>
+                        <Sparkles className='size-4' />
+                      </div>
+                    ) : plan === 'Pro' ? (
                       <div className='grid size-8 place-items-center rounded-md bg-gradient-to-br from-violet-600/30 via-fuchsia-500/20 to-cyan-400/15'>
                         <Sparkles className='size-4' />
                       </div>
@@ -344,7 +513,9 @@ export function CreatePortalSheet({ open, onOpenChange }) {
                     )}
 
                     <div className='leading-tight'>
-                      <div className='text-sm font-medium'>{plan} plan</div>
+                      <div className='text-sm font-medium'>
+                        {planLoading ? 'Loading...' : plan}
+                      </div>
                       <div className='text-xs text-muted-foreground'>
                         Early access
                       </div>
@@ -364,9 +535,13 @@ export function CreatePortalSheet({ open, onOpenChange }) {
         <SheetFooter className='border-t px-6 py-4'>
           <Button
             onClick={handleCreate}
-            disabled={loading || !name || !allowedToProgress}
+            disabled={loading || !name || !allowedToProgress || !accountReady}
           >
-            {!allowedToProgress ? 'Upgrade to use this color' : 'Create portal'}
+            {!allowedToProgress
+              ? 'Upgrade to use this color'
+              : !accountReady
+                ? 'Loading account...'
+                : 'Create portal'}
           </Button>
         </SheetFooter>
       </SheetContent>

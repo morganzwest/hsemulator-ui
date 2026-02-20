@@ -105,36 +105,32 @@ function Stepper({ value, min, max, step = 1, onChange }) {
 
 function CheckboxRow({ label, description, checked, onCheckedChange }) {
   function toggle() {
-    onCheckedChange(!checked)
+    onCheckedChange(!checked);
   }
 
   return (
     <div
-      role="button"
+      role='button'
       tabIndex={0}
       onClick={toggle}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          toggle()
+          e.preventDefault();
+          toggle();
         }
       }}
       className={cn(
         'flex cursor-pointer items-center gap-4 rounded-md border p-4 transition-colors',
         'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        checked ? 'border-primary bg-accent/40' : 'border-border'
+        checked ? 'border-primary bg-accent/40' : 'border-border',
       )}
     >
       {/* Left: text only */}
-      <div className="flex-1 space-y-1">
-        <Label className="cursor-pointer text-sm font-medium">
-          {label}
-        </Label>
+      <div className='flex-1 space-y-1'>
+        <Label className='cursor-pointer text-sm font-medium'>{label}</Label>
 
         {description && (
-          <p className="text-xs text-muted-foreground">
-            {description}
-          </p>
+          <p className='text-xs text-muted-foreground'>{description}</p>
         )}
       </div>
 
@@ -144,10 +140,10 @@ function CheckboxRow({ label, description, checked, onCheckedChange }) {
         onCheckedChange={onCheckedChange}
         onClick={(e) => e.stopPropagation()}
         aria-label={label}
-        className="shrink-0 scale-110"
+        className='shrink-0 scale-110'
       />
     </div>
-  )
+  );
 }
 
 /* -------------------------------------
@@ -193,99 +189,112 @@ export function EditorSettingsPage() {
       <section className='space-y-4'>
         {/* Theme */}
         <section className='space-y-6 rounded-lg border p-4 md:p-6'>
-          <h3 className='text-sm font-semibold'>Theme</h3>
+          <div className='space-y-1'>
+            <h3 className='text-sm font-semibold'>Theme</h3>
+          </div>
 
-          <div className='grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]'>
-            {THEMES.map((theme) => {
-              const active = settings['editor.theme'] === theme.id;
+          <div className='space-y-4'>
+            <div className='grid gap-3 grid-cols-[repeat(auto-fit,minmax(210px,1fr))]'>
+              {THEMES.map((theme) => {
+                const active = settings['editor.theme'] === theme.id;
 
-              return (
-                <button
-                  key={theme.id}
-                  onClick={() => set('editor.theme', theme.id)}
-                  className={cn(
-                    'group flex items-center gap-3 rounded-md border p-3 text-left transition',
-                    'hover:border-muted-foreground/40 hover:shadow-sm',
-                    active && 'border-primary ring-2 ring-primary scale-[1.01]',
-                  )}
-                >
-                  <div
-                    className='relative h-9 w-9 shrink-0 rounded-md border overflow-hidden'
-                    style={{ backgroundColor: theme.color }}
-                  />
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => set('editor.theme', theme.id)}
+                    className={cn(
+                      'group flex items-center gap-3 rounded-md border p-3 text-left transition',
+                      'hover:border-muted-foreground/40 hover:shadow-sm',
+                      active &&
+                        'border-primary ring-2 ring-primary scale-[1.01]',
+                    )}
+                  >
+                    <div
+                      className='relative h-9 w-9 shrink-0 rounded-md border overflow-hidden'
+                      style={{ backgroundColor: theme.color }}
+                    />
 
-                  <div className='min-w-0'>
-                    <span className='block truncate text-sm font-medium'>
-                      {theme.name}
-                    </span>
-                    <span className='text-xs text-muted-foreground'>
-                      {theme.id}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+                    <div className='min-w-0'>
+                      <span className='block truncate text-sm font-medium'>
+                        {theme.name}
+                      </span>
+                      <span className='text-xs text-muted-foreground'>
+                        {theme.id}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
 
         {/* Typography */}
         <section className='space-y-6 rounded-lg border p-4 md:p-6'>
-          <h3 className='text-sm font-semibold'>Typography</h3>
-
-          <div className='grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center'>
-            <Label>Font size</Label>
-            <Stepper
-              value={settings['editor.fontSize']}
-              min={12}
-              max={22}
-              onChange={(v) => set('editor.fontSize', v)}
-            />
+          <div className='space-y-1'>
+            <h3 className='text-sm font-semibold'>Typography</h3>
           </div>
 
-          <div className='grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center'>
-            <Label>Line height</Label>
-            <Stepper
-              value={settings['editor.lineHeight']}
-              min={18}
-              max={32}
-              step={2}
-              onChange={(v) => set('editor.lineHeight', v)}
-            />
+          <div className='space-y-4'>
+            <div className='grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center'>
+              <Label>Font size</Label>
+              <Stepper
+                value={settings['editor.fontSize']}
+                min={12}
+                max={22}
+                onChange={(v) => set('editor.fontSize', v)}
+              />
+            </div>
+
+            <div className='grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center'>
+              <Label>Line height</Label>
+              <Stepper
+                value={settings['editor.lineHeight']}
+                min={18}
+                max={32}
+                step={2}
+                onChange={(v) => set('editor.lineHeight', v)}
+              />
+            </div>
           </div>
         </section>
 
         {/* Behaviour */}
         <section className='space-y-6 rounded-lg border p-4 md:p-6'>
-          <h3 className='text-sm font-semibold'>Behaviour</h3>
+          <div className='space-y-1'>
+            <h3 className='text-sm font-semibold'>Behaviour</h3>
+          </div>
 
-          <div className='grid gap-3 md:grid-cols-2'>
-            <CheckboxRow
-              label='Minimap'
-              description='Show a code overview on the right-hand side'
-              checked={settings['editor.minimap']}
-              onCheckedChange={(v) => set('editor.minimap', !!v)}
-            />
+          <div className='space-y-4'>
+            <div className='grid gap-3 md:grid-cols-2'>
+              <CheckboxRow
+                label='Minimap'
+                description='Show a code overview on the right-hand side'
+                checked={settings['editor.minimap']}
+                onCheckedChange={(v) => set('editor.minimap', !!v)}
+              />
 
-            <CheckboxRow
-              label='Word wrap'
-              description='Wrap long lines instead of horizontal scrolling'
-              checked={settings['editor.wordWrap']}
-              onCheckedChange={(v) => set('editor.wordWrap', !!v)}
-            />
+              <CheckboxRow
+                label='Word wrap'
+                description='Wrap long lines instead of horizontal scrolling'
+                checked={settings['editor.wordWrap']}
+                onCheckedChange={(v) => set('editor.wordWrap', !!v)}
+              />
 
-            <CheckboxRow
-              label='Smooth scrolling'
-              description='Animate vertical scrolling'
-              checked={settings['editor.smoothScrolling']}
-              onCheckedChange={(v) => set('editor.smoothScrolling', !!v)}
-            />
+              <CheckboxRow
+                label='Smooth scrolling'
+                description='Animate vertical scrolling'
+                checked={settings['editor.smoothScrolling']}
+                onCheckedChange={(v) => set('editor.smoothScrolling', !!v)}
+              />
 
-            <CheckboxRow
-              label='Render whitespace'
-              description='Visualise spaces and tabs'
-              checked={settings['editor.renderWhitespace']}
-              onCheckedChange={(v) => set('editor.renderWhitespace', !!v)}
-            />
+              <CheckboxRow
+                label='Render whitespace'
+                description='Visualise spaces and tabs'
+                checked={settings['editor.renderWhitespace']}
+                onCheckedChange={(v) => set('editor.renderWhitespace', !!v)}
+              />
+            </div>
           </div>
         </section>
 

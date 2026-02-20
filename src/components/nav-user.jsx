@@ -9,6 +9,7 @@ import {
   Sparkles,
   MessageCircleQuestion,
   Settings2,
+  ActivityIcon,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -29,6 +30,8 @@ import {
 } from '@/components/ui/sidebar';
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { AccountSwitcher } from '@/components/account-switcher';
+import { Activity } from 'react';
 
 function handleOpenSettings() {
   window.dispatchEvent(new Event('settings:open'));
@@ -97,8 +100,42 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem
+              {/* <DropdownMenuItem
                 onClick={handleUpgrade}
+                className='
+    relative overflow-hidden
+    bg-gradient-to-br from-black/60 via-indigo-950/40 to-purple-950/30
+    text-indigo-200
+    border border-indigo-500/25
+    backdrop-blur-xl
+    transition-all duration-300
+    hover:scale-[1.015]
+    hover:ring-1 hover:ring-indigo-500/40
+    hover:shadow-[0_0_30px_rgba(99,102,241,0.25)]
+  '
+              >
+                <span className='absolute inset-0 pointer-events-none rounded-md ring-1 ring-indigo-500/40 opacity-40' />
+
+                <span
+                  className='
+      absolute inset-0 pointer-events-none
+      bg-gradient-to-r from-transparent via-white/10 to-transparent
+      opacity-0 hover:opacity-100
+      transition-opacity duration-500
+    '
+                />
+
+                <Sparkles className='text-indigo-300 drop-shadow-[0_0_8px_rgba(129,140,248,0.6)]' />
+
+                <span className='tracking-wide font-medium'>
+                  Upgrade your Plan
+                </span>
+
+                <span className='ml-auto text-[10px] uppercase tracking-widest text-indigo-300/80'>
+                  FOUNDRY
+                </span>
+              </DropdownMenuItem> */}
+              <DropdownMenuItem
                 className='
     relative overflow-hidden
     bg-gradient-to-br from-black/60 via-indigo-950/40 to-purple-950/30
@@ -126,12 +163,10 @@ export function NavUser({ user }) {
 
                 <Sparkles className='text-indigo-300 drop-shadow-[0_0_8px_rgba(129,140,248,0.6)]' />
 
-                <span className='tracking-wide font-medium'>
-                  Upgrade your Plan
-                </span>
+                <span className='tracking-wide font-medium'>Pilot Plan</span>
 
                 <span className='ml-auto text-[10px] uppercase tracking-widest text-indigo-300/80'>
-                  FOUNDRY
+                  PILOT
                 </span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -139,6 +174,10 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
+              {/* <DropdownMenuItem>
+                <AccountSwitcher />
+              </DropdownMenuItem> */}
+
               <DropdownMenuItem>
                 <BadgeCheck />
                 Account
@@ -152,6 +191,16 @@ export function NavUser({ user }) {
               <DropdownMenuItem onClick={handleOpenSettings}>
                 <Settings2 />
                 Settings
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  // Open status page in new tab
+                  window.open('https://novocode.betteruptime.com/', '_blank');
+                }}
+              >
+                <ActivityIcon />
+                Status
               </DropdownMenuItem>
 
               <DropdownMenuItem>

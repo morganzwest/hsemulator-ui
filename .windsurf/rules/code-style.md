@@ -21,3 +21,7 @@ Never hallucinate libraries or functions – only use known, verified packages.
 Always confirm file paths and module names exist before referencing them in code or tests.
 Never delete or overwrite existing code unless explicitly instructed to.
 Always write code in English, even when communication is in another language.
+
+For all major changes, especially to Auth Flows, APIs and DB Schema changes, please save it to memory.
+We use BetterStack via SentrySDK for error tracking and monitoring.
+We use Supabase for database and authentication and storage.

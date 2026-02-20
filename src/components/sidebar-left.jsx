@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getActivePortalId } from '@/lib/portal-state';
+import { getActiveAccountId } from '@/lib/account-state';
 import { CreateActionDialog } from '@/components/create-action-dialog';
 import { TemplatesSheet } from '~/components/template-sheet';
 import { SettingsSheet } from '@/components/settings/settings-sheet';
@@ -115,34 +116,69 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
 
       if (!user) return;
 
-      const { data, error } = await supabase
-        .from('portal_members')
+      // Get accounts where user is a member
+      const { data: accountData, error: accountError } = await supabase
+        .from('account_users')
         .select(
           `
-        portal:portal_uuid (
-          uuid,
-          name,
-          icon,
-          color,
-          created_at,
-          created_by
-        ),
-        role
-      `,
+          account_id,
+          role,
+          account:accounts (
+            id,
+            name,
+            plan
+          )
+        `,
         )
-        .eq('profile_id', user.id)
-        .order('created_at', { ascending: true, foreignTable: 'portal' });
+        .eq('user_id', user.id);
+
+      if (accountError) {
+        console.error('[SidebarLeft] Failed to load accounts:', accountError);
+        return;
+      }
+
+      if (!accountData || accountData.length === 0) {
+        console.log('[SidebarLeft] No accounts found for user');
+        return;
+      }
+
+      // Get portals for user's accounts
+      const accountIds = accountData.map((au) => au.account_id);
+      const { data: portalData, error } = await supabase
+        .from('portals')
+        .select('uuid, name, icon, color, created_at')
+        .in('account_id', accountIds)
+        .order('created_at', { ascending: true });
 
       if (error) {
         console.error('[SidebarLeft] Failed to load portals:', error);
         return;
       }
 
+      // FIX: MUST FIX THE PLAN STATE
+      // Combine portal data with account information
       const portals =
-        data?.map((row) => ({
-          ...row.portal,
-          role: row.role,
-        })) ?? [];
+        portalData?.map((portal) => {
+          const accountUser = accountData.find(
+            (au) => au.account_id === portal.account_id,
+          );
+          console.log(
+            '[SidebarLeft] Found accountUser for portal:',
+            portal.uuid,
+            accountUser,
+          );
+          const portalWithAccount = {
+            ...portal,
+            role: accountUser?.role || 'member',
+            account: accountUser?.account,
+            // Add plan directly to portal object for easier access
+            plan: accountUser?.account?.plan || 'Free',
+          };
+          console.log('[SidebarLeft] Portal with account:', portalWithAccount);
+          return portalWithAccount;
+        }) ?? [];
+
+      console.log('[SidebarLeft] Final portals array:', portals);
 
       const activeUuid = initPortalState(portals);
       const active = portals.find((p) => p.uuid === activeUuid);
@@ -193,7 +229,10 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
 
   useEffect(() => {
     if (!portalsLoaded) return;
-    loadActions();
+    const timer = setTimeout(() => {
+      loadActions();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [portalsLoaded, loadActions]);
 
   /* -----------------------------

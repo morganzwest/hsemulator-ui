@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { SettingsPage } from '../settings-page';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { toast } from 'sonner';
+import { getActiveAccountId } from '~/lib/account-state';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,12 +97,28 @@ export function TeamMembersSettingsPage({ portalId }) {
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('client');
+  const [role, setRole] = useState('owner');
 
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
   const [invites, setInvites] = useState([]);
   const [updatingId, setUpdatingId] = useState(null);
+
+  const [accountId, setAccountId] = useState(null);
+  const [accountError, setAccountError] = useState(null);
+
+  // Initialize account ID safely
+  useEffect(() => {
+    try {
+      const id = getActiveAccountId();
+      setAccountId(id);
+      setAccountError(null);
+    } catch (error) {
+      console.error('Account state not initialized:', error.message);
+      setAccountError(error.message);
+      setAccountId(null);
+    }
+  }, []);
 
   async function confirmRemove() {
     if (!memberToRemove) return;
@@ -149,7 +166,7 @@ export function TeamMembersSettingsPage({ portalId }) {
     setInviteToRevoke(null);
   }
 
-  async function resolveCurrentUserRole() {
+  const resolveCurrentUserRole = useCallback(async () => {
     if (!portalId) return;
 
     const { data: authData } = await supabase.auth.getUser();
@@ -168,9 +185,9 @@ export function TeamMembersSettingsPage({ portalId }) {
     if (error) return;
 
     if (data) setCurrentUserRole(data.role);
-  }
+  }, [portalId, supabase]);
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     if (!portalId) return;
 
     const { data: membersData, error: membersError } = await supabase
@@ -208,12 +225,15 @@ export function TeamMembersSettingsPage({ portalId }) {
 
     setMembers(membersData ?? []);
     setInvites(invitesData ?? []);
-  }
+  }, [portalId, supabase]);
 
+  // Load data when account ID is available
   useEffect(() => {
-    resolveCurrentUserRole();
-    loadData();
-  }, [portalId]);
+    if (accountId && portalId) {
+      resolveCurrentUserRole();
+      loadData();
+    }
+  }, [accountId, portalId, resolveCurrentUserRole, loadData]);
 
   async function handleInvite() {
     if (!email || !portalId) return;
@@ -237,7 +257,7 @@ export function TeamMembersSettingsPage({ portalId }) {
 
       setFullName('');
       setEmail('');
-      setRole('client');
+      setRole('owner');
 
       await loadData();
       toast.success('Invite sent');
@@ -285,244 +305,310 @@ export function TeamMembersSettingsPage({ portalId }) {
   const hasData = sortedMembers.length || sortedInvites.length;
   const isOwner = currentUserRole === 'owner';
 
+  // Show loading state while account is being initialized
+  if (accountError) {
+    return (
+      <SettingsPage
+        title='Team members'
+        description='Manage workspace users and permissions.'
+      >
+        <div className='rounded-md border border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800 p-6 text-center'>
+          <p className='text-sm text-red-800 dark:text-red-200'>
+            Account information is not available. Please refresh the page or try
+            relogging.
+          </p>
+          <p className='text-xs text-red-600 dark:text-red-400 mt-2'>
+            Error: {accountError}
+          </p>
+        </div>
+      </SettingsPage>
+    );
+  }
+
+  if (!accountId) {
+    return (
+      <SettingsPage
+        title='Team members'
+        description='Manage workspace users and permissions.'
+      >
+        <div className='rounded-md border p-6 text-center'>
+          <p className='text-sm text-muted-foreground'>
+            Loading account information...
+          </p>
+        </div>
+      </SettingsPage>
+    );
+  }
+
   return (
     <SettingsPage
       title='Team members'
       description='Manage workspace users and permissions.'
     >
-      <section className='space-y-6 rounded-lg border p-6'>
-        {/* Invite Bar */}
-
-        <div className='space-y-2'>
-          <Label>Invite user</Label>
-
-          <div className='rounded-md border bg-muted/40 p-3'>
-            <div className='flex gap-2'>
-              <Input
-                placeholder='email@company.com'
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className='h-9'
-              />
-
-              <Input
-                placeholder='Name (optional)'
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className='h-9'
-              />
-
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger className='h-9 w-32'>
-                  <SelectValue />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {ROLES.slice()
-                    .sort()
-                    .map((r) => (
-                      <SelectItem key={r} value={r}>
-                        {r}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-
-              <Button
-                onClick={handleInvite}
-                disabled={loading || !email.trim()}
-                className='h-9 px-3'
-              >
-                Invite
-              </Button>
-            </div>
-
-            <p className='text-xs text-muted-foreground mt-2'>
-              {ROLE_DESCRIPTIONS[role]}
-            </p>
+      <>
+        <section className='space-y-6 rounded-lg border p-4 md:p-6'>
+          {/* Invite Bar */}
+          <div className='space-y-1'>
+            <h3 className='text-sm font-semibold'>Invite user</h3>
           </div>
-        </div>
 
-        {/* Empty */}
+          <div className='space-y-4'>
+            <div className='rounded-md border bg-muted/40 p-3'>
+              <div className='flex flex-col gap-4 sm:flex-row sm:items-end'>
+                <div className='flex-1'>
+                  <Label htmlFor='email' className='mb-1.5 block'>
+                    Email *
+                  </Label>
+                  <Input
+                    id='email'
+                    placeholder='email@company.com'
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className='h-9'
+                  />
+                </div>
 
-        {!hasData && <EmptyMembersState />}
+                <div className='flex-1'>
+                  <Label htmlFor='fullName' className='mb-1.5 block'>
+                    Name *
+                  </Label>
+                  <Input
+                    id='fullName'
+                    placeholder='Full name'
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className='h-9'
+                  />
+                </div>
 
-        {/* Active Members */}
-
-        {sortedMembers.length > 0 && (
-          <div className='space-y-2'>
-            <p className='text-xs font-medium text-muted-foreground'>
-              Active Members
-            </p>
-
-            {sortedMembers.map((m) => {
-              const displayName = m.profile.full_name ?? m.profile.email;
-              const isSelf = m.profile_id === currentUserId;
-
-              return (
-                <div
-                  key={m.profile.id}
-                  className='group flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted/40'
+                <div className='flex-1'>
+                  <Label htmlFor='role' className='mb-1.5 block'>
+                    Role
+                  </Label>
+                  <Select value={role} onValueChange={setRole} disabled>
+                    <SelectTrigger className='h-9'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES.slice()
+                        .sort()
+                        .map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r.charAt(0).toUpperCase() + r.slice(1)}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={handleInvite}
+                  disabled={loading || !email.trim() || !fullName.trim()}
+                  className='h-9 px-6 sm:w-auto'
                 >
-                  <div className='flex items-center gap-3 min-w-0'>
-                    <Avatar profile={m.profile} />
+                  {loading ? (
+                    <>
+                      <div className='h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent' />
+                      Sending...
+                    </>
+                  ) : (
+                    <>Invite User</>
+                  )}
+                </Button>
+              </div>
 
-                    <div className='min-w-0'>
+              <p className='text-xs text-muted-foreground mt-3'>
+                {ROLE_DESCRIPTIONS[role]}
+              </p>
+            </div>
+          </div>
+
+          {/* Empty */}
+          {!hasData && <EmptyMembersState />}
+
+          {/* Active Members */}
+          {sortedMembers.length > 0 && (
+            <div className='space-y-4'>
+              <div className='space-y-1'>
+                <h4 className='text-xs font-medium text-muted-foreground'>
+                  Active Members
+                </h4>
+              </div>
+
+              <div className='space-y-2'>
+                {sortedMembers.map((m) => {
+                  const displayName = m.profile.full_name ?? m.profile.email;
+                  const isSelf = m.profile_id === currentUserId;
+
+                  return (
+                    <div
+                      key={m.profile.id}
+                      className='group flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted/40'
+                    >
+                      <div className='flex items-center gap-3 min-w-0'>
+                        <Avatar profile={m.profile} />
+
+                        <div className='min-w-0'>
+                          <div className='flex items-center gap-2'>
+                            <p className='text-sm truncate'>{displayName}</p>
+
+                            {isSelf && (
+                              <span className='text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground'>
+                                You
+                              </span>
+                            )}
+                          </div>
+
+                          <p className='text-xs text-muted-foreground truncate'>
+                            {m.profile.email}
+                          </p>
+                        </div>
+                      </div>
+
                       <div className='flex items-center gap-2'>
-                        <p className='text-sm truncate'>{displayName}</p>
+                        {isOwner && !isSelf && (
+                          <button
+                            onClick={() => setMemberToRemove(m)}
+                            disabled={removingId === m.profile_id}
+                            className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
+                          >
+                            Remove
+                          </button>
+                        )}
 
-                        {isSelf && (
-                          <span className='text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground'>
-                            You
+                        {isOwner && !isSelf ? (
+                          <Select
+                            value={m.role}
+                            onValueChange={(value) =>
+                              handleRoleChange(m.profile_id, value)
+                            }
+                          >
+                            <SelectTrigger
+                              className='h-8 w-32 text-xs capitalize'
+                              disabled={updatingId === m.profile_id}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+
+                            <SelectContent>
+                              {ROLES.slice()
+                                .sort()
+                                .map((r) => (
+                                  <SelectItem key={r} value={r}>
+                                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className='text-xs text-muted-foreground capitalize'>
+                            {m.role}
                           </span>
                         )}
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-                      <p className='text-xs text-muted-foreground truncate'>
-                        {m.profile.email}
-                      </p>
+          {/* Pending Invites */}
+          {sortedInvites.length > 0 && (
+            <div className='space-y-4'>
+              <div className='space-y-1'>
+                <h4 className='text-xs font-medium text-muted-foreground'>
+                  Pending Invites
+                </h4>
+              </div>
+
+              <div className='space-y-2'>
+                {sortedInvites.map((invite) => (
+                  <div
+                    key={invite.id}
+                    className='group flex items-center justify-between rounded-md border border-dashed px-3 py-2'
+                  >
+                    <div className='min-w-0'>
+                      <p className='text-sm truncate'>{invite.email}</p>
+                      <StatusBadge>Invite sent</StatusBadge>
+                    </div>
+
+                    <div className='flex items-center gap-4'>
+                      {isOwner && (
+                        <button
+                          onClick={() => setInviteToRevoke(invite)}
+                          disabled={revokingId === invite.id}
+                          className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
+                        >
+                          Revoke
+                        </button>
+                      )}
+
+                      <span className='text-xs text-muted-foreground capitalize'>
+                        {invite.role}
+                      </span>
                     </div>
                   </div>
-
-                  <div className='flex items-center gap-2'>
-                    {isOwner && !isSelf && (
-                      <button
-                        onClick={() => setMemberToRemove(m)}
-                        disabled={removingId === m.profile_id}
-                        className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
-                      >
-                        Remove
-                      </button>
-                    )}
-
-                    {isOwner && !isSelf ? (
-                      <Select
-                        value={m.role}
-                        onValueChange={(value) =>
-                          handleRoleChange(m.profile_id, value)
-                        }
-                      >
-                        <SelectTrigger
-                          className='h-8 w-32 text-xs capitalize'
-                          disabled={updatingId === m.profile_id}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-
-                        <SelectContent>
-                          {ROLES.slice()
-                            .sort()
-                            .map((r) => (
-                              <SelectItem key={r} value={r}>
-                                {r.charAt(0).toUpperCase() + r.slice(1)}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className='text-xs text-muted-foreground capitalize'>
-                        {m.role}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Pending Invites */}
-
-        {sortedInvites.length > 0 && (
-          <div className='space-y-2'>
-            <p className='text-xs font-medium text-muted-foreground'>
-              Pending Invites
-            </p>
-
-            {sortedInvites.map((invite) => (
-              <div
-                key={invite.id}
-                className='group flex items-center justify-between rounded-md border border-dashed px-3 py-2'
-              >
-                <div className='min-w-0'>
-                  <p className='text-sm truncate'>{invite.email}</p>
-                  <StatusBadge>Invite sent</StatusBadge>
-                </div>
-
-                <div className='flex items-center gap-4'>
-                  {isOwner && (
-                    <button
-                      onClick={() => setInviteToRevoke(invite)}
-                      disabled={revokingId === invite.id}
-                      className='cursor-pointer opacity-0 group-hover:opacity-100 transition text-xs text-red-500 hover:text-red-600'
-                    >
-                      Revoke
-                    </button>
-                  )}
-
-                  <span className='text-xs text-muted-foreground capitalize'>
-                    {invite.role}
-                  </span>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
-      <AlertDialog
-        open={!!inviteToRevoke}
-        onOpenChange={() => setInviteToRevoke(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke invite</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will invalidate the invite for{' '}
-              <span className='font-medium'>{inviteToRevoke?.email}</span>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            </div>
+          )}
+        </section>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRevokeInvite}
-              disabled={revokingId === inviteToRevoke?.id}
-              className='bg-red-500 text-white hover:bg-red-700'
-            >
-              Revoke
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog
+          open={!!inviteToRevoke}
+          onOpenChange={() => setInviteToRevoke(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revoke invite</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will invalidate the invite for{' '}
+                <span className='font-medium'>{inviteToRevoke?.email}</span>.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
 
-      <AlertDialog
-        open={!!memberToRemove}
-        onOpenChange={() => setMemberToRemove(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove team member</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will immediately revoke workspace access for{' '}
-              <span className='font-medium'>
-                {memberToRemove?.profile.full_name ??
-                  memberToRemove?.profile.email}
-              </span>
-              . This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmRevokeInvite}
+                disabled={revokingId === inviteToRevoke?.id}
+                className='bg-red-500 text-white hover:bg-red-700'
+              >
+                Revoke
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmRemove}
-              className='bg-red-500 text-white hover:bg-red-700'
-            >
-              Remove
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog
+          open={!!memberToRemove}
+          onOpenChange={() => setMemberToRemove(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove team member</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will immediately revoke workspace access for{' '}
+                <span className='font-medium'>
+                  {memberToRemove?.profile.full_name ??
+                    memberToRemove?.profile.email}
+                </span>
+                . This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmRemove}
+                className='bg-red-500 text-white hover:bg-red-700'
+              >
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     </SettingsPage>
   );
 }

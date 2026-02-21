@@ -347,7 +347,7 @@ export function CreatePortalSheet({ open, onOpenChange }) {
     addAvailablePortal({
       uuid: portal.uuid,
       name,
-      type,
+      type: 'portal',
       icon,
       color,
       plan,

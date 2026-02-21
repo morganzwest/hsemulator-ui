@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SettingsPage } from '@/components/settings/settings-page';
+import { ComingSoonNotice } from '@/components/settings/settings-notice';
 import { AlertCircle, ArrowUp, Briefcase, Users, Play } from 'lucide-react';
 import { useAccount } from '@/contexts/AccountContext';
 import Image from 'next/image';
@@ -478,18 +479,7 @@ export function TeamMembersSettingsPage({ portalId }) {
 
         <section className='space-y-6 rounded-lg border p-4 md:p-6'>
           {/* Coming Soon Notice */}
-          <div className='rounded-md border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50 p-4 text-center'>
-            <div className='flex items-center justify-center gap-2 mb-2'>
-              <div className='h-2 w-2 rounded-full bg-slate-600 dark:bg-slate-400' />
-              <h3 className='text-sm font-semibold text-slate-800 dark:text-slate-200'>
-                Team Members coming soon
-              </h3>
-            </div>
-            <p className='text-xs text-slate-700 dark:text-slate-300'>
-              We&apos;re working on bringing team collaboration features to your
-              workspace. Stay tuned!
-            </p>
-          </div>
+          <ComingSoonNotice title='Team Members coming soon' />
 
           {/* Invite Bar - Disabled */}
           <div className='space-y-1'>

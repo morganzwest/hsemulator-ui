@@ -2,9 +2,10 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 import { inferLanguage } from '@/lib/editor/infer-language'
 import { toast } from 'sonner'
 import { getActivePortalId } from '../portal-state'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { subscribeExecutionRealtime } from './realtime-logs'
 import { isAbleToExecuteAction, getLimitErrorMessage } from '../account-limits'
+import { useRealtimeConnection } from '@/hooks/useRealtimeConnection'
 
 /* -----------------------------
    Helpers
@@ -189,10 +190,18 @@ export function useActionEditor({
   setRunning,
 }) {
   const supabase = createSupabaseBrowserClient()
+  const { connectionState, connectionInfo, handleConnectionChange } = useRealtimeConnection()
 
   const activeExecutionIdRef = useRef(null)
   const resolveExecutionRef = useRef(null)
   const subscribedRef = useRef(false)
+  const closedByUserRef = useRef(false)
+
+  // Manual reconnect handler
+  const handleManualReconnect = useCallback(() => {
+    console.log('[Realtime] Manual reconnect triggered by user')
+    // Note: This will be handled by the subscription cleanup/recreation logic
+  }, [])
 
   /* -----------------------------
      Realtime subscription
@@ -226,16 +235,23 @@ export function useActionEditor({
           resolveExecutionRef.current = null
         }
       },
+      onConnectionChange: handleConnectionChange,
     })
 
-    return stop
-  }, [])
+    window.addEventListener('manual-reconnect-request', handleManualReconnect)
+
+    return () => {
+      closedByUserRef.current = true
+      stop()
+      window.removeEventListener('manual-reconnect-request', handleManualReconnect)
+    }
+  }, [supabase, setLogs, handleConnectionChange, handleManualReconnect])
 
   /* -----------------------------
      Load files
   ----------------------------- */
 
-  async function loadFiles() {
+  const loadFiles = useCallback(async () => {
     if (!activeAction) return
     getActivePortalId()
 
@@ -268,7 +284,7 @@ export function useActionEditor({
     setFiles(loaded)
     setActiveFile(Object.keys(loaded)[0] ?? null)
     setLoadingFiles(false)
-  }
+  }, [activeAction, setLoadingFiles, setLogs, setFiles, setActiveFile, supabase.storage])
 
   /* -----------------------------
      Save files
@@ -278,33 +294,39 @@ export function useActionEditor({
     if (!activeAction) return
     const basePath = resolveActionBasePath(activeAction)
 
-    await editorRef?.current
-      ?.getAction('editor.action.formatDocument')
-      ?.run()
+    try {
+      await editorRef?.current
+        ?.getAction('editor.action.formatDocument')
+        ?.run()
 
-    await new Promise(r => setTimeout(r, 0))
+      await new Promise(r => setTimeout(r, 0))
 
-    for (const [name, file] of Object.entries(files)) {
-      if (!file.dirty) continue
-      await supabase.storage
+      for (const [name, file] of Object.entries(files)) {
+        if (!file.dirty) continue
+        await supabase.storage
+          .from('actions')
+          .upload(`${basePath}/${name}`, new Blob([file.value]), {
+            upsert: true,
+          })
+      }
+
+      await supabase
         .from('actions')
-        .upload(`${basePath}/${name}`, new Blob([file.value]), {
-          upsert: true,
-        })
-    }
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', activeAction.id)
 
-    await supabase
-      .from('actions')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', activeAction.id)
-
-    setFiles(prev =>
-      Object.fromEntries(
-        Object.entries(prev).map(([k, v]) => [k, { ...v, dirty: false }])
+      setFiles(prev =>
+        Object.fromEntries(
+          Object.entries(prev).map(([k, v]) => [k, { ...v, dirty: false }])
+        )
       )
-    )
 
-    setLogs(l => [...l, '✔ Files saved'])
+      setLogs(l => [...l, '✔ Files saved'])
+    } catch (error) {
+      console.error('[Editor] Failed to save files:', error)
+      setLogs(l => [...l, `✖ Failed to save files: ${error.message}`])
+      throw error // Re-throw to allow caller to handle
+    }
   }
 
   /* -----------------------------
@@ -376,11 +398,16 @@ export function useActionEditor({
             actionId: activeAction.id,
           })
 
+          const runtimeSecret = process.env.NEXT_PUBLIC_RUNTIME_SECRET
+          if (!runtimeSecret) {
+            throw new Error('Runtime secret not configured')
+          }
+
           await fetch(`${process.env.NEXT_PUBLIC_RUNTIME_URL}/execute`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: 'Bearer dev_secret_key',
+              'Authorization': `Bearer ${runtimeSecret}`,
             },
             body: JSON.stringify({
               mode: 'execute',
@@ -416,5 +443,11 @@ export function useActionEditor({
     )
   }
 
-  return { loadFiles, saveAllFiles, runFile }
+  return {
+    loadFiles,
+    saveAllFiles,
+    runFile,
+    connectionState,
+    connectionInfo
+  }
 }

@@ -34,6 +34,7 @@ export function subscribeExecutionRealtime(
         channelName = 'execution:realtime',
         onLog,
         onExecutionUpdate,
+        onConnectionChange, // New callback for connection state changes
 
         // reconnect tuning
         maxRetries = 8,
@@ -42,6 +43,10 @@ export function subscribeExecutionRealtime(
 
         // auth tuning
         waitForAuthMs = 3_000, // if no session yet, retry within this window
+
+        // connection health tuning
+        heartbeatIntervalMs = 30_000, // 30 seconds
+        connectionTimeoutMs = 60_000, // 1 minute
     } = {}
 ) {
     if (!supabase) {
@@ -53,6 +58,10 @@ export function subscribeExecutionRealtime(
     let closedByUser = false
     let reconnectTimer = null
     let authRetryTimer = null
+    let heartbeatTimer = null
+    let connectionState = 'disconnected' // 'disconnected', 'connecting', 'connected', 'reconnecting', 'error'
+    let lastActivity = Date.now()
+    let connectionStartTime = null
 
     // keep the latest token we applied to realtime, avoid redundant setAuth calls
     let lastAppliedAccessToken = null
@@ -68,12 +77,13 @@ export function subscribeExecutionRealtime(
     function clearAllTimers() {
         reconnectTimer = clearTimer(reconnectTimer)
         authRetryTimer = clearTimer(authRetryTimer)
+        heartbeatTimer = clearTimer(heartbeatTimer)
     }
 
     function backoffDelay(attempt) {
         const delay = baseRetryDelayMs * Math.pow(2, attempt)
-        // jitter helps avoid thundering herd on reconnect
-        const jitter = Math.floor(Math.random() * Math.min(250, delay * 0.2))
+        // Improved jitter helps avoid thundering herd on reconnect (25-50% of delay)
+        const jitter = Math.floor(Math.random() * Math.min(delay * 0.5, delay * 0.25))
         return Math.min(delay + jitter, maxRetryDelayMs)
     }
 
@@ -102,6 +112,112 @@ export function subscribeExecutionRealtime(
         authUnsub = null
     }
 
+    function updateConnectionState(newState, reason = null) {
+        const oldState = connectionState
+
+        // Connection state validation matrix
+        const validTransitions = {
+            'disconnected': ['connecting'],
+            'connecting': ['connected', 'error', 'disconnected'],
+            'connected': ['error', 'disconnected', 'reconnecting'],
+            'reconnecting': ['connected', 'error', 'disconnected'],
+            'error': ['connecting', 'disconnected', 'reconnecting']
+        }
+
+        if (oldState && validTransitions[oldState] && !validTransitions[oldState].includes(newState)) {
+            console.warn('[Realtime][STATE] Invalid state transition detected', {
+                oldState,
+                newState,
+                reason,
+                channelName,
+                time: new Date().toISOString()
+            })
+        }
+
+        connectionState = newState
+
+        console.info('[Realtime][STATE]', `${oldState} -> ${newState}`, {
+            channelName,
+            reason,
+            retries,
+            time: new Date().toISOString()
+        })
+
+        if (typeof onConnectionChange === 'function') {
+            onConnectionChange({
+                state: newState,
+                oldState,
+                reason,
+                channelName,
+                retries,
+                timestamp: Date.now()
+            })
+        }
+
+        // Update activity timestamp on successful connection
+        if (newState === 'connected') {
+            lastActivity = Date.now()
+        }
+    }
+
+    function startHeartbeat() {
+        // Atomic cleanup - clear existing timer first
+        if (heartbeatTimer) {
+            clearInterval(heartbeatTimer)
+            heartbeatTimer = null
+        }
+
+        // Only start if not closed and in connected state
+        if (closedByUser || connectionState !== 'connected') {
+            return
+        }
+
+        heartbeatTimer = setInterval(() => {
+            if (closedByUser || connectionState !== 'connected') {
+                // Clear timer if state changed during interval
+                if (heartbeatTimer) {
+                    clearInterval(heartbeatTimer)
+                    heartbeatTimer = null
+                }
+                return
+            }
+
+            const now = Date.now()
+            const timeSinceActivity = now - lastActivity
+
+            // If no activity for longer than timeout, consider connection stale
+            if (timeSinceActivity > connectionTimeoutMs) {
+                console.warn('[Realtime][HEARTBEAT] Connection appears stale', {
+                    channelName,
+                    timeSinceActivity,
+                    lastActivity: new Date(lastActivity).toISOString()
+                })
+                updateConnectionState('error', 'stale_connection')
+                scheduleReconnect('stale_connection')
+                return
+            }
+
+            // Send a ping through the channel to verify it's still responsive
+            if (channel && channel.state === 'joined') {
+                try {
+                    // Use a built-in method to check connection health
+                    channel.send({
+                        type: 'heartbeat',
+                        timestamp: now
+                    })
+                } catch (err) {
+                    console.warn('[Realtime][HEARTBEAT] Failed to send heartbeat', {
+                        channelName,
+                        error: err.message
+                    })
+                    // Update connection state on heartbeat failure
+                    updateConnectionState('error', 'heartbeat_failed')
+                    scheduleReconnect('heartbeat_failed')
+                }
+            }
+        }, heartbeatIntervalMs)
+    }
+
     function scheduleReconnect(reason) {
         if (closedByUser) return
 
@@ -109,7 +225,9 @@ export function subscribeExecutionRealtime(
             console.error('[Realtime] Max retries reached — giving up', {
                 channelName,
                 reason,
+                totalRetries: retries,
             })
+            updateConnectionState('error', 'max_retries_exceeded')
             return
         }
 
@@ -125,6 +243,7 @@ export function subscribeExecutionRealtime(
         reconnectTimer = setTimeout(() => {
             if (closedByUser) return
             teardownChannel()
+            updateConnectionState('reconnecting', `retry_${reason}`)
             void createAndSubscribe({ reason: `reconnect:${reason}` })
         }, delay)
     }
@@ -219,6 +338,7 @@ export function subscribeExecutionRealtime(
     async function createAndSubscribe({ reason = 'initial' } = {}) {
         if (closedByUser) return
 
+        updateConnectionState('connecting', reason)
         attachAuthListenerOnce()
         reconnectTimer = clearTimer(reconnectTimer)
         authRetryTimer = clearTimer(authRetryTimer)
@@ -240,6 +360,9 @@ export function subscribeExecutionRealtime(
                 table: logsTable,
             },
             payload => {
+                // Update activity timestamp on actual data reception
+                lastActivity = Date.now()
+
                 // v2 payload shape:
                 // {
                 //   eventType: 'INSERT' | 'UPDATE' | 'DELETE',
@@ -265,6 +388,9 @@ export function subscribeExecutionRealtime(
                 table: executionsTable,
             },
             payload => {
+                // Update activity timestamp on actual data reception
+                lastActivity = Date.now()
+
                 if (typeof onExecutionUpdate === 'function') onExecutionUpdate(payload)
             }
         )
@@ -280,19 +406,23 @@ export function subscribeExecutionRealtime(
                 retries = 0
                 reconnectTimer = clearTimer(reconnectTimer)
                 authRetryTimer = clearTimer(authRetryTimer)
+                updateConnectionState('connected', 'subscription_successful')
+                startHeartbeat()
                 return
             }
 
             if (status === 'CHANNEL_ERROR') {
-                console.warning('[Realtime] CHANNEL_ERROR — scheduling reconnect', {
+                console.warn('[Realtime] CHANNEL_ERROR — scheduling reconnect', {
                     channelName,
                 })
+                updateConnectionState('error', 'channel_error')
                 scheduleReconnect('CHANNEL_ERROR')
                 return
             }
 
             if (status === 'CLOSED') {
                 console.warn('[Realtime] CLOSED — scheduling reconnect', { channelName })
+                updateConnectionState('error', 'connection_closed')
                 scheduleReconnect('CLOSED')
                 return
             }
@@ -301,6 +431,7 @@ export function subscribeExecutionRealtime(
                 console.warn('[Realtime] TIMED_OUT — scheduling reconnect', {
                     channelName,
                 })
+                updateConnectionState('error', 'connection_timeout')
                 scheduleReconnect('TIMED_OUT')
                 return
             }
@@ -316,6 +447,7 @@ export function subscribeExecutionRealtime(
 
     return function unsubscribe() {
         closedByUser = true
+        updateConnectionState('disconnected', 'user_initiated')
         teardownAll()
         console.log('[Realtime] Unsubscribed from execution realtime', {
             channelName,

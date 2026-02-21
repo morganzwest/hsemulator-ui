@@ -31,7 +31,7 @@ import {
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { getCurrentPlan } from '@/lib/account-limits';
-import { getActiveAccountId } from '@/lib/account-state';
+import { useAccount } from '@/contexts/AccountContext';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { Activity } from 'react';
 import * as React from 'react';
@@ -48,25 +48,12 @@ export function NavUser({ user }) {
   const supabase = createSupabaseBrowserClient();
   const [currentPlan, setCurrentPlan] = React.useState('pilot');
   const [loadingPlan, setLoadingPlan] = React.useState(true);
-  const [accountReady, setAccountReady] = React.useState(false);
 
-  // Check if account state is ready
-  React.useEffect(() => {
-    try {
-      getActiveAccountId();
-      setAccountReady(true);
-    } catch (error) {
-      console.warn(
-        '[NavUser] Account state not yet initialized:',
-        error.message,
-      );
-      setAccountReady(false);
-    }
-  }, []);
+  const { initialized, loading: accountLoading } = useAccount();
 
   React.useEffect(() => {
     async function loadPlan() {
-      if (!accountReady) {
+      if (!initialized || accountLoading) {
         console.warn(
           '[NavUser] Account state not ready, skipping plan loading',
         );
@@ -85,7 +72,7 @@ export function NavUser({ user }) {
     }
 
     loadPlan();
-  }, [accountReady]);
+  }, [initialized, accountLoading]);
 
   const getPlanDisplayInfo = (plan) => {
     switch (plan) {
@@ -222,9 +209,9 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              {/* <DropdownMenuItem>
+              <DropdownMenuItem>
                 <AccountSwitcher />
-              </DropdownMenuItem> */}
+              </DropdownMenuItem>
 
               <DropdownMenuItem>
                 <BadgeCheck />

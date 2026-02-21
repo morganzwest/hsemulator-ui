@@ -19,7 +19,7 @@ import {
   getExecutionUsageHistory,
   getUpgradeUrl,
 } from '@/lib/account-limits';
-import { getActiveAccountId } from '@/lib/account-state';
+import { useAccount } from '@/contexts/AccountContext';
 import { UsageChart } from '@/components/usage-chart';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -29,24 +29,18 @@ export function UsageSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [accountId, setAccountId] = useState(null);
-  const [accountError, setAccountError] = useState(null);
 
-  // Initialize account ID safely
-  useEffect(() => {
-    try {
-      const id = getActiveAccountId();
-      setAccountId(id);
-      setAccountError(null);
-    } catch (error) {
-      console.error('Account state not initialized:', error.message);
-      setAccountError(error.message);
-      setAccountId(null);
-    }
-  }, []);
+  const {
+    getActiveAccountId,
+    loading: accountLoading,
+    error: accountError,
+  } = useAccount();
 
   useEffect(() => {
     async function fetchLimits() {
+      if (accountLoading) return;
+
+      const accountId = getActiveAccountId();
       if (!accountId) return;
 
       try {
@@ -63,10 +57,13 @@ export function UsageSettingsPage() {
     }
 
     fetchLimits();
-  }, [accountId]);
+  }, [accountLoading, getActiveAccountId]);
 
   useEffect(() => {
     async function fetchHistory() {
+      if (accountLoading) return;
+
+      const accountId = getActiveAccountId();
       if (!accountId) return;
 
       try {
@@ -85,13 +82,44 @@ export function UsageSettingsPage() {
     }
 
     fetchHistory();
-  }, [accountId]);
+  }, [accountLoading, getActiveAccountId]);
 
   const handleUpgrade = () => {
     if (limits?.plan) {
       window.location.href = getUpgradeUrl(limits.plan);
     }
   };
+
+  // Show loading while account state is initializing
+  if (accountLoading) {
+    return (
+      <div className='space-y-6'>
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader className='pb-3'>
+                <Skeleton className='h-5 w-20' />
+                <Skeleton className='h-4 w-32' />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className='h-8 w-16 mb-2' />
+                <Skeleton className='h-2 w-full' />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className='h-6 w-32' />
+            <Skeleton className='h-4 w-48' />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className='h-75 w-full' />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (accountError) {
     return (

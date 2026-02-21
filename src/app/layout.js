@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
 import '@/sentry.client.config'
 import '@/lib/global-error-handler'
+import { AccountProvider } from '@/contexts/AccountContext';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -54,10 +55,11 @@ export default function RootLayout({ children }) {
           enableSystem
           disableTransitionOnChange
         >
-          <SettingsProvider>
-
-            {children}
-          </SettingsProvider>
+          <AccountProvider>
+            <SettingsProvider>
+              {children}
+            </SettingsProvider>
+          </AccountProvider>
 
           <Toaster position="top-center" />
         </ThemeProvider>

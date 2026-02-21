@@ -169,6 +169,7 @@ export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
         scope === 'cicd' &&
         (error.type === CICD_ERROR_TYPES.MISSING_SCOPE ? (
           <WarningNotice
+            className='mt-2'
             title={error.message}
             description={error.guidance}
             action={
@@ -190,6 +191,7 @@ export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
           />
         ) : (
           <ErrorNotice
+            className='mt-2'
             title={error.message}
             description={error.guidance}
             action={

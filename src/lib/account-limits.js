@@ -8,6 +8,44 @@ function getSupabaseClient() {
 }
 
 /**
+ * Get the current account plan
+ * @param {string} accountId - Account UUID (optional, uses active account if not provided)
+ * @returns {Promise<string>} - Current plan ('pilot' | 'professional' | 'enterprise')
+ */
+export async function getCurrentPlan(accountId = null) {
+  try {
+    const targetAccountId = accountId || getActiveAccountId()
+
+    const { data, error } = await getSupabaseClient()
+      .from('accounts')
+      .select('plan')
+      .eq('id', targetAccountId)
+      .single()
+
+    if (error) {
+      console.error('[account-limits] Error getting current plan:', error)
+      throw new AccountLimitError(
+        'Failed to get current plan',
+        'general',
+        null
+      )
+    }
+
+    return data?.plan || 'pilot'
+  } catch (err) {
+    if (err instanceof AccountLimitError) {
+      throw err
+    }
+    console.error('[account-limits] Unexpected error:', err)
+    throw new AccountLimitError(
+      'An unexpected error occurred while getting current plan',
+      'general',
+      null
+    )
+  }
+}
+
+/**
  * Error classes for account limits
  */
 export class AccountLimitError extends Error {
@@ -285,6 +323,7 @@ export const AccountLimitTypes = {
 }
 
 const accountLimits = {
+  getCurrentPlan,
   isAbleToAddPortal,
   isAbleToAddUser,
   getAccountLimits,

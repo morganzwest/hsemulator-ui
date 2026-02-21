@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -12,8 +12,20 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SettingsPage } from '@/components/settings/settings-page';
 import { AlertCircle, ArrowUp, Briefcase, Users, Play } from 'lucide-react';
-import { getActiveAccountId } from '@/lib/account-state';
+import { useAccount } from '@/contexts/AccountContext';
+import Image from 'next/image';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import {
   checkLimitsWithUpgradeInfo,
   getLimitErrorMessage,
@@ -72,9 +84,11 @@ function Avatar({ profile }) {
 
   if (profile.avatar_url) {
     return (
-      <img
+      <Image
         src={profile.avatar_url}
         alt={displayName}
+        width={32}
+        height={32}
         className='h-8 w-8 rounded-full object-cover bg-muted'
         onError={(e) => {
           e.currentTarget.style.display = 'none';
@@ -94,9 +108,12 @@ function Avatar({ profile }) {
 
 export function TeamMembersSettingsPage({ portalId }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [removingId, setRemovingId] = useState(null);
-  const [memberToRemove, setMemberToRemove] = useState(null);
-  const [inviteToRevoke, setInviteToRevoke] = useState(null);
+  const {
+    getActiveAccountId,
+    loading: accountLoading,
+    error: accountError,
+  } = useAccount();
+  const accountId = getActiveAccountId();
   const [revokingId, setRevokingId] = useState(null);
 
   const [currentUserRole, setCurrentUserRole] = useState(null);
@@ -110,24 +127,11 @@ export function TeamMembersSettingsPage({ portalId }) {
   const [members, setMembers] = useState([]);
   const [invites, setInvites] = useState([]);
   const [updatingId, setUpdatingId] = useState(null);
-
-  const [accountId, setAccountId] = useState(null);
-  const [accountError, setAccountError] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
+  const [memberToRemove, setMemberToRemove] = useState(null);
+  const [inviteToRevoke, setInviteToRevoke] = useState(null);
   const [showLimitsModal, setShowLimitsModal] = useState(false);
   const [accountLimits, setAccountLimits] = useState(null);
-
-  // Initialize account ID safely
-  useEffect(() => {
-    try {
-      const id = getActiveAccountId();
-      setAccountId(id);
-      setAccountError(null);
-    } catch (error) {
-      console.error('Account state not initialized:', error.message);
-      setAccountError(error.message);
-      setAccountId(null);
-    }
-  }, []);
 
   async function confirmRemove() {
     if (!memberToRemove) return;
@@ -249,7 +253,7 @@ export function TeamMembersSettingsPage({ portalId }) {
 
   // Load data when account ID is available
   useEffect(() => {
-    if (accountId && portalId) {
+    if (accountId && portalId && !accountLoading) {
       resolveCurrentUserRole();
       loadData();
       loadAccountLimits();
@@ -257,6 +261,7 @@ export function TeamMembersSettingsPage({ portalId }) {
   }, [
     accountId,
     portalId,
+    accountLoading,
     resolveCurrentUserRole,
     loadData,
     loadAccountLimits,
@@ -365,6 +370,21 @@ export function TeamMembersSettingsPage({ portalId }) {
   const isOwner = currentUserRole === 'owner';
 
   // Show loading state while account is being initialized
+  if (accountLoading) {
+    return (
+      <SettingsPage
+        title='Team members'
+        description='Manage workspace users and permissions.'
+      >
+        <div className='rounded-md border p-6 text-center'>
+          <p className='text-sm text-muted-foreground'>
+            Loading account information...
+          </p>
+        </div>
+      </SettingsPage>
+    );
+  }
+
   if (accountError) {
     return (
       <SettingsPage

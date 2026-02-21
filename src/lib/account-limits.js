@@ -36,6 +36,11 @@ export async function getCurrentPlan(accountId = null) {
     if (err instanceof AccountLimitError) {
       throw err
     }
+    // Handle "Account state not initialised" gracefully
+    if (err.message === 'Account state not initialised') {
+      console.warn('[account-limits] Account state not yet initialized, returning default plan')
+      return 'pilot' // Return default plan instead of throwing
+    }
     console.error('[account-limits] Unexpected error:', err)
     throw new AccountLimitError(
       'An unexpected error occurred while getting current plan',
@@ -186,6 +191,11 @@ export async function getAccountLimits(accountId = null) {
     if (err instanceof AccountLimitError) {
       throw err
     }
+    // Handle "Account state not initialised" gracefully
+    if (err.message === 'Account state not initialised') {
+      console.warn('[account-limits] Account state not yet initialized, returning empty limits')
+      return {} // Return empty limits instead of throwing
+    }
     console.error('[account-limits] Unexpected error:', err)
     throw new AccountLimitError(
       'An unexpected error occurred while getting account limits',
@@ -224,6 +234,11 @@ export async function getExecutionUsageHistory(accountId = null, months = 12) {
   } catch (err) {
     if (err instanceof AccountLimitError) {
       throw err
+    }
+    // Handle "Account state not initialised" gracefully
+    if (err.message === 'Account state not initialised') {
+      console.warn('[account-limits] Account state not yet initialized, returning empty history')
+      return [] // Return empty history instead of throwing
     }
     console.error('[account-limits] Unexpected error:', err)
     throw new AccountLimitError(

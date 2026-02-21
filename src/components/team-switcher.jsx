@@ -115,7 +115,8 @@ export function TeamSwitcher({ teams }) {
                   {activeTeam.name}
                 </div>
                 <div className='text-xs text-muted-foreground'>
-                  {plan} workspace
+                  {/* TODO: Show Portal ID? */}
+                  {/* {plan} workspace */}
                 </div>
               </div>
 
@@ -168,7 +169,8 @@ export function TeamSwitcher({ teams }) {
                         {team.name}
                       </div>
                       <div className='text-xs text-muted-foreground'>
-                        {team.plan || 'Free'}
+                        {/* TODO: Show Portal ID? */}
+                        {/* {team.plan || 'Free'} */}
                       </div>
                     </div>
 

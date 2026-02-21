@@ -19,6 +19,7 @@ import {
   getExecutionUsageHistory,
   getUpgradeUrl,
 } from '@/lib/account-limits';
+import { getActiveAccountId } from '@/lib/account-state';
 import { UsageChart } from '@/components/usage-chart';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -28,12 +29,29 @@ export function UsageSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [accountId, setAccountId] = useState(null);
+  const [accountError, setAccountError] = useState(null);
+
+  // Initialize account ID safely
+  useEffect(() => {
+    try {
+      const id = getActiveAccountId();
+      setAccountId(id);
+      setAccountError(null);
+    } catch (error) {
+      console.error('Account state not initialized:', error.message);
+      setAccountError(error.message);
+      setAccountId(null);
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchLimits() {
+      if (!accountId) return;
+
       try {
         setLoading(true);
-        const data = await getAccountLimits();
+        const data = await getAccountLimits(accountId);
         setLimits(data);
         setError(null);
       } catch (err) {
@@ -45,13 +63,15 @@ export function UsageSettingsPage() {
     }
 
     fetchLimits();
-  }, []);
+  }, [accountId]);
 
   useEffect(() => {
     async function fetchHistory() {
+      if (!accountId) return;
+
       try {
         setHistoryLoading(true);
-        const data = await getExecutionUsageHistory(null, 6); // Always get 6 months
+        const data = await getExecutionUsageHistory(accountId, 6); // Always get 6 months
         setExecutionHistory(data);
       } catch (err) {
         console.error(
@@ -65,13 +85,29 @@ export function UsageSettingsPage() {
     }
 
     fetchHistory();
-  }, []);
+  }, [accountId]);
 
   const handleUpgrade = () => {
     if (limits?.plan) {
       window.location.href = getUpgradeUrl(limits.plan);
     }
   };
+
+  if (accountError) {
+    return (
+      <Card>
+        <CardContent className='pt-6'>
+          <div className='flex items-center gap-3 text-destructive'>
+            <AlertCircle className='h-5 w-5' />
+            <div>
+              <p className='font-medium'>Account not available</p>
+              <p className='text-sm text-muted-foreground'>{accountError}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (loading) {
     return (

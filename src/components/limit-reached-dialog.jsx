@@ -7,6 +7,7 @@ import {
   ExternalLink,
   Briefcase,
   Users,
+  Play,
 } from 'lucide-react';
 
 import {
@@ -36,6 +37,8 @@ export function LimitReachedDialog({
         return Briefcase;
       case 'user':
         return Users;
+      case 'execution':
+        return Play;
       default:
         return AlertCircle;
     }
@@ -47,17 +50,21 @@ export function LimitReachedDialog({
         return 'Portals';
       case 'user':
         return 'Team Members';
+      case 'execution':
+        return 'Monthly Executions';
       default:
         return 'Resources';
     }
   };
 
   const getRemaining = () => {
-    return Math.max(0, max - current);
+    return Math.max(0, (max || 0) - (current || 0));
   };
 
   const getUsagePercent = () => {
-    return max > 0 ? (current / max) * 100 : 0;
+    const maxVal = max || 0;
+    const currentVal = current || 0;
+    return maxVal > 0 ? (currentVal / maxVal) * 100 : 0;
   };
 
   const isLimitReached = getRemaining() === 0;
@@ -68,6 +75,8 @@ export function LimitReachedDialog({
         return 'Unlock unlimited portals and advanced features to scale your business.';
       case 'user':
         return 'Add more team members and collaborate more effectively.';
+      case 'execution':
+        return 'Increase your monthly execution limit to run more actions and automate more workflows.';
       default:
         return 'Upgrade your plan to access more features and increase your limits.';
     }
@@ -78,6 +87,8 @@ export function LimitReachedDialog({
         return 'Portal Limit Reached';
       case 'user':
         return 'User Limit Reached';
+      case 'execution':
+        return 'Execution Limit Reached';
       default:
         return 'Limit Reached';
     }
@@ -89,6 +100,8 @@ export function LimitReachedDialog({
         return `You have created ${current} of ${max} portals available in your current plan.`;
       case 'user':
         return `You have added ${current} of ${max} users available in your current plan.`;
+      case 'execution':
+        return `You have used ${current} of ${max} executions available this month.`;
       default:
         return `You have reached the limit for ${type}.`;
     }
@@ -100,6 +113,8 @@ export function LimitReachedDialog({
         return 'Upgrade your plan to create more portals and unlock additional features for your team.';
       case 'user':
         return 'Upgrade your plan to add more team members and collaborate more effectively.';
+      case 'execution':
+        return 'Upgrade your plan to increase your monthly execution limit and automate more workflows.';
       default:
         return 'Upgrade your plan to increase your limits and access more features.';
     }
@@ -131,6 +146,8 @@ export function LimitReachedDialog({
         return <Briefcase {...props} />;
       case 'user':
         return <Users {...props} />;
+      case 'execution':
+        return <Play {...props} />;
       default:
         return <AlertCircle {...props} />;
     }
@@ -145,7 +162,13 @@ export function LimitReachedDialog({
         <DialogHeader>
           <DialogTitle className='flex items-center gap-2'>
             <AlertCircle className='size-5 text-orange-500' />
-            {type === 'portal' ? 'Portal Limit Reached' : 'User Limit Reached'}
+            {type === 'portal'
+              ? 'Portal Limit Reached'
+              : type === 'user'
+                ? 'User Limit Reached'
+                : type === 'execution'
+                  ? 'Execution Limit Reached'
+                  : 'Limit Reached'}
           </DialogTitle>
           <DialogDescription>
             You have reached the limit for {typeLabel.toLowerCase()} in your
@@ -162,13 +185,13 @@ export function LimitReachedDialog({
                 <span className='text-sm font-medium'>{typeLabel}</span>
               </div>
               <span className='text-sm text-muted-foreground'>
-                {current} / {max}
+                {current || 0} / {max || 0}
               </span>
             </div>
-            <Progress value={usagePercent} className='h-2' />
+            <Progress value={getUsagePercent()} className='h-2' />
             <div className='text-xs text-muted-foreground'>
-              {remaining} {typeLabel.toLowerCase()}
-              {remaining !== 1 ? 's' : ''} remaining
+              {getRemaining()} {typeLabel.toLowerCase()}
+              {getRemaining() !== 1 ? 's' : ''} remaining
             </div>
           </div>
 

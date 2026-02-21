@@ -25,6 +25,7 @@ import { resolvePortalIcon, resolvePortalColor } from '@/lib/portal-icons';
 import { isAbleToAddPortal, getAccountLimits } from '@/lib/account-limits';
 import { CreatePortalSheet } from './createPortalSheet';
 import { LimitReachedDialog } from './limit-reached-dialog';
+import { formatLimitNumber } from '@/lib/utils/number-formatting';
 
 export function TeamSwitcher({ teams }) {
   const { isMobile } = useSidebar();
@@ -50,18 +51,29 @@ export function TeamSwitcher({ teams }) {
         setOpenCreate(true);
       } else {
         // Get account limits to show current usage
-        const limits = await getAccountLimits();
-        setLimitInfo({
-          current: limits.actual_portals || 0,
-          max: limits.max_portals || 1,
-          plan: limits.plan || 'Free',
-        });
-        setShowLimitDialog(true);
+        try {
+          const limits = await getAccountLimits();
+          const maxPortals = formatLimitNumber(limits.max_portals);
+          setLimitInfo({
+            current: limits.actual_portals || 0,
+            max: maxPortals.value,
+            plan: limits.plan || 'Free',
+          });
+          setShowLimitDialog(true);
+        } catch (limitsError) {
+          console.error(
+            '[TeamSwitcher] Error getting account limits:',
+            limitsError,
+          );
+          // Set default values on error
+          setLimitInfo({ current: 0, max: 1, plan: 'Free' });
+          setShowLimitDialog(true);
+        }
       }
     } catch (error) {
       console.error('[TeamSwitcher] Error checking portal limits:', error);
       // Set default values on error
-      setLimitInfo({ current: 0, max: 1 });
+      setLimitInfo({ current: 0, max: 1, plan: 'Free' });
       setShowLimitDialog(true);
     } finally {
       setCheckingLimits(false);

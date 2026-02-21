@@ -5,16 +5,30 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+} from '@/components/ui/sheet';
 import { toast } from 'sonner';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { getActiveAccountId } from '@/lib/account-state';
-import { 
-  checkLimitsWithUpgradeInfo, 
+import {
+  checkLimitsWithUpgradeInfo,
   getLimitErrorMessage,
-  AccountLimitError 
+  AccountLimitError,
 } from '@/lib/account-limits';
+import { formatLimitNumber } from '@/lib/utils/number-formatting';
 
 const supabase = createSupabaseBrowserClient();
 
@@ -32,7 +46,7 @@ export function InviteUserSheet({ open, onOpenChange }) {
     try {
       // Check account limits before inviting user
       const limitCheck = await checkLimitsWithUpgradeInfo('user');
-      
+
       if (!limitCheck.canProceed) {
         if (limitCheck.error) {
           toast.error(limitCheck.error);
@@ -52,12 +66,17 @@ export function InviteUserSheet({ open, onOpenChange }) {
         .from('portal_invites')
         .select('id')
         .eq('email', email)
-        .eq('portal_uuid', (await supabase
-          .from('portals')
-          .select('uuid')
-          .eq('account_id', accountId)
-          .limit(1)
-          .single()).data?.uuid)
+        .eq(
+          'portal_uuid',
+          (
+            await supabase
+              .from('portals')
+              .select('uuid')
+              .eq('account_id', accountId)
+              .limit(1)
+              .single()
+          ).data?.uuid,
+        )
         .single();
 
       if (existingInvite) {
@@ -67,7 +86,9 @@ export function InviteUserSheet({ open, onOpenChange }) {
       }
 
       // Get current user for invited_by field
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         toast.error('You must be logged in to invite users');
         setLoading(false);
@@ -101,43 +122,45 @@ export function InviteUserSheet({ open, onOpenChange }) {
 
       if (inviteError) {
         console.error(inviteError);
-        
+
         // Handle limit exceeded errors from database triggers
         if (inviteError.message?.includes('User limit exceeded')) {
           const limits = await getAccountLimits(accountId);
-          toast.error(`User limit reached (${limits.max_users}). Upgrade your plan to add more users.`);
+          const maxUsers = formatLimitNumber(limits.max_users);
+          toast.error(
+            `User limit reached (<span title="${maxUsers.tooltip}">${maxUsers.value}</span>). Upgrade your plan to add more users.`,
+          );
         } else {
           toast.error('Failed to send invitation: ' + inviteError.message);
         }
-        
+
         setLoading(false);
         return;
       }
 
       toast.success(`Invitation sent to ${email}`);
-      
+
       // Reset form
       setEmail('');
       setFullName('');
       setRole('member');
       onOpenChange(false);
-
     } catch (error) {
       console.error('Error inviting user:', error);
-      
+
       if (error instanceof AccountLimitError) {
         toast.error(getLimitErrorMessage(error));
       } else {
         toast.error('Failed to invite user. Please try again.');
       }
-      
+
       setLoading(false);
     }
   }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[400px] sm:w-[540px]">
+      <SheetContent side='right' className='w-[400px] sm:w-[540px]'>
         <SheetHeader>
           <SheetTitle>Invite User</SheetTitle>
           <SheetDescription>
@@ -145,40 +168,40 @@ export function InviteUserSheet({ open, onOpenChange }) {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
+        <div className='space-y-4 py-4'>
+          <div className='space-y-2'>
+            <Label htmlFor='fullName'>Full Name</Label>
             <Input
-              id="fullName"
+              id='fullName'
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="John Doe"
+              placeholder='John Doe'
               disabled={loading}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='email'>Email</Label>
             <Input
-              id="email"
-              type="email"
+              id='email'
+              type='email'
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="john@example.com"
+              placeholder='john@example.com'
               disabled={loading}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
+          <div className='space-y-2'>
+            <Label htmlFor='role'>Role</Label>
             <Select value={role} onValueChange={setRole} disabled={loading}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
+                <SelectValue placeholder='Select a role' />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="owner">Owner</SelectItem>
+                <SelectItem value='member'>Member</SelectItem>
+                <SelectItem value='admin'>Admin</SelectItem>
+                <SelectItem value='owner'>Owner</SelectItem>
               </SelectContent>
             </Select>
           </div>

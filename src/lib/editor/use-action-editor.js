@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { getActivePortalId } from '../portal-state'
 import { useEffect, useRef } from 'react'
 import { subscribeExecutionRealtime } from './realtime-logs'
+import { isAbleToExecuteAction, getLimitErrorMessage } from '../account-limits'
 
 /* -----------------------------
    Helpers
@@ -337,6 +338,17 @@ export function useActionEditor({
           const { data: { user }, error: userErr } = await supabase.auth.getUser()
           if (userErr) throw userErr
           if (!user) throw new Error("Not signed in")
+
+          // Check execution limits before creating execution
+          const canExecute = await isAbleToExecuteAction()
+          if (!canExecute) {
+            const errorMessage = getLimitErrorMessage({
+              type: 'execution',
+              message: 'Monthly execution limit reached'
+            })
+            toast.error(errorMessage)
+            return
+          }
 
           const { data: exec, error: execErr } = await supabase
             .from('action_executions')

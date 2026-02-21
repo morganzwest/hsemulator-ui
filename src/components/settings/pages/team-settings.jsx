@@ -22,6 +22,7 @@ import {
   getAccountLimits,
 } from '@/lib/account-limits';
 import { AccountLimitsModal } from '@/components/account-limits-modal';
+import { formatLimitNumber } from '@/lib/utils/number-formatting';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -299,8 +300,9 @@ export function TeamMembersSettingsPage({ portalId }) {
         // Handle limit exceeded errors from database triggers
         if (error.message?.includes('User limit exceeded')) {
           const limits = await getAccountLimits(accountId);
+          const maxUsers = formatLimitNumber(limits.max_users);
           toast.error(
-            `User limit reached (${limits.max_users}). Upgrade your plan to add more users.`,
+            `User limit reached (<span title="${maxUsers.tooltip}">${maxUsers.value}</span>). Upgrade your plan to add more users.`,
           );
         } else {
           throw error;
@@ -424,28 +426,22 @@ export function TeamMembersSettingsPage({ portalId }) {
             </div>
 
             <div className='grid grid-cols-1 gap-4'>
-              {/* <div className='space-y-2'>
-                <div className='flex items-center justify-between'>
-                  <span className='text-xs font-medium'>Portals</span>
-                  <span className='text-xs text-muted-foreground'>
-                    {accountLimits.actual_portals}/{accountLimits.max_portals}
-                  </span>
-                </div>
-                <div className='h-1.5 w-full bg-muted rounded-full overflow-hidden'>
-                  <div
-                    className='h-full bg-primary rounded-full transition-all duration-300'
-                    style={{
-                      width: `${accountLimits.max_portals > 0 ? (accountLimits.actual_portals / accountLimits.max_portals) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-              </div> */}
-
               <div className='space-y-2'>
                 <div className='flex items-center justify-between'>
                   <span className='text-xs font-medium'>Team Members</span>
                   <span className='text-xs text-muted-foreground'>
-                    {accountLimits.actual_users}/{accountLimits.max_users}
+                    {accountLimits?.actual_users || 0}/
+                    <span
+                      title={
+                        accountLimits
+                          ? formatLimitNumber(accountLimits.max_users).tooltip
+                          : null
+                      }
+                    >
+                      {accountLimits
+                        ? formatLimitNumber(accountLimits.max_users).value
+                        : '0'}
+                    </span>
                   </span>
                 </div>
                 <div className='h-1.5 w-full bg-muted rounded-full overflow-hidden'>

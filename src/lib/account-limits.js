@@ -52,7 +52,7 @@ export class AccountLimitError extends Error {
   constructor(message, type, accountUsage = null) {
     super(message)
     this.name = 'AccountLimitError'
-    this.type = type // 'portal' | 'user'
+    this.type = type // 'portal' | 'user' | 'execution'
     this.accountUsage = accountUsage
   }
 }
@@ -67,7 +67,7 @@ export async function isAbleToAddPortal(accountId = null) {
     const targetAccountId = accountId || getActiveAccountId()
 
     const { data, error } = await getSupabaseClient()
-      .rpc('can_create_portal', { account_id: targetAccountId })
+      .rpc('can_create_portal', { p_account_id: targetAccountId })
 
     if (error) {
       console.error('[account-limits] Error checking portal limit:', error)
@@ -102,7 +102,7 @@ export async function isAbleToAddUser(accountId = null) {
     const targetAccountId = accountId || getActiveAccountId()
 
     const { data, error } = await getSupabaseClient()
-      .rpc('can_add_user', { account_id: targetAccountId })
+      .rpc('can_add_user', { p_account_id: targetAccountId })
 
     if (error) {
       console.error('[account-limits] Error checking user limit:', error)
@@ -128,6 +128,41 @@ export async function isAbleToAddUser(accountId = null) {
 }
 
 /**
+ * Check if account can execute more actions this month
+ * @param {string} accountId - Account UUID (optional, uses active account if not provided)
+ * @returns {Promise<boolean>} - True if execution is allowed
+ */
+export async function isAbleToExecuteAction(accountId = null) {
+  try {
+    const targetAccountId = accountId || getActiveAccountId()
+
+    const { data, error } = await getSupabaseClient()
+      .rpc('can_execute_action', { p_account_id: targetAccountId })
+
+    if (error) {
+      console.error('[account-limits] Error checking execution limit:', error)
+      throw new AccountLimitError(
+        'Failed to check execution limit',
+        'execution',
+        null
+      )
+    }
+
+    return data || false
+  } catch (err) {
+    if (err instanceof AccountLimitError) {
+      throw err
+    }
+    console.error('[account-limits] Unexpected error:', err)
+    throw new AccountLimitError(
+      'An unexpected error occurred while checking execution limits',
+      'execution',
+      null
+    )
+  }
+}
+
+/**
  * Get comprehensive account limits and usage
  * @param {string} accountId - Account UUID (optional, uses active account if not provided)
  * @returns {Promise<Object>} - Account limits and usage data
@@ -137,15 +172,13 @@ export async function getAccountLimits(accountId = null) {
     const targetAccountId = accountId || getActiveAccountId()
 
     const { data, error } = await getSupabaseClient()
-      .rpc('get_account_usage', { account_id: targetAccountId })
+      .rpc('get_account_usage_with_executions', { p_account_id: targetAccountId })
 
     if (error) {
       console.error('[account-limits] Error getting account usage:', error)
-      throw new AccountLimitError(
-        'Failed to get account limits',
-        'general',
-        null
-      )
+      // Don't throw AccountLimitError for general database errors
+      // Only throw AccountLimitError for actual limit exceeded scenarios
+      throw new Error(error.message || 'Failed to get account limits')
     }
 
     return data || {}
@@ -163,8 +196,47 @@ export async function getAccountLimits(accountId = null) {
 }
 
 /**
+ * Get execution usage history for an account
+ * @param {string} accountId - Account UUID (optional, uses active account if not provided)
+ * @param {number} months - Number of months to fetch (default: 12)
+ * @returns {Promise<Array>} - Array of monthly usage data
+ */
+export async function getExecutionUsageHistory(accountId = null, months = 12) {
+  try {
+    const targetAccountId = accountId || getActiveAccountId()
+
+    const { data, error } = await getSupabaseClient()
+      .rpc('get_execution_usage_history', {
+        p_account_id: targetAccountId,
+        months: months
+      })
+
+    if (error) {
+      console.error('[account-limits] Error getting execution history:', error)
+      throw new AccountLimitError(
+        'Failed to get execution history',
+        'execution',
+        null
+      )
+    }
+
+    return data || []
+  } catch (err) {
+    if (err instanceof AccountLimitError) {
+      throw err
+    }
+    console.error('[account-limits] Unexpected error:', err)
+    throw new AccountLimitError(
+      'An unexpected error occurred while getting execution history',
+      'execution',
+      null
+    )
+  }
+}
+
+/**
  * Unified limit checker for any operation type
- * @param {string} operationType - 'portal' | 'user'
+ * @param {string} operationType - 'portal' | 'user' | 'execution'
  * @param {string} accountId - Account UUID (optional, uses active account if not provided)
  * @returns {Promise<boolean>} - True if operation is allowed
  */
@@ -174,6 +246,8 @@ export async function checkLimitsBeforeOperation(operationType, accountId = null
       return await isAbleToAddPortal(accountId)
     case 'user':
       return await isAbleToAddUser(accountId)
+    case 'execution':
+      return await isAbleToExecuteAction(accountId)
     default:
       throw new AccountLimitError(
         `Unknown operation type: ${operationType}`,
@@ -204,6 +278,11 @@ export function getLimitErrorMessage(error) {
   if (type === 'user') {
     const maxUsers = usage?.max_users || 'your plan limit'
     return `You've reached your user limit (${maxUsers}). Upgrade your plan to add more users.`
+  }
+
+  if (type === 'execution') {
+    const maxExecutions = usage?.max_executions || 'your plan limit'
+    return `You've reached your monthly execution limit (${maxExecutions}). Upgrade your plan for more executions.`
   }
 
   return error.message
@@ -319,14 +398,17 @@ export async function checkLimitsWithUpgradeInfo(operationType, accountId = null
 // Export types for TypeScript users
 export const AccountLimitTypes = {
   PORTAL: 'portal',
-  USER: 'user'
+  USER: 'user',
+  EXECUTION: 'execution'
 }
 
 const accountLimits = {
   getCurrentPlan,
   isAbleToAddPortal,
   isAbleToAddUser,
+  isAbleToExecuteAction,
   getAccountLimits,
+  getExecutionUsageHistory,
   checkLimitsBeforeOperation,
   checkLimitsWithUpgradeInfo,
   getLimitErrorMessage,

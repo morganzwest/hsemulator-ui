@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { SettingsPage } from '../settings-page';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import * as React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { toast } from 'sonner';
-import { getActiveAccountId } from '~/lib/account-state';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AlertCircle, ArrowUp, Briefcase, Users, Play } from 'lucide-react';
+import { getActiveAccountId } from '@/lib/account-state';
 import {
   checkLimitsWithUpgradeInfo,
   getLimitErrorMessage,

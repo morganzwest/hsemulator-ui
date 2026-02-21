@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 import { getActivePortal, setActivePortal } from '@/lib/portal-state';
+import { getActiveAccountId } from '@/lib/account-state';
 import { resolvePortalIcon, resolvePortalColor } from '@/lib/portal-icons';
 import { isAbleToAddPortal, getAccountLimits } from '@/lib/account-limits';
 import { CreatePortalSheet } from './createPortalSheet';
@@ -34,6 +35,21 @@ export function TeamSwitcher({ teams }) {
   const [showLimitDialog, setShowLimitDialog] = React.useState(false);
   const [checkingLimits, setCheckingLimits] = React.useState(false);
   const [limitInfo, setLimitInfo] = React.useState({ current: 0, max: 0 });
+  const [accountReady, setAccountReady] = React.useState(false);
+
+  // Check if account state is ready
+  React.useEffect(() => {
+    try {
+      getActiveAccountId();
+      setAccountReady(true);
+    } catch (error) {
+      console.warn(
+        '[TeamSwitcher] Account state not yet initialized:',
+        error.message,
+      );
+      setAccountReady(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     try {
@@ -42,6 +58,13 @@ export function TeamSwitcher({ teams }) {
   }, [teams]);
 
   const handleAddPortalClick = async () => {
+    if (!accountReady) {
+      console.warn(
+        '[TeamSwitcher] Account state not ready, skipping portal limit check',
+      );
+      return;
+    }
+
     setCheckingLimits(true);
 
     try {

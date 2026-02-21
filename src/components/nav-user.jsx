@@ -31,6 +31,7 @@ import {
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { getCurrentPlan } from '@/lib/account-limits';
+import { getActiveAccountId } from '@/lib/account-state';
 import { AccountSwitcher } from '@/components/account-switcher';
 import { Activity } from 'react';
 import * as React from 'react';
@@ -47,9 +48,31 @@ export function NavUser({ user }) {
   const supabase = createSupabaseBrowserClient();
   const [currentPlan, setCurrentPlan] = React.useState('pilot');
   const [loadingPlan, setLoadingPlan] = React.useState(true);
+  const [accountReady, setAccountReady] = React.useState(false);
+
+  // Check if account state is ready
+  React.useEffect(() => {
+    try {
+      getActiveAccountId();
+      setAccountReady(true);
+    } catch (error) {
+      console.warn(
+        '[NavUser] Account state not yet initialized:',
+        error.message,
+      );
+      setAccountReady(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     async function loadPlan() {
+      if (!accountReady) {
+        console.warn(
+          '[NavUser] Account state not ready, skipping plan loading',
+        );
+        return;
+      }
+
       try {
         const plan = await getCurrentPlan();
         setCurrentPlan(plan);
@@ -62,7 +85,7 @@ export function NavUser({ user }) {
     }
 
     loadPlan();
-  }, []);
+  }, [accountReady]);
 
   const getPlanDisplayInfo = (plan) => {
     switch (plan) {

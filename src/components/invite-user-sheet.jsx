@@ -27,6 +27,7 @@ import {
   checkLimitsWithUpgradeInfo,
   getLimitErrorMessage,
   AccountLimitError,
+  getAccountLimits,
 } from '@/lib/account-limits';
 import { formatLimitNumber } from '@/lib/utils/number-formatting';
 
@@ -58,57 +59,25 @@ export function InviteUserSheet({ open, onOpenChange }) {
         setLoading(false);
         return;
       }
-
-      const accountId = getActiveAccountId();
-
-      // Check if user is already invited or member
-      const { data: existingInvite } = await supabase
-        .from('portal_invites')
-        .select('id')
-        .eq('email', email)
-        .eq(
-          'portal_uuid',
-          (
-            await supabase
-              .from('portals')
-              .select('uuid')
-              .eq('account_id', accountId)
-              .limit(1)
-              .single()
-          ).data?.uuid,
-        )
-        .single();
-
-      if (existingInvite) {
-        toast.error('User already invited to this portal');
-        setLoading(false);
-        return;
-      }
-
       // Get current user for invited_by field
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: user } = await supabase.auth.getUser();
       if (!user) {
         toast.error('You must be logged in to invite users');
         setLoading(false);
         return;
       }
-
-      // Get the portal UUID for the account
+      // Get the portal UUID for account_id
       const { data: portal } = await supabase
         .from('portals')
         .select('uuid')
-        .eq('account_id', accountId)
+        .eq('account_id', user.user.id)
         .limit(1)
         .single();
-
       if (!portal) {
         toast.error('No portal found for this account');
         setLoading(false);
         return;
       }
-
       // Create the invitation
       const { error: inviteError } = await supabase
         .from('portal_invites')
@@ -116,16 +85,15 @@ export function InviteUserSheet({ open, onOpenChange }) {
           portal_uuid: portal.uuid,
           email: email.toLowerCase().trim(),
           role,
-          invited_by: user.id,
           full_name: fullName.trim(),
-        });
-
+          invited_by: user.id,
+        })
+        .select();
       if (inviteError) {
         console.error(inviteError);
-
         // Handle limit exceeded errors from database triggers
         if (inviteError.message?.includes('User limit exceeded')) {
-          const limits = await getAccountLimits(accountId);
+          const limits = await getAccountLimits(user.user.id);
           const maxUsers = formatLimitNumber(limits.max_users);
           toast.error(
             `User limit reached (<span title="${maxUsers.tooltip}">${maxUsers.value}</span>). Upgrade your plan to add more users.`,
@@ -133,27 +101,22 @@ export function InviteUserSheet({ open, onOpenChange }) {
         } else {
           toast.error('Failed to send invitation: ' + inviteError.message);
         }
-
-        setLoading(false);
-        return;
+      } else {
+        toast.success(`Invitation sent to ${email}`);
+        // Reset form
+        setEmail('');
+        setFullName('');
+        setRole('member');
+        onOpenChange(false);
       }
-
-      toast.success(`Invitation sent to ${email}`);
-
-      // Reset form
-      setEmail('');
-      setFullName('');
-      setRole('member');
-      onOpenChange(false);
+      setLoading(false);
     } catch (error) {
       console.error('Error inviting user:', error);
-
       if (error instanceof AccountLimitError) {
         toast.error(getLimitErrorMessage(error));
       } else {
         toast.error('Failed to invite user. Please try again.');
       }
-
       setLoading(false);
     }
   }

@@ -12,9 +12,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 import {
@@ -25,18 +29,21 @@ import {
 } from '@/lib/portal-icons';
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, AlertCircle, ExternalLink } from 'lucide-react';
 import {
   setActivePortal,
   getAvailablePortals,
   addAvailablePortal,
 } from '~/lib/portal-state';
-import { getActiveAccountId, getAvailableAccounts } from '~/lib/account-state';
+import { getActiveAccountId } from '~/lib/account-state';
+import {
+  checkLimitsWithUpgradeInfo,
+  navigateToPricing,
+} from '@/lib/account-limits';
 
 const supabase = createSupabaseBrowserClient();
 
 export function CreatePortalSheet({ open, onOpenChange }) {
-  const [type, setType] = React.useState('workspace');
   const [name, setName] = React.useState('');
   const [portalId, setPortalId] = React.useState('');
   const [icon, setIcon] = React.useState('briefcase');
@@ -52,25 +59,59 @@ export function CreatePortalSheet({ open, onOpenChange }) {
   });
   const [accountReady, setAccountReady] = React.useState(false);
   const [planLoading, setPlanLoading] = React.useState(false);
-
-  // Cache plan changes to localStorage
-  React.useEffect(() => {
-    console.log('[CreatePortalSheet] Plan state changed to:', plan);
-    if (typeof window !== 'undefined' && plan !== 'Free') {
-      localStorage.setItem('user_plan', plan);
-    }
-  }, [plan]);
-
-  // Force re-render when plan changes by updating a key
-  const sheetKey = React.useMemo(() => `portal-sheet-${plan}`, [plan]);
+  const [portalLimitCheck, setPortalLimitCheck] = React.useState({
+    canProceed: true,
+    loading: true,
+    error: null,
+    upgradeUrl: null,
+  });
 
   // Memoize color and other values
   const c = React.useMemo(() => resolvePortalColor(color), [color]);
   const isPremiumColor = Boolean(c?.premium);
   const isPro = plan.toLowerCase() === 'pro';
 
-  // single gate
+  // Check if user can proceed (both plan limits and color limits)
   const allowedToProgress = !isPremiumColor || isPro;
+  const canCreatePortal =
+    allowedToProgress &&
+    portalLimitCheck.canProceed &&
+    accountReady &&
+    !portalLimitCheck.loading;
+
+  // Check portal limits when sheet opens or account changes
+  React.useEffect(() => {
+    async function checkPortalLimits() {
+      if (!accountReady) return;
+
+      setPortalLimitCheck((prev) => ({ ...prev, loading: true }));
+
+      try {
+        const result = await checkLimitsWithUpgradeInfo('portal');
+        setPortalLimitCheck({
+          canProceed: result.canProceed,
+          loading: false,
+          error: result.error,
+          upgradeUrl: result.upgradeUrl,
+        });
+      } catch (error) {
+        console.error(
+          '[CreatePortalSheet] Error checking portal limits:',
+          error,
+        );
+        setPortalLimitCheck({
+          canProceed: false,
+          loading: false,
+          error: 'Failed to check portal limits',
+          upgradeUrl: '/pricing',
+        });
+      }
+    }
+
+    if (open) {
+      checkPortalLimits();
+    }
+  }, [open, accountReady]);
 
   /* ---------------------------------
      Check account state on mount
@@ -231,7 +272,13 @@ export function CreatePortalSheet({ open, onOpenChange }) {
   }, []); // Run once on mount
 
   async function handleCreate() {
-    if (!name || !allowedToProgress || !accountReady) return;
+    if (
+      !name ||
+      !allowedToProgress ||
+      !accountReady ||
+      !portalLimitCheck.canProceed
+    )
+      return;
 
     setLoading(true);
 
@@ -280,8 +327,8 @@ export function CreatePortalSheet({ open, onOpenChange }) {
       .from('portals')
       .insert({
         name,
-        type,
-        id: type === 'portal' ? Number(portalId) : null,
+        type: 'portal',
+        id: Number(portalId) || null,
         icon,
         color,
         account_id: accountId,
@@ -324,7 +371,7 @@ export function CreatePortalSheet({ open, onOpenChange }) {
         <SheetHeader className='border-b'>
           <SheetTitle>Create portal</SheetTitle>
           <SheetDescription>
-            Create a workspace or link an external portal.
+            Create a new HubSpot portal for your account.
           </SheetDescription>
         </SheetHeader>
 
@@ -334,42 +381,10 @@ export function CreatePortalSheet({ open, onOpenChange }) {
             {/* Identity */}
             <Card className='p-4'>
               <div className='space-y-4'>
-                {/* Type */}
-                <div className='space-y-2'>
-                  <Label className='text-xs text-muted-foreground'>
-                    Workspace type
-                  </Label>
-
-                  <RadioGroup
-                    value={type}
-                    onValueChange={setType}
-                    className='grid grid-cols-2 gap-2'
-                  >
-                    {[
-                      { id: 'workspace', label: 'Workspace' },
-                      { id: 'portal', label: 'HubSpot portal' },
-                    ].map((opt) => (
-                      <label
-                        key={opt.id}
-                        className={cn(
-                          'flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition',
-                          'focus-within:ring-1 focus-within:ring-primary',
-                          type === opt.id
-                            ? 'border-primary bg-primary/5'
-                            : 'hover:bg-muted',
-                        )}
-                      >
-                        <RadioGroupItem value={opt.id} />
-                        <span className='font-medium'>{opt.label}</span>
-                      </label>
-                    ))}
-                  </RadioGroup>
-                </div>
-
                 {/* Identity */}
                 <div className='space-y-3'>
                   <div className='space-y-1.5'>
-                    <Label>Name</Label>
+                    <Label>Portal Name</Label>
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -377,26 +392,21 @@ export function CreatePortalSheet({ open, onOpenChange }) {
                     />
                   </div>
 
-                  {type === 'portal' && (
-                    <div className='space-y-1.5'>
-                      <Label>HubSpot Portal ID</Label>
-                      <Input
-                        value={portalId}
-                        onChange={(e) => {
-                          // Strip all non-numeric characters
-                          const numericOnly = e.target.value.replace(
-                            /\D+/g,
-                            '',
-                          );
-                          setPortalId(numericOnly);
-                        }}
-                        inputMode='numeric'
-                        maxLength={11}
-                        pattern='[0-9]*'
-                        placeholder='1234567890'
-                      />
-                    </div>
-                  )}
+                  <div className='space-y-1.5'>
+                    <Label>HubSpot Portal ID (Optional)</Label>
+                    <Input
+                      value={portalId}
+                      onChange={(e) => {
+                        // Strip all non-numeric characters
+                        const numericOnly = e.target.value.replace(/\D+/g, '');
+                        setPortalId(numericOnly);
+                      }}
+                      inputMode='numeric'
+                      maxLength={11}
+                      pattern='[0-9]*'
+                      placeholder='1234567890'
+                    />
+                  </div>
                 </div>
               </div>
             </Card>
@@ -479,7 +489,7 @@ export function CreatePortalSheet({ open, onOpenChange }) {
                         {plan}
                       </span>
                       <span>~</span>
-                      <span>{type === 'portal' ? 'Portal' : 'Workspace'}</span>
+                      <span>Portal</span>
                     </div>
 
                     {isPremiumColor && !allowedToProgress && (
@@ -533,16 +543,73 @@ export function CreatePortalSheet({ open, onOpenChange }) {
 
         {/* Footer */}
         <SheetFooter className='border-t px-6 py-4'>
-          <Button
-            onClick={handleCreate}
-            disabled={loading || !name || !allowedToProgress || !accountReady}
-          >
-            {!allowedToProgress
-              ? 'Upgrade to use this color'
-              : !accountReady
-                ? 'Loading account...'
-                : 'Create portal'}
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                onClick={handleCreate}
+                disabled={
+                  loading ||
+                  !name ||
+                  !allowedToProgress ||
+                  !accountReady ||
+                  portalLimitCheck.loading ||
+                  !portalLimitCheck.canProceed
+                }
+              >
+                {loading
+                  ? 'Creating...'
+                  : !allowedToProgress
+                    ? 'Upgrade to use this color'
+                    : !accountReady
+                      ? 'Loading account...'
+                      : portalLimitCheck.loading
+                        ? 'Checking limits...'
+                        : !portalLimitCheck.canProceed
+                          ? 'Portal limit reached'
+                          : 'Create portal'}
+              </Button>
+            </PopoverTrigger>
+
+            {!portalLimitCheck.canProceed &&
+              !portalLimitCheck.loading &&
+              portalLimitCheck.error && (
+                <PopoverContent className='w-80' align='end'>
+                  <div className='space-y-3'>
+                    <div className='flex items-center gap-2 text-sm font-medium text-orange-600'>
+                      <AlertCircle className='size-4' />
+                      Portal Limit Reached
+                    </div>
+
+                    <p className='text-sm text-muted-foreground'>
+                      {portalLimitCheck.error}
+                    </p>
+
+                    {portalLimitCheck.upgradeUrl && (
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        className='w-full'
+                        onClick={() =>
+                          navigateToPricing(
+                            {
+                              source: 'portal_limit',
+                              currentPlan: plan.toLowerCase(),
+                              operation: 'portal',
+                              feature: 'create_portal',
+                              location: 'create_portal_sheet',
+                            },
+                            supabase,
+                          )
+                        }
+                      >
+                        <ExternalLink className='size-4 mr-2' />
+                        Upgrade Plan
+                      </Button>
+                    )}
+                  </div>
+                </PopoverContent>
+              )}
+          </Popover>
         </SheetFooter>
       </SheetContent>
     </Sheet>

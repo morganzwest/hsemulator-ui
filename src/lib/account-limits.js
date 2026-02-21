@@ -187,6 +187,67 @@ export function getUpgradeUrl(currentPlan) {
 }
 
 /**
+ * Create pricing referral URL with tracking parameters
+ * @param {Object} options - URL options
+ * @param {string} options.source - Source of referral (e.g., 'portal_limit', 'user_limit')
+ * @param {string} options.userId - User ID for tracking
+ * @param {string} options.currentPlan - Current plan ('free' | 'pro')
+ * @param {string} options.operation - Operation type ('portal' | 'user')
+ * @param {string} options.feature - Specific feature triggering upgrade
+ * @param {string} options.location - UI location where upgrade was triggered
+ * @returns {string} - Complete pricing URL with tracking parameters
+ */
+export function createPricingReferral(options = {}) {
+  const {
+    source,
+    userId,
+    currentPlan,
+    operation,
+    feature,
+    location,
+  } = options
+
+  const baseUrl = getUpgradeUrl(currentPlan || 'free')
+  const url = new URL(baseUrl, window.location.origin)
+
+  // Add tracking parameters
+  if (source) url.searchParams.set('source', source)
+  if (userId) url.searchParams.set('userId', userId)
+  if (operation) url.searchParams.set('operation', operation)
+  if (feature) url.searchParams.set('feature', feature)
+  if (location) url.searchParams.set('location', location)
+
+  // Add timestamp for tracking
+  url.searchParams.set('timestamp', Date.now().toString())
+
+  return url.toString()
+}
+
+/**
+ * Navigate to pricing page with proper tracking
+ * @param {Object} options - Same options as createPricingReferral
+ * @param {Object} supabaseClient - Supabase client instance
+ */
+export async function navigateToPricing(options = {}, supabaseClient = null) {
+  try {
+    let userId = options.userId
+
+    // Get user ID if not provided
+    if (!userId && supabaseClient) {
+      const { data } = await supabaseClient.auth.getUser()
+      userId = data.user?.id
+    }
+
+    const url = createPricingReferral({ ...options, userId })
+    window.location.href = url
+  } catch (error) {
+    console.error('[account-limits] Error navigating to pricing:', error)
+    // Fallback to basic pricing page
+    window.location.href = '/pricing'
+  }
+}
+
+/**
  * Check limits and provide complete response with upgrade info
  * @param {string} operationType - 'portal' | 'user'
  * @param {string} accountId - Account UUID (optional)
@@ -231,6 +292,8 @@ const accountLimits = {
   checkLimitsWithUpgradeInfo,
   getLimitErrorMessage,
   getUpgradeUrl,
+  createPricingReferral,
+  navigateToPricing,
   AccountLimitError,
   AccountLimitTypes
 }

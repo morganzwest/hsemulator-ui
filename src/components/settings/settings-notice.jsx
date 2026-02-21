@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
  * @param {string} props.description - Notice description
  * @param {'info'|'warning'|'error'|'success'} props.variant - Visual variant (default: 'info')
  * @param {React.ReactNode} props.icon - Custom icon (overrides variant icon)
+ * @param {React.ReactNode} props.action - Action button or element to display
  * @param {string} props.className - Additional CSS classes
  * @param {boolean} props.centered - Whether to center the content (default: false)
  */
@@ -20,6 +21,7 @@ export function SettingsNotice({
   description,
   variant = 'info',
   icon: customIcon,
+  action,
   className,
   centered = false,
   ...props
@@ -74,8 +76,14 @@ export function SettingsNotice({
     <div className='space-y-1'>
       <p className={cn('text-sm font-medium', styles.title)}>{title}</p>
       {description && (
-        <p className={cn('text-xs', styles.description)}>{description}</p>
+        <p
+          className={cn('text-xs', styles.description)}
+          style={{ whiteSpace: 'pre-wrap' }}
+        >
+          {description}
+        </p>
       )}
+      {/* {action && <div className='mt-2'>{action}</div>} */}
     </div>
   );
 
@@ -93,6 +101,14 @@ export function SettingsNotice({
         <div className='flex items-center justify-center gap-2 mb-2'>
           <div className={cn('h-2 w-2 rounded-full', styles.dot)} />
           <h3 className={cn('text-sm font-semibold', styles.title)}>{title}</h3>
+        </div>
+      ) : action ? (
+        <div className='flex items-start justify-between gap-2'>
+          <div className='flex items-start gap-2 flex-1'>
+            <IconComponent className='h-4 w-4 mt-0.5 shrink-0' />
+            {content}
+          </div>
+          <div className='shrink-0'>{action}</div>
         </div>
       ) : (
         <div className='flex items-start gap-2'>

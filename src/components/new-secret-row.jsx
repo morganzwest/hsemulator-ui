@@ -11,9 +11,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Eye, EyeOff, Plus } from 'lucide-react';
-import { createSecret } from '~/lib/settings/secrets';
+import { Eye, EyeOff, Plus, AlertCircle, HelpCircle } from 'lucide-react';
+import { createSecret, CICD_ERROR_TYPES } from '~/lib/settings/secrets';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import {
+  ErrorNotice,
+  WarningNotice,
+} from '@/components/settings/settings-notice';
 
 const MAX_DESC_LENGTH = 128;
 
@@ -24,12 +29,26 @@ export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
   const [scope, setScope] = useState('portal');
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [showGuidance, setShowGuidance] = useState(false);
 
   // Check if a CICD secret already exists
   const hasCicdSecret = secrets.some((secret) => secret.scope === 'cicd');
 
+  // Validate key input - only allow letters and underscores
+  const handleKeyChange = (e) => {
+    const value = e.target.value.toUpperCase();
+    // Only allow letters (A-Z) and underscores
+    const sanitized = value.replace(/[^A-Z_]/g, '');
+    setName(sanitized);
+  };
+
   async function save() {
     if (saving) return;
+
+    // Clear previous errors
+    setError(null);
+    setShowGuidance(false);
 
     const key = name.trim().toUpperCase();
     const val = value.trim();
@@ -41,7 +60,7 @@ export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
 
     // Prevent creating CICD secret if one already exists
     if (scope === 'cicd' && hasCicdSecret) {
-      alert('Only one CICD secret is allowed per portal');
+      toast.error('Only one CICD secret is allowed per portal');
       return;
     }
 
@@ -68,9 +87,28 @@ export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
       setValue('');
       setDescription('');
       setVisible(false);
+
+      // Show success toast
+      toast.success('Secret created successfully');
     } catch (error) {
       console.error('[NewSecretRow] Error creating secret:', error);
-      alert(`Failed to create secret: ${error.message}`);
+
+      // Set error state for inline display and show guidance immediately
+      setError(error);
+      setShowGuidance(true);
+
+      // Show appropriate toast notification based on error type
+      if (error.type === CICD_ERROR_TYPES.INVALID_SECRET) {
+        toast.error(error.message, {
+          description: 'See below for detailed guidance',
+        });
+      } else if (error.type === CICD_ERROR_TYPES.MISSING_SCOPE) {
+        toast.error(error.message, {
+          description: 'Contact your administrator for help',
+        });
+      } else {
+        toast.error(error.message || 'Failed to create secret');
+      }
     } finally {
       setSaving(false);
     }
@@ -95,7 +133,7 @@ export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
           placeholder='KEY_NAME'
           value={name}
           disabled={saving}
-          onChange={(e) => setName(e.target.value.toUpperCase())}
+          onChange={handleKeyChange}
           className='font-mono'
         />
 
@@ -125,6 +163,53 @@ export function NewSecretRow({ portalId, onCreated, secrets = [] }) {
           <Plus className='h-4 w-4' />
         </Button>
       </div>
+
+      {/* Inline Error Notices */}
+      {error &&
+        scope === 'cicd' &&
+        (error.type === CICD_ERROR_TYPES.MISSING_SCOPE ? (
+          <WarningNotice
+            title={error.message}
+            description={error.guidance}
+            action={
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => {
+                  // Open help guide - you can customize this URL
+                  window.open(
+                    'https://developers.hubspot.com/docs/apps/legacy-apps/private-apps/overview',
+                    '_blank',
+                  );
+                }}
+                className='text-xs'
+              >
+                Help Guide
+              </Button>
+            }
+          />
+        ) : (
+          <ErrorNotice
+            title={error.message}
+            description={error.guidance}
+            action={
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => {
+                  // Open help guide - you can customize this URL
+                  window.open(
+                    'https://developers.hubspot.com/docs/apps/legacy-apps/private-apps/overview',
+                    '_blank',
+                  );
+                }}
+                className='text-xs'
+              >
+                Help Guide
+              </Button>
+            }
+          />
+        ))}
 
       {/* TODO: Add Description input to DB and API route */}
       {/* Description */}

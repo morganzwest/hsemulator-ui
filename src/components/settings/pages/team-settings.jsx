@@ -16,6 +16,13 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { toast } from 'sonner';
 import { getActiveAccountId } from '~/lib/account-state';
 import {
+  checkLimitsWithUpgradeInfo,
+  getLimitErrorMessage,
+  AccountLimitError,
+  getAccountLimits,
+} from '@/lib/account-limits';
+import { AccountLimitsModal } from '@/components/account-limits-modal';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -106,6 +113,8 @@ export function TeamMembersSettingsPage({ portalId }) {
 
   const [accountId, setAccountId] = useState(null);
   const [accountError, setAccountError] = useState(null);
+  const [showLimitsModal, setShowLimitsModal] = useState(false);
+  const [accountLimits, setAccountLimits] = useState(null);
 
   // Initialize account ID safely
   useEffect(() => {
@@ -227,13 +236,31 @@ export function TeamMembersSettingsPage({ portalId }) {
     setInvites(invitesData ?? []);
   }, [portalId, supabase]);
 
+  const loadAccountLimits = useCallback(async () => {
+    if (!accountId) return;
+
+    try {
+      const limits = await getAccountLimits(accountId);
+      setAccountLimits(limits);
+    } catch (error) {
+      console.error('Error loading account limits:', error);
+    }
+  }, [accountId]);
+
   // Load data when account ID is available
   useEffect(() => {
     if (accountId && portalId) {
       resolveCurrentUserRole();
       loadData();
+      loadAccountLimits();
     }
-  }, [accountId, portalId, resolveCurrentUserRole, loadData]);
+  }, [
+    accountId,
+    portalId,
+    resolveCurrentUserRole,
+    loadData,
+    loadAccountLimits,
+  ]);
 
   async function handleInvite() {
     if (!email || !portalId) return;
@@ -241,6 +268,21 @@ export function TeamMembersSettingsPage({ portalId }) {
     setLoading(true);
 
     try {
+      // Check account limits before inviting user
+      const limitCheck = await checkLimitsWithUpgradeInfo('user');
+
+      if (!limitCheck.canProceed) {
+        if (limitCheck.error) {
+          toast.error(limitCheck.error);
+        }
+        if (limitCheck.upgradeUrl) {
+          // Show limits modal instead of redirecting
+          setShowLimitsModal(true);
+        }
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.functions.invoke(
         'invite-portal-member',
         {
@@ -253,7 +295,17 @@ export function TeamMembersSettingsPage({ portalId }) {
         },
       );
 
-      if (error) throw error;
+      if (error) {
+        // Handle limit exceeded errors from database triggers
+        if (error.message?.includes('User limit exceeded')) {
+          const limits = await getAccountLimits(accountId);
+          toast.error(
+            `User limit reached (${limits.max_users}). Upgrade your plan to add more users.`,
+          );
+        } else {
+          throw error;
+        }
+      }
 
       setFullName('');
       setEmail('');
@@ -262,7 +314,13 @@ export function TeamMembersSettingsPage({ portalId }) {
       await loadData();
       toast.success('Invite sent');
     } catch (err) {
-      toast.error(err.message ?? 'Invite failed');
+      console.error('Error inviting user:', err);
+
+      if (err instanceof AccountLimitError) {
+        toast.error(getLimitErrorMessage(err));
+      } else {
+        toast.error(err.message ?? 'Invite failed');
+      }
     }
 
     setLoading(false);
@@ -346,14 +404,85 @@ export function TeamMembersSettingsPage({ portalId }) {
       description='Manage workspace users and permissions.'
     >
       <>
+        {/* Account Limits Section */}
+        {accountLimits && (
+          <section className='space-y-4 rounded-lg border p-4 md:p-6'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <h3 className='text-sm font-semibold'>Account Limits</h3>
+                <p className='text-xs text-muted-foreground'>
+                  Current usage for your {accountLimits.plan} plan
+                </p>
+              </div>
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => setShowLimitsModal(true)}
+              >
+                View Details
+              </Button>
+            </div>
+
+            <div className='grid grid-cols-1 gap-4'>
+              {/* <div className='space-y-2'>
+                <div className='flex items-center justify-between'>
+                  <span className='text-xs font-medium'>Portals</span>
+                  <span className='text-xs text-muted-foreground'>
+                    {accountLimits.actual_portals}/{accountLimits.max_portals}
+                  </span>
+                </div>
+                <div className='h-1.5 w-full bg-muted rounded-full overflow-hidden'>
+                  <div
+                    className='h-full bg-primary rounded-full transition-all duration-300'
+                    style={{
+                      width: `${accountLimits.max_portals > 0 ? (accountLimits.actual_portals / accountLimits.max_portals) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </div> */}
+
+              <div className='space-y-2'>
+                <div className='flex items-center justify-between'>
+                  <span className='text-xs font-medium'>Team Members</span>
+                  <span className='text-xs text-muted-foreground'>
+                    {accountLimits.actual_users}/{accountLimits.max_users}
+                  </span>
+                </div>
+                <div className='h-1.5 w-full bg-muted rounded-full overflow-hidden'>
+                  <div
+                    className='h-full bg-primary rounded-full transition-all duration-300'
+                    style={{
+                      width: `${accountLimits.max_users > 0 ? (accountLimits.actual_users / accountLimits.max_users) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className='space-y-6 rounded-lg border p-4 md:p-6'>
-          {/* Invite Bar */}
+          {/* Coming Soon Notice */}
+          <div className='rounded-md border border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/50 p-4 text-center'>
+            <div className='flex items-center justify-center gap-2 mb-2'>
+              <div className='h-2 w-2 rounded-full bg-slate-600 dark:bg-slate-400' />
+              <h3 className='text-sm font-semibold text-slate-800 dark:text-slate-200'>
+                Team Members coming soon
+              </h3>
+            </div>
+            <p className='text-xs text-slate-700 dark:text-slate-300'>
+              We&apos;re working on bringing team collaboration features to your
+              workspace. Stay tuned!
+            </p>
+          </div>
+
+          {/* Invite Bar - Disabled */}
           <div className='space-y-1'>
             <h3 className='text-sm font-semibold'>Invite user</h3>
           </div>
 
           <div className='space-y-4'>
-            <div className='rounded-md border bg-muted/40 p-3'>
+            <div className='rounded-md border bg-muted/40 p-3 opacity-60'>
               <div className='flex flex-col gap-4 sm:flex-row sm:items-end'>
                 <div className='flex-1'>
                   <Label htmlFor='email' className='mb-1.5 block'>
@@ -365,6 +494,7 @@ export function TeamMembersSettingsPage({ portalId }) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className='h-9'
+                    disabled
                   />
                 </div>
 
@@ -378,6 +508,7 @@ export function TeamMembersSettingsPage({ portalId }) {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className='h-9'
+                    disabled
                   />
                 </div>
 
@@ -402,17 +533,10 @@ export function TeamMembersSettingsPage({ portalId }) {
                 </div>
                 <Button
                   onClick={handleInvite}
-                  disabled={loading || !email.trim() || !fullName.trim()}
+                  disabled={true}
                   className='h-9 px-6 sm:w-auto'
                 >
-                  {loading ? (
-                    <>
-                      <div className='h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent' />
-                      Sending...
-                    </>
-                  ) : (
-                    <>Invite User</>
-                  )}
+                  Invite User
                 </Button>
               </div>
 
@@ -608,6 +732,13 @@ export function TeamMembersSettingsPage({ portalId }) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Account Limits Modal */}
+        <AccountLimitsModal
+          open={showLimitsModal}
+          onOpenChange={setShowLimitsModal}
+          limits={accountLimits}
+        />
       </>
     </SettingsPage>
   );

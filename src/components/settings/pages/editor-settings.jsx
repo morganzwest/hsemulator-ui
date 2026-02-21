@@ -194,7 +194,7 @@ export function EditorSettingsPage() {
           </div>
 
           <div className='space-y-4'>
-            <div className='grid gap-3 grid-cols-[repeat(auto-fit,minmax(210px,1fr))]'>
+            <div className='grid gap-3 grid-cols-[repeat(auto-fit,minmax(160px,1fr))]'>
               {THEMES.map((theme) => {
                 const active = settings['editor.theme'] === theme.id;
 
@@ -218,9 +218,9 @@ export function EditorSettingsPage() {
                       <span className='block truncate text-sm font-medium'>
                         {theme.name}
                       </span>
-                      <span className='text-xs text-muted-foreground'>
+                      {/* <span className='text-xs text-muted-foreground'>
                         {theme.id}
-                      </span>
+                      </span> */}
                     </div>
                   </button>
                 );

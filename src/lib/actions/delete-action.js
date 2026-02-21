@@ -39,16 +39,30 @@ export async function deleteAction({
       }
 
       /* -------------------------------------
-         Delete DB record (authoritative)
+         Mark action as soft deleted (preserve execution history)
       ------------------------------------- */
 
       const { error: deleteError } = await supabase
         .from('actions')
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', actionId)
 
       if (deleteError) {
         throw new Error(deleteError.message || 'Failed to delete action')
+      }
+
+      /* -------------------------------------
+         Mark associated executions as having deleted action
+      ------------------------------------- */
+
+      const { error: executionsError } = await supabase
+        .from('action_executions')
+        .update({ action_deleted_at: new Date().toISOString() })
+        .eq('action_id', actionId)
+
+      if (executionsError) {
+        console.warn('Warning: Failed to update action_executions deletion timestamp:', executionsError)
+        // Don't throw error - action deletion is still successful
       }
 
       window.dispatchEvent(new Event('actions:resync'))

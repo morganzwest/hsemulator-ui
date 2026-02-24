@@ -37,5 +37,26 @@ export async function GET(request) {
     return NextResponse.redirect(`${origin}/login?error=oauth`);
   }
 
+  // Check if user has a profile (to determine if they need onboarding)
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('onboarding_status')
+        .eq('id', user.id)
+        .single();
+
+      // If no profile exists or onboarding not completed, redirect to onboarding
+      if (profileError?.code === 'PGRST116' || !profile || profile.onboarding_status !== 'completed') {
+        return NextResponse.redirect(`${origin}/dashboard/onboarding?source=new`);
+      }
+    }
+  } catch (error) {
+    console.error("Error checking user profile:", error);
+    // If there's an error checking the profile, default to dashboard
+  }
+
   return NextResponse.redirect(`${origin}/dashboard`);
 }

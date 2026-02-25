@@ -41,9 +41,6 @@ function CTASection() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
-          <Button size="sm" variant="outline" asChild>
-            <Link href="#pricing">View pricing</Link>
-          </Button>
         </div>
       </div>
     </motion.section>
@@ -97,7 +94,7 @@ function TrialCTA() {
           No Risk Trial
         </Badge>
         <h2 className="mb-6 text-4xl font-bold tracking-tight">
-          Ready to experience HSEmulator?
+          Ready to experience Novocode?
         </h2>
         <p className="mb-8 text-xl text-muted-foreground max-w-2xl mx-auto">
           Start your 14-day free trial today. No credit card required. Full access to all features.
@@ -108,9 +105,6 @@ function TrialCTA() {
               Start free trial
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
-          </Button>
-          <Button size="sm" variant="outline" asChild>
-            <Link href="#detailed-pricing">See detailed comparison</Link>
           </Button>
         </div>
       </div>
@@ -201,7 +195,7 @@ export default function PricingPage() {
             Ready to transform your development workflow?
           </h2>
           <p className="mb-8 text-xl text-muted-foreground">
-            Join thousands of developers who&apos;ve already accelerated their projects with HSEmulator.
+            Join thousands of developers who&apos;ve already accelerated their projects with Novocode.
           </p>
           <div className="flex justify-center gap-4">
             <Button size="lg" asChild>

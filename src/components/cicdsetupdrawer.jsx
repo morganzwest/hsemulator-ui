@@ -576,7 +576,7 @@ export function CICDSetupDrawer({
         return 'Action is out of sync with source code. Deploy to update.';
       case 'unmanaged':
         if (actionFound) {
-          return 'Action exists but is not managed by hsemulator. Force deploy to take control.';
+          return 'Action exists but is not managed by novocode. Force deploy to take control.';
         }
         return 'No action found with this search key. Force deploy to create new action.';
       case 'not_found':
@@ -713,9 +713,9 @@ export function CICDSetupDrawer({
                               <TooltipContent className='max-w-xs'>
                                 <p className='text-sm'>
                                   Create a secret with the exact name above and
-                                  a blank value (single space) in your custom
-                                  code action. This allows hsemulator to locate
-                                  and manage your action.
+                                  and a blank value (single space) in your
+                                  custom code action. This allows novocode to
+                                  locate and manage your action.
                                 </p>
                                 <div className='mt-2 pt-2 border-t border-border'>
                                   <p className='text-xs text-muted-foreground mb-1'>
@@ -775,8 +775,8 @@ export function CICDSetupDrawer({
                                       {secretName}
                                     </span>{' '}
                                     and a blank value (single space) in your
-                                    custom code action. This allows hsemulator
-                                    to locate and manage your action.
+                                    custom code action. This allows novocode to
+                                    locate and manage your action.
                                   </p>
                                   <div className='pt-2 border-t border-blue-200 dark:border-blue-700'>
                                     {/* <p className='text-xs text-blue-600 dark:text-blue-400 mb-1'>

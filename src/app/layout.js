@@ -23,12 +23,12 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: {
-    default: 'HSEmulator',
-    template: '%s – HSEmulator',
+    default: 'Novocode',
+    template: '%s – Novocode',
   },
   description:
     'Local runtime and execution engine for HubSpot custom code actions',
-  applicationName: 'HSEmulator',
+  applicationName: 'Novocode',
 }
 
 export const viewport = {

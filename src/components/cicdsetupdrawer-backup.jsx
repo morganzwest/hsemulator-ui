@@ -325,7 +325,7 @@ export function CICDSetupDrawer({
         return 'Action is out of sync with source code. Deploy to update.';
       case 'unmanaged':
         if (actionFound) {
-          return 'Action exists but is not managed by hsemulator. Force deploy to take control.';
+          return 'Action exists but is not managed by novocode. Force deploy to take control.';
         }
         return 'No action found with this search key. Force deploy to create new action.';
       case 'not_found':

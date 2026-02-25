@@ -138,7 +138,7 @@ export const testimonials = [
     name: 'Sarah Chen',
     role: 'CTO',
     company: 'TechCorp',
-    content: 'HSEmulator became critical to our release process. CI/CD and telemetry alone justified the upgrade.',
+    content: 'Novocode became critical to our release process. CI/CD and telemetry alone justified the upgrade.',
     avatar: 'SC'
   },
   {

@@ -93,7 +93,14 @@ export function SecretRow({ secret, onDeleted }) {
         >
           {/* Key and Scope */}
           <div className='flex flex-1 items-center gap-3'>
-            <div className='font-mono text-sm'>{secret.name}</div>
+            <div className='font-mono text-sm'>
+              {secret.name}
+              {secret.usage_count > 0 && (
+                <span className='ml-2 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded'>
+                  Used in {secret.usage_count} {secret.usage_count !== 1 ? 'actions' : 'action'}
+                </span>
+              )}
+            </div>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div

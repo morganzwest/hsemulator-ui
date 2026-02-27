@@ -46,7 +46,7 @@ export function SecretRow({ secret, onDeleted }) {
           {secret.name}
           {secret.usage_count > 0 && (
             <span className='ml-2 text-xs text-muted-foreground'>
-              ({secret.usage_count} use{secret.usage_count !== 1 ? 's' : ''})
+              Used in {secret.usage_count} {secret.usage_count !== 1 ? 'actions' : 'action'}
             </span>
           )}
         </div>

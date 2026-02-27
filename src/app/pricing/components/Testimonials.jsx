@@ -37,7 +37,7 @@ export function Testimonials({ testimonials }) {
           <h2 className='text-4xl font-bold mb-4'>Loved by teams worldwide</h2>
           <p className='text-xl text-muted-foreground max-w-2xl mx-auto'>
             See what our customers have to say about their experience with
-            HSEmulator
+            Novocode
           </p>
         </div>
 

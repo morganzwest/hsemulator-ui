@@ -49,3 +49,80 @@ export function createSuccessResponse(data, message = null) {
     timestamp: new Date().toISOString()
   }
 }
+
+// Sentry integration utilities
+export function captureException(error, context = {}) {
+  // Import Sentry dynamically to avoid SSR issues
+  import('@sentry/nextjs').then(Sentry => {
+    Sentry.captureException(error, {
+      contexts: {
+        custom: context
+      }
+    });
+  }).catch(err => {
+    console.error('Failed to capture exception with Sentry:', err);
+  });
+}
+
+export function captureMessage(message, level = 'info', context = {}) {
+  // Import Sentry dynamically to avoid SSR issues
+  import('@sentry/nextjs').then(Sentry => {
+    Sentry.captureMessage(message, level, {
+      contexts: {
+        custom: context
+      }
+    });
+  }).catch(err => {
+    console.error('Failed to capture message with Sentry:', err);
+  });
+}
+
+export function setUserContext(user) {
+  // Import Sentry dynamically to avoid SSR issues
+  import('@sentry/nextjs').then(Sentry => {
+    Sentry.setUser({
+      id: user.id,
+      email: user.email,
+      username: user.username || user.name
+    });
+  }).catch(err => {
+    console.error('Failed to set user context with Sentry:', err);
+  });
+}
+
+export function clearUserContext() {
+  // Import Sentry dynamically to avoid SSR issues
+  import('@sentry/nextjs').then(Sentry => {
+    Sentry.setUser(null);
+  }).catch(err => {
+    console.error('Failed to clear user context with Sentry:', err);
+  });
+}
+
+// Enhanced error handler that logs to console and Sentry
+export function handleError(error, context = {}) {
+  // Always log to console for development
+  console.error('Application Error:', error, context);
+
+  // Send to Sentry in production
+  if (process.env.NODE_ENV === 'production') {
+    captureException(error, context);
+  }
+}
+
+// Utility to create error boundaries for React components
+export function createErrorBoundary(fallback, onError) {
+  return {
+    fallback,
+    onError: (error, errorInfo) => {
+      handleError(error, {
+        componentStack: errorInfo.componentStack,
+        errorBoundary: true
+      });
+
+      if (onError) {
+        onError(error, errorInfo);
+      }
+    }
+  };
+}

@@ -9,6 +9,7 @@ import {
   Sparkles,
   MessageCircleQuestion,
   Settings2,
+  ActivityIcon,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -29,6 +30,11 @@ import {
 } from '@/components/ui/sidebar';
 
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { getCurrentPlan } from '@/lib/account-limits';
+import { useAccount } from '@/contexts/AccountContext';
+import { AccountSwitcher } from '@/components/account-switcher';
+import { Activity } from 'react';
+import * as React from 'react';
 
 function handleOpenSettings() {
   window.dispatchEvent(new Event('settings:open'));
@@ -40,6 +46,82 @@ function handleUpgrade() {
 export function NavUser({ user }) {
   const { isMobile } = useSidebar();
   const supabase = createSupabaseBrowserClient();
+  const [currentPlan, setCurrentPlan] = React.useState('pilot');
+  const [loadingPlan, setLoadingPlan] = React.useState(true);
+
+  const { initialized, loading: accountLoading } = useAccount();
+
+  React.useEffect(() => {
+    async function loadPlan() {
+      if (!initialized || accountLoading) {
+        console.warn(
+          '[NavUser] Account state not ready, skipping plan loading',
+        );
+        return;
+      }
+
+      try {
+        const plan = await getCurrentPlan();
+        setCurrentPlan(plan);
+      } catch (error) {
+        console.error('[NavUser] Error loading plan:', error);
+        setCurrentPlan('pilot'); // fallback
+      } finally {
+        setLoadingPlan(false);
+      }
+    }
+
+    loadPlan();
+  }, [initialized, accountLoading]);
+
+  const getPlanDisplayInfo = (plan) => {
+    switch (plan) {
+      case 'pilot':
+        return {
+          label: 'Pilot Plan',
+          badge: 'PILOT',
+          icon: Sparkles,
+          bgGradient:
+            'bg-gradient-to-br from-black/60 via-indigo-950/40 to-purple-950/30',
+          borderColor: 'border-indigo-500/25',
+          textColor: 'text-indigo-200',
+          iconColor: 'text-indigo-300',
+          badgeColor: 'text-indigo-300/80',
+          hoverRing: 'hover:ring-indigo-500/40',
+          hoverShadow: 'hover:shadow-[0_0_30px_rgba(99,102,241,0.25)]',
+        };
+      case 'professional':
+        return {
+          label: 'Professional Plan',
+          badge: 'PRO',
+          icon: Sparkles,
+          bgGradient:
+            'bg-gradient-to-br from-black/60 via-emerald-950/40 to-cyan-950/30',
+          borderColor: 'border-emerald-500/25',
+          textColor: 'text-emerald-200',
+          iconColor: 'text-emerald-300',
+          badgeColor: 'text-emerald-300/80',
+          hoverRing: 'hover:ring-emerald-500/40',
+          hoverShadow: 'hover:shadow-[0_0_30px_rgba(16,185,129,0.25)]',
+        };
+      case 'enterprise':
+        return {
+          label: 'Enterprise Plan',
+          badge: 'ENTERPRISE',
+          icon: Sparkles,
+          bgGradient:
+            'bg-gradient-to-br from-black/60 via-amber-950/40 to-orange-950/30',
+          borderColor: 'border-amber-500/25',
+          textColor: 'text-amber-200',
+          iconColor: 'text-amber-300',
+          badgeColor: 'text-amber-300/80',
+          hoverRing: 'hover:ring-amber-500/40',
+          hoverShadow: 'hover:shadow-[0_0_30px_rgba(251,191,36,0.25)]',
+        };
+      default:
+        return getPlanDisplayInfo('pilot');
+    }
+  };
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -97,73 +179,29 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
-              {/* <DropdownMenuItem
-                onClick={handleUpgrade}
-                className='
-    relative overflow-hidden
-    bg-gradient-to-br from-black/60 via-indigo-950/40 to-purple-950/30
-    text-indigo-200
-    border border-indigo-500/25
-    backdrop-blur-xl
-    transition-all duration-300
-    hover:scale-[1.015]
-    hover:ring-1 hover:ring-indigo-500/40
-    hover:shadow-[0_0_30px_rgba(99,102,241,0.25)]
-  '
-              >
-                <span className='absolute inset-0 pointer-events-none rounded-md ring-1 ring-indigo-500/40 opacity-40' />
-
-                <span
-                  className='
-      absolute inset-0 pointer-events-none
-      bg-gradient-to-r from-transparent via-white/10 to-transparent
-      opacity-0 hover:opacity-100
-      transition-opacity duration-500
-    '
-                />
-
-                <Sparkles className='text-indigo-300 drop-shadow-[0_0_8px_rgba(129,140,248,0.6)]' />
-
-                <span className='tracking-wide font-medium'>
-                  Upgrade your Plan
-                </span>
-
-                <span className='ml-auto text-[10px] uppercase tracking-widest text-indigo-300/80'>
-                  FOUNDRY
-                </span>
-              </DropdownMenuItem> */}
               <DropdownMenuItem
-                className='
-    relative overflow-hidden
-    bg-gradient-to-br from-black/60 via-indigo-950/40 to-purple-950/30
-    text-indigo-200
-    border border-indigo-500/25
-    backdrop-blur-xl
-    transition-all duration-300
-    hover:scale-[1.015]
-    hover:ring-1 hover:ring-indigo-500/40
-    hover:shadow-[0_0_30px_rgba(99,102,241,0.25)]
-  '
+                className={`relative overflow-hidden ${getPlanDisplayInfo(currentPlan).bgGradient} ${getPlanDisplayInfo(currentPlan).textColor} border ${getPlanDisplayInfo(currentPlan).borderColor} backdrop-blur-xl transition-all duration-300 hover:scale-[1.015] ${getPlanDisplayInfo(currentPlan).hoverRing} ${getPlanDisplayInfo(currentPlan).hoverShadow}`}
               >
                 {/* Glow ring layer */}
-                <span className='absolute inset-0 pointer-events-none rounded-md ring-1 ring-indigo-500/40 opacity-40' />
-
-                {/* Shine sweep */}
                 <span
-                  className='
-      absolute inset-0 pointer-events-none
-      bg-gradient-to-r from-transparent via-white/10 to-transparent
-      opacity-0 hover:opacity-100
-      transition-opacity duration-500
-    '
+                  className={`absolute inset-0 pointer-events-none rring-1 ring-current opacity-40`}
                 />
 
-                <Sparkles className='text-indigo-300 drop-shadow-[0_0_8px_rgba(129,140,248,0.6)]' />
+                {/* Shine sweep */}
+                <span className='absolute inset-0 pointer-events-none bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-500' />
 
-                <span className='tracking-wide font-medium'>Pilot Plan</span>
+                <Sparkles
+                  className={`${getPlanDisplayInfo(currentPlan).iconColor} drop-shadow-[0_0_8px_rgba(129,140,248,0.6)]`}
+                />
 
-                <span className='ml-auto text-[10px] uppercase tracking-widest text-indigo-300/80'>
-                  PILOT
+                <span className='tracking-wide font-medium'>
+                  {getPlanDisplayInfo(currentPlan).label}
+                </span>
+
+                <span
+                  className={`ml-auto text-[10px] uppercase tracking-widest ${getPlanDisplayInfo(currentPlan).badgeColor}`}
+                >
+                  {getPlanDisplayInfo(currentPlan).badge}
                 </span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
@@ -171,6 +209,10 @@ export function NavUser({ user }) {
             <DropdownMenuSeparator />
 
             <DropdownMenuGroup>
+              <DropdownMenuItem>
+                <AccountSwitcher />
+              </DropdownMenuItem>
+
               <DropdownMenuItem>
                 <BadgeCheck />
                 Account
@@ -184,6 +226,16 @@ export function NavUser({ user }) {
               <DropdownMenuItem onClick={handleOpenSettings}>
                 <Settings2 />
                 Settings
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  // Open status page in new tab
+                  window.open('https://novocode.betteruptime.com/', '_blank');
+                }}
+              >
+                <ActivityIcon />
+                Status
               </DropdownMenuItem>
 
               <DropdownMenuItem>

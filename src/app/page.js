@@ -14,7 +14,7 @@ import { createSupabaseBrowserClient } from "~/lib/supabase/browser"
 
 
 export function InstallCommand() {
-  const command = "winget install novocy.hsemulator"
+  const command = "winget install novocy.novocode"
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {

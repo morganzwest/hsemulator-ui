@@ -13,13 +13,14 @@ import { cn } from '@/lib/utils';
 import { Users, X } from 'lucide-react';
 import { EditorSettingsPage } from '@/components/settings/pages/editor-settings';
 
-import { Code2, Key, DownloadCloud } from 'lucide-react';
+import { Code2, Key, DownloadCloud, TrendingUp } from 'lucide-react';
 
 import { PortalSecretsSettingsPage } from './pages/secret-settings';
 import { getActivePortalId } from '@/lib/portal-state';
 import { IoPeople } from 'react-icons/io5';
 import { TeamMembersSettingsPage } from './pages/team-settings';
 import { ImportSettingsPage } from './pages/import-settings';
+import { UsageSettingsPage } from './pages/usage-settings';
 
 /* -------------------------------------
    Tabs
@@ -44,6 +45,12 @@ export const SETTINGS_TABS = [
     label: 'Team',
     icon: Users,
     page: 'team',
+  },
+  {
+    key: 'usage',
+    label: 'Usage',
+    icon: TrendingUp,
+    page: 'usage',
   },
 ];
 
@@ -159,6 +166,8 @@ export function SettingsSheet({ children }) {
                     Loading portal…
                   </div>
                 ))}
+
+              {activeTabDef.page === 'usage' && <UsageSettingsPage />}
             </div>
           </section>
         </div>

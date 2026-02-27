@@ -5,6 +5,9 @@ import { Toaster } from "@/components/ui/sonner"
 import { SettingsProvider } from '@/lib/settings/settings-provider';
 import { Analytics } from "@vercel/analytics/next"
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import '@/sentry.client.config'
+import '@/lib/global-error-handler'
+import { AccountProvider } from '@/contexts/AccountContext';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -20,12 +23,12 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: {
-    default: 'HSEmulator',
-    template: '%s – HSEmulator',
+    default: 'Novocode',
+    template: '%s – Novocode',
   },
   description:
     'Local runtime and execution engine for HubSpot custom code actions',
-  applicationName: 'HSEmulator',
+  applicationName: 'Novocode',
 }
 
 export const viewport = {
@@ -44,7 +47,7 @@ export default function RootLayout({ children }) {
           'bg-background text-foreground antialiased',
         ].join(' ')}
       >
-        <Analytics/>
+        <Analytics />
         <SpeedInsights />
         <ThemeProvider
           attribute="class"
@@ -52,12 +55,13 @@ export default function RootLayout({ children }) {
           enableSystem
           disableTransitionOnChange
         >
-        <SettingsProvider>
+          <AccountProvider>
+            <SettingsProvider>
+              {children}
+            </SettingsProvider>
+          </AccountProvider>
 
-          {children}
-        </SettingsProvider>
-
-        <Toaster position="top-center" />
+          <Toaster position="top-center" />
         </ThemeProvider>
       </body>
     </html>

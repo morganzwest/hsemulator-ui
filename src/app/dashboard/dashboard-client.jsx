@@ -25,25 +25,56 @@ import {
 import { Separator } from '@/components/ui/separator';
 
 /* -------------------------------------
-   Runtime status indicator
+   Combined Runtime & Connection status indicator
 ------------------------------------- */
 
-function RuntimeStatus({ healthy, checking }) {
+function CombinedStatus({
+  healthy,
+  checking,
+  connectionState,
+  connectionInfo,
+}) {
   let label = 'Checking';
   let color = 'bg-muted';
+  let tooltip = 'Checking runtime health...';
 
   if (!checking) {
-    if (healthy) {
-      label = 'Ready';
-      color = 'bg-emerald-500';
-    } else {
+    const connectionStateInfo = connectionInfo || {};
+    const { state: connState, reason, retries } = connectionStateInfo;
+
+    // Priority: Error/Offline > Reconnecting > Ready
+    if (!healthy) {
       label = 'Offline';
       color = 'bg-red-500';
+      tooltip = 'Runtime server is offline';
+    } else if (connState === 'error' || connState === 'disconnected') {
+      label = 'Offline';
+      color = 'bg-red-500';
+      tooltip = `Connection error: ${reason || 'Unknown error'}`;
+    } else if (connState === 'reconnecting') {
+      label = 'Reconnecting';
+      color = 'bg-yellow-500';
+      tooltip = `Runtime ready • Reconnecting (attempt ${retries || 0})`;
+    } else if (connState === 'connecting') {
+      label = 'Connecting';
+      color = 'bg-yellow-500';
+      tooltip = 'Runtime ready • Connecting to realtime...';
+    } else if (connState === 'connected') {
+      label = 'Ready';
+      color = 'bg-emerald-500';
+      tooltip = 'Runtime ready • Realtime connected';
+    } else {
+      label = 'Ready';
+      color = 'bg-emerald-500';
+      tooltip = 'Runtime ready';
     }
   }
 
   return (
-    <div className='flex items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground'>
+    <div
+      className='flex items-center gap-2 rounded-md border px-2 py-1 text-xs text-muted-foreground'
+      title={tooltip}
+    >
       <span className={`h-2 w-2 rounded-full ${color}`} />
       <span>{label}</span>
     </div>
@@ -65,6 +96,13 @@ export default function DashboardClient() {
 
   const [healthy, setHealthy] = useState(false);
   const [checkingHealth, setCheckingHealth] = useState(true);
+  const [connectionState, setConnectionState] = useState('disconnected');
+  const [connectionInfo, setConnectionInfo] = useState({
+    reason: null,
+    retries: 0,
+    timestamp: null,
+    channelName: null,
+  });
 
   /* -----------------------------
      Runtime health check
@@ -150,7 +188,12 @@ export default function DashboardClient() {
 
             <Tooltip>
               <TooltipTrigger>
-                <RuntimeStatus healthy={healthy} checking={checkingHealth} />
+                <CombinedStatus
+                  healthy={healthy}
+                  checking={checkingHealth}
+                  connectionState={connectionState}
+                  connectionInfo={connectionInfo}
+                />
               </TooltipTrigger>
 
               {!healthy && !checkingHealth && (
@@ -163,7 +206,14 @@ export default function DashboardClient() {
         </header>
 
         <div className='flex flex-1 min-w-0 flex-col p-4'>
-          <EditorPanel runtimeHealthy={healthy} activeAction={activeAction} />
+          <EditorPanel
+            runtimeHealthy={healthy}
+            activeAction={activeAction}
+            onConnectionChange={(state, info) => {
+              setConnectionState(state);
+              setConnectionInfo(info);
+            }}
+          />
         </div>
       </SidebarInset>
 

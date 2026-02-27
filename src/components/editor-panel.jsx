@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,6 +41,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { CICDSetupDrawer } from './cicdsetupdrawer';
 import { AssignSecretsDialog } from './assign-secrets-dialog';
 import { Key } from 'lucide-react';
+import { ConnectionStatusBanner } from '@/components/ui/connection-status-banner';
 
 /* --------------------------------
    Language icon
@@ -68,7 +69,11 @@ function LanguageIcon({ language }) {
    Editor Panel
 -------------------------------- */
 
-export function EditorPanel({ runtimeHealthy, activeAction }) {
+export function EditorPanel({
+  runtimeHealthy,
+  activeAction,
+  onConnectionChange,
+}) {
   const editorRef = useRef(null);
   const outputEndRef = useRef(null);
   const containerRef = useRef(null);
@@ -94,15 +99,23 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
   const hasDirtyFiles = Object.values(files).some((f) => f.dirty);
   const canRun = runtimeHealthy && !running;
 
-  const { loadFiles, saveAllFiles, runFile } = useActionEditor({
-    activeAction,
-    files,
-    setFiles,
-    setActiveFile,
-    setLoadingFiles,
-    setLogs,
-    setRunning,
-  });
+  const { loadFiles, saveAllFiles, runFile, connectionState, connectionInfo } =
+    useActionEditor({
+      activeAction,
+      files,
+      setFiles,
+      setActiveFile,
+      setLoadingFiles,
+      setLogs,
+      setRunning,
+    });
+
+  // Notify parent of connection state changes
+  useEffect(() => {
+    if (onConnectionChange) {
+      onConnectionChange(connectionState, connectionInfo);
+    }
+  }, [connectionState, connectionInfo, onConnectionChange]);
 
   /* -----------------------------
      Effects
@@ -115,11 +128,68 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
       return;
     }
     loadFiles();
-  }, [activeAction]);
+  }, [activeAction, loadFiles]);
 
   useEffect(() => {
     outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  /* -----------------------------
+     Handlers
+  ----------------------------- */
+
+  function updateFile(value) {
+    if (!activeFile || !files[activeFile]) {
+      console.warn(
+        '[Editor] Cannot update file: no active file or file not found',
+      );
+      return;
+    }
+    setFiles((prev) => ({
+      ...prev,
+      [activeFile]: {
+        ...prev[activeFile],
+        value,
+        dirty: true,
+      },
+    }));
+  }
+
+  const handleSave = useCallback(async () => {
+    await saveAllFiles(editorRef);
+  }, [saveAllFiles]);
+
+  const handleRun = useCallback(async () => {
+    if (!canRun) return;
+    await saveAllFiles(editorRef);
+    await runFile();
+  }, [canRun, saveAllFiles, runFile]);
+
+  const handleSaveTemplate = useCallback(async () => {
+    if (!activeAction || templateSaving) return;
+
+    try {
+      setTemplateSaving(true);
+      setTemplateSaved(false);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      await createPrivateTemplate({
+        supabase,
+        ownerId: user.id,
+        name: `${activeAction.name} Template`,
+        description: 'Saved from editor',
+        files,
+      });
+
+      setTemplateSaved(true);
+      setTimeout(() => setTemplateSaved(false), 2000);
+    } finally {
+      setTemplateSaving(false);
+    }
+  }, [activeAction, templateSaving, supabase, files]);
 
   useEffect(() => {
     const openCreate = () => setCreateOpen(true);
@@ -141,32 +211,7 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
       window.removeEventListener('editor:save-all', saveAll);
       window.removeEventListener('editor:run', run);
     };
-  }, []);
-
-  /* -----------------------------
-     Handlers
-  ----------------------------- */
-
-  function updateFile(value) {
-    setFiles((prev) => ({
-      ...prev,
-      [activeFile]: {
-        ...prev[activeFile],
-        value,
-        dirty: true,
-      },
-    }));
-  }
-
-  async function handleSave() {
-    await saveAllFiles(editorRef);
-  }
-
-  async function handleRun() {
-    if (!canRun) return;
-    await saveAllFiles(editorRef);
-    await runFile();
-  }
+  }, [handleRun, handleSave, handleSaveTemplate]);
 
   function EditorLoadingState() {
     return (
@@ -214,32 +259,6 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
         </div>
       </div>
     );
-  }
-
-  async function handleSaveTemplate() {
-    if (!activeAction || templateSaving) return;
-
-    try {
-      setTemplateSaving(true);
-      setTemplateSaved(false);
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      await createPrivateTemplate({
-        supabase,
-        ownerId: user.id,
-        name: `${activeAction.name} Template`,
-        description: 'Saved from editor',
-        files,
-      });
-
-      setTemplateSaved(true);
-      setTimeout(() => setTemplateSaved(false), 2000);
-    } finally {
-      setTemplateSaving(false);
-    }
   }
 
   function handleResize(e) {
@@ -321,7 +340,21 @@ export function EditorPanel({ runtimeHealthy, activeAction }) {
           No files found for this action
         </div>
       ) : (
-        <div className='flex h-[90vh] min-w-0 flex-col gap-3 overflow-hidden'>
+        <div className='flex h-[90vh] min-w-0 flex-col overflow-hidden'>
+          {/* Connection Status Banner */}
+          <ConnectionStatusBanner
+            connectionState={connectionState}
+            connectionInfo={connectionInfo}
+            onManualReconnect={() => {
+              // Trigger manual reconnect by dispatching custom event
+              window.dispatchEvent(new CustomEvent('manual-reconnect-request'));
+            }}
+            silent={
+              connectionInfo.reason &&
+              connectionInfo.reason.includes('stale_connection')
+            }
+          />
+
           {/* Toolbar */}
           <div
             className='

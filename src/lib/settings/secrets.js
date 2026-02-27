@@ -3,6 +3,52 @@
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser'
 
 /* -------------------------------------------------
+   Error Types and Messages
+------------------------------------------------- */
+
+const CICD_ERROR_TYPES = {
+    INVALID_SECRET: 'CICD_SECRET_INVALID',
+    MISSING_SCOPE: 'CICD_SCOPE_MISSING',
+    GENERIC: 'GENERIC'
+};
+
+const CICD_ERROR_MESSAGES = {
+    [CICD_ERROR_TYPES.INVALID_SECRET]: {
+        message: 'Private app token could not be verified',
+        guidance:
+            'HubSpot rejected the token during validation. Check the following:\n' +
+            '• The token is copied exactly with no extra spaces or characters\n' +
+            '• The token is still active and has not been regenerated\n' +
+            '• The token belongs to the intended HubSpot portal\n' +
+            '• The prefix is correct (typically "pat-")\n\n' +
+            'If the issue persists, generate a new token in HubSpot and retry.',
+        recoverable: true,
+    },
+
+    [CICD_ERROR_TYPES.MISSING_SCOPE]: {
+        message: 'Token missing required permissions',
+        guidance:
+            'The token is valid but does not include the permissions needed for CI/CD.\n\n' +
+            'Update your HubSpot private app scopes to include:\n' +
+            '• Automation\n\n' +
+            'After saving the scope changes, retry the operation.',
+        recoverable: false,
+    },
+
+    [CICD_ERROR_TYPES.GENERIC]: {
+        message: 'Unable to create secret',
+        guidance:
+            'Something unexpected prevented the secret from being created.\n\n' +
+            'Recommended steps:\n' +
+            '• Retry the action\n' +
+            '• Confirm HubSpot and network connectivity\n' +
+            '• Verify the token is still valid\n\n' +
+            'If this continues, contact support with the error details.',
+        recoverable: true,
+    },
+};
+
+/* -------------------------------------------------
    Internal helpers (CLIENT → SERVER)
 ------------------------------------------------- */
 
@@ -23,7 +69,33 @@ async function apiRequest(path, { method, body }) {
     } catch { }
 
     if (!res.ok) {
-        throw new Error(data?.message || `Request failed (${res.status})`)
+        // Create structured error object
+        let errorMessage = data?.message || `Request failed (${res.status})`
+        let errorType = CICD_ERROR_TYPES.GENERIC
+        let guidance = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.GENERIC].guidance
+        let recoverable = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.GENERIC].recoverable
+
+        // Classify error type for CICD secrets
+        if (res.status === 401) {
+            errorType = CICD_ERROR_TYPES.INVALID_SECRET
+            errorMessage = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.INVALID_SECRET].message
+            guidance = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.INVALID_SECRET].guidance
+            recoverable = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.INVALID_SECRET].recoverable
+        } else if (res.status === 403) {
+            errorType = CICD_ERROR_TYPES.MISSING_SCOPE
+            errorMessage = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.MISSING_SCOPE].message
+            guidance = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.MISSING_SCOPE].guidance
+            recoverable = CICD_ERROR_MESSAGES[CICD_ERROR_TYPES.MISSING_SCOPE].recoverable
+        }
+
+        const error = new Error(errorMessage)
+        error.status = res.status
+        error.type = errorType
+        error.guidance = guidance
+        error.recoverable = recoverable
+        error.data = data
+
+        throw error
     }
 
     return data
@@ -150,18 +222,34 @@ export async function createSecret(input) {
 
     const payload = validateCreateSecret(input)
 
-    const res = await apiRequest('/api/runtime/secrets', {
-        method: 'POST',
-        body: payload,
-    })
+    try {
+        const res = await apiRequest('/api/runtime/secrets', {
+            method: 'POST',
+            body: payload,
+        })
 
-    if (!res?.secret_id) {
-        console.error('[secrets][createSecret] unexpected response:', res)
-        throw new Error('Secret creation failed')
+        if (!res?.secret_id) {
+            console.error('[secrets][createSecret] unexpected response:', res)
+            throw new Error('Secret creation failed')
+        }
+
+        return res
+    } catch (error) {
+        // Log the full error for debugging
+        console.error('[secrets][createSecret] Error:', {
+            message: error.message,
+            status: error.status,
+            type: error.type,
+            data: error.data
+        })
+
+        // Re-throw the structured error for component handling
+        throw error
     }
-
-    return res
 }
+
+// Export error constants for component use
+export { CICD_ERROR_TYPES, CICD_ERROR_MESSAGES }
 
 /**
  * DELETE secret (SERVER)

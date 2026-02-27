@@ -40,6 +40,7 @@ export function useActionExecutions({
             avatar_url
           )
         `)
+        .is('action_deleted_at', null) // Filter out executions from deleted actions
         .order('created_at', { ascending: false })
         .limit(limit)
 

@@ -148,6 +148,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
         .from('portals')
         .select('uuid, name, icon, color, created_at')
         .in('account_id', accountIds)
+        .is('deleted_at', null) // Filter out soft-deleted portals
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -211,6 +212,7 @@ export function SidebarLeft({ onSelectAction, onActionsLoaded, ...props }) {
       )
       .eq('portal_id', portalId)
       .eq('is_active', true)
+      .is('deleted_at', null) // Filter out soft-deleted actions
       .order('updated_at', { ascending: false });
 
     if (error) {

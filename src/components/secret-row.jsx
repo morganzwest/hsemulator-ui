@@ -42,7 +42,14 @@ export function SecretRow({ secret, onDeleted }) {
         )}
       >
         {/* Key */}
-        <div className='flex-1 font-mono text-sm'>{secret.name}</div>
+        <div className='flex-1 font-mono text-sm'>
+          {secret.name}
+          {secret.usage_count > 0 && (
+            <span className='ml-2 text-xs text-muted-foreground'>
+              ({secret.usage_count} use{secret.usage_count !== 1 ? 's' : ''})
+            </span>
+          )}
+        </div>
 
         {/* Editor */}
         {editing && (

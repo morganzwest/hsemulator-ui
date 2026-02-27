@@ -97,20 +97,49 @@ export async function fetchPortalSecrets(portalId) {
 
     const supabase = createSupabaseBrowserClient()
 
-    const { data, error } = await supabase
+    // First get the secrets
+    const { data: secrets, error: secretsError } = await supabase
         .from('secrets')
         .select('id, name, scope, action_id, portal_id')
         .eq('portal_id', portalId)
         .order('created_at', { ascending: true })
 
-    if (error) {
-        console.error('[secrets][fetchPortalSecrets] Supabase error:', error)
-        throw new Error(error.message)
+    if (secretsError) {
+        console.error('[secrets][fetchPortalSecrets] Supabase error:', secretsError)
+        throw new Error(secretsError.message)
     }
 
-    console.log('[secrets][fetchPortalSecrets] rows:', data)
+    // Then get usage counts for these secrets
+    const secretIds = secrets?.map(s => s.id) || []
+    let usageCounts = {}
 
-    return data ?? []
+    if (secretIds.length > 0) {
+        const { data: usageData, error: usageError } = await supabase
+            .from('action_secrets')
+            .select('secret_id')
+            .eq('portal_id', portalId)
+            .in('secret_id', secretIds)
+
+        if (usageError) {
+            console.error('[secrets][fetchPortalSecrets] Usage count error:', usageError)
+        } else {
+            // Count occurrences by secret_id
+            usageCounts = {}
+            usageData?.forEach(row => {
+                usageCounts[row.secret_id] = (usageCounts[row.secret_id] || 0) + 1
+            })
+        }
+    }
+
+    // Combine secrets with usage counts
+    const secretsWithUsage = secrets?.map(secret => ({
+        ...secret,
+        usage_count: usageCounts[secret.id] || 0
+    })) || []
+
+    console.log('[secrets][fetchPortalSecrets] rows with usage:', secretsWithUsage)
+
+    return secretsWithUsage
 }
 
 /**

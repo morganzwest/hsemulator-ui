@@ -122,6 +122,7 @@ export function useWorkflowStatus({
  * }
  */
   const checkStatus = useCallback(async (signal) => {
+    // Don't check status if workflow ID is empty or other required fields are missing
     if (!workflowId.trim() || (!secretName?.trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
       return;
     }
@@ -229,7 +230,15 @@ export function useWorkflowStatus({
 
   // Clear status when fields are incomplete or we're editing
   useEffect(() => {
-    if (!workflowId.trim() || (!secretName?.trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
+    // NEVER clear status automatically while user is typing - only clear on explicit user action
+    // This prevents the component from resetting while typing workflow IDs
+    if (!workflowId.trim()) {
+      setWorkflowStatus(null);
+      setStatusChecked(false);
+      return;
+    }
+
+    if ((!secretName?.trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
       setWorkflowStatus(null);
       setStatusChecked(false);
     }

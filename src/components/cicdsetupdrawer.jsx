@@ -141,6 +141,7 @@ export function CICDSetupDrawer({
   sourceCode,
 }) {
   const [workflowId, setWorkflowId] = useState('');
+  const [debouncedWorkflowId, setDebouncedWorkflowId] = useState('');
   const [selectedActionId, setSelectedActionId] = useState('');
   const [secretName, setSecretName] = useState('');
   const [token, setToken] = useState('');
@@ -152,6 +153,18 @@ export function CICDSetupDrawer({
   const [manualStatusTrigger, setManualStatusTrigger] = useState(0);
   const [pushCompleted, setPushCompleted] = useState(false);
   const pushCompletedTimeoutRef = useRef(null);
+
+  // Track if user has made manual input to prevent config overwrites
+  const hasUserInputRef = useRef(false);
+
+  // Debounce workflow ID to prevent rapid state changes while typing
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedWorkflowId(workflowId);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [workflowId]);
 
   // Workflow fetching states
   const [workflowData, setWorkflowData] = useState(null);
@@ -171,7 +184,7 @@ export function CICDSetupDrawer({
     triggerStatusCheck,
     // secretName is the legacy prop for secret identification, actionId is the new intent-driven prop
   } = useWorkflowStatus({
-    workflowId,
+    workflowId: debouncedWorkflowId,
     secretName: cicdSecret?.name,
     cicdSecretId: cicdSecret?.id,
     sourceCode,
@@ -280,6 +293,52 @@ export function CICDSetupDrawer({
   };
 
   /**
+   * Determines if the selected action ID should be cleared based on workflow ID changes
+   *
+   * @param {string} newWorkflowId - The new workflow ID value
+   * @param {string} previousWorkflowId - The previous workflow ID value
+   * @returns {boolean} True if action ID should be cleared
+   */
+  const shouldClearActionId = (newWorkflowId, previousWorkflowId) => {
+    // Clear if workflow ID becomes empty
+    if (!newWorkflowId.trim()) {
+      return true;
+    }
+
+    // Clear if workflow ID becomes too short (likely incomplete typing)
+    if (newWorkflowId.length < 6) {
+      return true;
+    }
+
+    // Clear if workflow ID format becomes invalid (non-numeric)
+    if (!/^\d+$/.test(newWorkflowId)) {
+      return true;
+    }
+
+    // Clear if the workflow ID fundamentally changes (not just typing more digits)
+    // This prevents clearing when user is just adding more digits to an existing valid ID
+    if (
+      previousWorkflowId &&
+      newWorkflowId.startsWith(previousWorkflowId) &&
+      newWorkflowId.length > previousWorkflowId.length
+    ) {
+      return false;
+    }
+
+    // Clear if workflow ID changes to a completely different value
+    if (
+      previousWorkflowId &&
+      previousWorkflowId.length >= 6 &&
+      newWorkflowId.length >= 6 &&
+      newWorkflowId !== previousWorkflowId
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  /**
    * Validates secret name input for format and length requirements
    *
    * @param {string} value - The secret name value to validate
@@ -313,32 +372,40 @@ export function CICDSetupDrawer({
   };
 
   /* --------------------------------
-     Load config on open
+     Load config on open (ONLY ONCE)
   -------------------------------- */
 
+  // Reset user input flag when drawer closes
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      hasUserInputRef.current = false;
+    }
+  }, [open]);
+
+  // Load config ONLY when drawer opens and user hasn't made input yet
+  useEffect(() => {
+    if (!open || hasUserInputRef.current) return;
 
     setLoading(true);
 
     // Get portal data for URL generation
     try {
       const portal = getActivePortal();
-      console.log('Portal data retrieved:', portal);
       setPortalData(portal);
     } catch (err) {
       console.warn('Failed to get portal data:', err);
-      // Fallback: try to use the portalId prop if available
-      console.log('Using portalId prop as fallback:', portalId);
       setPortalData({ id: portalId });
     }
 
     fetchCICDConfig(actionId, portalId)
       .then((config) => {
-        console.log('[CICD] Auto-pull loaded config:', config);
-        setWorkflowId(config.workflowId || '');
-        setSelectedActionId(config.actionId || '');
-        setSecretName(''); // Always empty now
+        // ONLY set workflow ID if user hasn't typed anything yet
+        if (!hasUserInputRef.current) {
+          setWorkflowId(config.workflowId || '');
+          setSelectedActionId(config.actionId || '');
+        }
+
+        setSecretName('');
         setMaskedToken(
           config.token ? `${config.token.slice(0, 8)}•••••••` : '',
         );
@@ -346,45 +413,17 @@ export function CICDSetupDrawer({
         setToken('');
         setReplaceToken(false);
         setIsEditing(false);
-        resetStatus(); // Use hook's reset function
+
         // Clear validation errors on load
         setWorkflowIdError('');
         setSecretNameError('');
 
-        // Trigger a fresh status check after config is loaded
-        setTimeout(() => {
-          triggerStatusCheck();
-        }, 100);
-
-        // Auto-pull logic:
-        // - If workflow_id exists but action_id is empty, we should allow action selection
-        // - If both workflow_id and action_id exist, proceed with status checking
-        // - If neither exists, user needs to enter workflow_id and fetch actions
-
-        console.log('[CICD] Auto-pull logic:', {
-          workflowId: config.workflowId,
-          actionId: config.actionId,
-          hasWorkflowId: !!config.workflowId,
-          hasActionId: !!config.actionId,
-        });
-
+        // Set up action selection UI based on config
         if (config.workflowId && config.actionId) {
-          // Both exist - proceed with status checking
-          console.log(
-            '[CICD] Both workflow_id and action_id exist - proceeding with status checking',
-          );
           setShowActionSelection(false);
         } else if (config.workflowId && !config.actionId) {
-          // Workflow exists but no action selected - show that user needs to select action
-          console.log(
-            '[CICD] workflow_id exists but action_id empty - user needs to fetch actions',
-          );
-          setShowActionSelection(false); // Don't show selection until they click fetch
+          setShowActionSelection(false);
         } else {
-          // Neither exists - fresh start
-          console.log(
-            '[CICD] Neither workflow_id nor action_id exist - fresh start',
-          );
           setShowActionSelection(false);
         }
       })
@@ -392,7 +431,7 @@ export function CICDSetupDrawer({
         toast.error(ERROR_MESSAGES.FAILED_TO_LOAD_CONFIG);
       })
       .finally(() => setLoading(false));
-  }, [open, actionId, portalId, resetStatus, triggerStatusCheck]);
+  }, [open, actionId, portalId]); // Remove all hook dependencies
 
   /* --------------------------------
      Derived state
@@ -999,13 +1038,19 @@ export function CICDSetupDrawer({
                                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                                   : 'bg-background border-input focus:ring-2 focus:ring-primary focus:border-primary'
                             }`}
-                            inputMode='numeric'
                             placeholder='123456789'
                             value={workflowId}
                             onChange={(e) => {
                               const value = e.target.value.replace(/\D/g, '');
+
+                              // Mark that user has made manual input
+                              if (value !== workflowId) {
+                                hasUserInputRef.current = true;
+                              }
+
                               setWorkflowId(value);
-                              setSelectedActionId('');
+
+                              // NEVER clear selected action ID while typing - only clear on explicit user action
                               if (value) validateWorkflowId(value);
                             }}
                             onBlur={() => validateWorkflowId(workflowId)}
@@ -1019,6 +1064,18 @@ export function CICDSetupDrawer({
                               <div className='w-5 h-5 rounded-full bg-green-500 flex items-center justify-center'>
                                 <Check className='h-3 w-3 text-white' />
                               </div>
+                            )}
+                            {selectedActionId.trim() && (
+                              <Button
+                                type='button'
+                                variant='outline'
+                                size='sm'
+                                onClick={() => setSelectedActionId('')}
+                                className='h-7 px-2 text-xs'
+                                title='Clear selected action'
+                              >
+                                <RefreshCcw className='h-3 w-3' />
+                              </Button>
                             )}
                             {!(
                               workflowId.trim() &&

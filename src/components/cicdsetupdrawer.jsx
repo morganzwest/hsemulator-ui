@@ -127,12 +127,13 @@ export function CICDSetupDrawer({
     statusChecked,
     resetStatus,
     triggerStatusCheck,
+    // secretName is the legacy prop for secret identification, actionId is the new intent-driven prop
   } = useWorkflowStatus({
     workflowId,
-    secretName: selectedActionId, // Use selectedActionId as search key
+    secretName: cicdSecret?.name,
     cicdSecretId: cicdSecret?.id,
     sourceCode,
-    actionId: selectedActionId, // Add actionId parameter
+    actionId: selectedActionId,
     isEditing,
     manualTrigger: manualStatusTrigger,
     debounceMs: 1500, // Use improved debouncing

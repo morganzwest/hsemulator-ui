@@ -456,8 +456,8 @@ export function CICDSetupDrawer({
     }
   }
 
-  async function handleActionSelection(selectedActionId) {
-    setSelectedActionId(selectedActionId);
+  async function handleActionSelection(newSelectedActionId) {
+    setSelectedActionId(newSelectedActionId);
     setShowActionSelection(false);
 
     // Save the selected action_id to database
@@ -467,7 +467,7 @@ export function CICDSetupDrawer({
         portalId,
         workflowId,
         secretName: '', // Empty since we're not using search tokens anymore
-        selectedActionId: selectedActionId,
+        selectedActionId: newSelectedActionId,
       });
       toast.success('Action selected successfully');
     } catch (err) {

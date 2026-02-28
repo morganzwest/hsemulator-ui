@@ -2,15 +2,15 @@ import { NextResponse } from 'next/server'
 import { logger } from '@/lib/logger'
 import { ERROR_MESSAGES, createErrorResponse } from '@/lib/errors'
 
-const RUNTIME_URL = process.env.NEXT_PUBLIC_RUNTIME_URL
-const RUNTIME_SECRET = process.env.NEXT_PUBLIC_RUNTIME_SECRET
+const RUNTIME_URL = process.env.RUNTIME_URL
+const RUNTIME_SECRET = process.env.RUNTIME_SECRET
 
 // Environment variable validation
 if (!RUNTIME_URL) {
-    throw new Error(ERROR_MESSAGES.MISSING_ENV_VAR('NEXT_PUBLIC_RUNTIME_URL'))
+    throw new Error(ERROR_MESSAGES.MISSING_ENV_VAR('RUNTIME_URL'))
 }
 if (!RUNTIME_SECRET) {
-    throw new Error(ERROR_MESSAGES.MISSING_ENV_VAR('NEXT_PUBLIC_RUNTIME_SECRET'))
+    throw new Error(ERROR_MESSAGES.MISSING_ENV_VAR('RUNTIME_SECRET'))
 }
 
 // Debug: Log environment variable status (without exposing secrets)

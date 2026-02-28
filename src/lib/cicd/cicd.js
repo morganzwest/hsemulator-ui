@@ -256,10 +256,13 @@ export async function checkWorkflowStatus({
  */
 export async function fetchWorkflowDetails(workflowId, cicdSecretId) {
   try {
-    // Build URL with cicd_secret_id parameter
-    const url = cicdSecretId
-      ? `/api/cicd/workflow/${workflowId}?cicd_secret_id=${cicdSecretId}`
-      : `/api/cicd/workflow/${workflowId}`
+    // Build URL with cicd_secret_id parameter using URLSearchParams for safe encoding
+    const queryParams = new URLSearchParams()
+    if (cicdSecretId) {
+      queryParams.append('cicd_secret_id', cicdSecretId)
+    }
+    const queryString = queryParams.toString()
+    const url = `/api/cicd/workflow/${workflowId}${queryString ? `?${queryString}` : ''}`
 
     const res = await fetch(url, {
       method: 'GET',

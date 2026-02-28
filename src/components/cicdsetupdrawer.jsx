@@ -403,6 +403,10 @@ export function CICDSetupDrawer({
         if (!hasUserInputRef.current) {
           setWorkflowId(config.workflowId || '');
           setSelectedActionId(config.actionId || '');
+          console.log(
+            '[CICD] Auto-pull config loaded, workflowId:',
+            config.workflowId,
+          );
         }
 
         setSecretName('');
@@ -505,7 +509,10 @@ export function CICDSetupDrawer({
     try {
       console.log('[CICD] Calling fetchWorkflowDetails for:', workflowId);
       const data = await fetchWorkflowDetails(workflowId, cicdSecret?.id);
-      console.log('[CICD] Workflow data received:', data);
+      console.log(
+        '[CICD] Workflow data received, action count:',
+        data.actions?.length || 0,
+      );
       setWorkflowData(data);
 
       if (data.actions && data.actions.length > 0) {

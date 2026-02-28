@@ -123,7 +123,7 @@ export function useWorkflowStatus({
  */
   const checkStatus = useCallback(async (signal) => {
     // Don't check status if workflow ID is empty or other required fields are missing
-    if (!workflowId.trim() || (!secretName?.trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
+    if (!workflowId.trim() || (!(secretName || '').trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
       return;
     }
 
@@ -238,7 +238,7 @@ export function useWorkflowStatus({
       return;
     }
 
-    if ((!secretName?.trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
+    if ((!(secretName || '').trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
       setWorkflowStatus(null);
       setStatusChecked(false);
     }

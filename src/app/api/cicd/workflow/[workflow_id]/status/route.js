@@ -73,31 +73,50 @@ export async function POST(req, { params }) {
         const runtimeUrl = `${RUNTIME_URL}/cicd/workflow/${workflow_id}/status?${queryParams}`
         logger.debug('[cicd][POST /workflow/status] → Runtime URL:', runtimeUrl)
 
-        const res = await fetch(runtimeUrl, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${RUNTIME_SECRET}`,
-                'accept': 'application/json',
-            },
-        })
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
 
-        const responseText = await res.text()
-        logger.debug('[cicd][POST /workflow/status] ← Runtime response status:', res.status)
-        // Log truncated response to avoid exposing sensitive data
-        const truncatedResponse = responseText.length > 200
-            ? responseText.substring(0, 200) + '...(truncated)'
-            : responseText
-        logger.debug('[cicd][POST /workflow/status] ← Runtime response (truncated):', truncatedResponse)
-
-        let data
         try {
-            data = JSON.parse(responseText)
-        } catch {
-            data = { detail: responseText }
-        }
+            const res = await fetch(runtimeUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${RUNTIME_SECRET}`,
+                    'accept': 'application/json',
+                },
+                signal: controller.signal,
+            })
+            clearTimeout(timeoutId)
 
-        return NextResponse.json(data, { status: res.status })
+            const responseText = await res.text()
+            logger.debug('[cicd][POST /workflow/status] ← Runtime response status:', res.status)
+            // Log truncated response to avoid exposing sensitive data
+            const truncatedResponse = responseText.length > 200
+                ? responseText.substring(0, 200) + '...(truncated)'
+                : responseText
+            logger.debug('[cicd][POST /workflow/status] ← Runtime response (truncated):', truncatedResponse)
+
+            let data
+            try {
+                data = JSON.parse(responseText)
+            } catch {
+                data = { detail: responseText }
+            }
+
+            return NextResponse.json(data, { status: res.status })
+        } catch (fetchError) {
+            clearTimeout(timeoutId)
+            if (fetchError.name === 'AbortError') {
+                logger.error('[cicd][POST /workflow/status] Request timeout:', runtimeUrl)
+                return NextResponse.json(
+                    createErrorResponse('Request timeout. Please try again.', 504),
+                    { status: 504 }
+                )
+            }
+            throw fetchError
+        } finally {
+            clearTimeout(timeoutId)
+        }
     } catch (err) {
         logger.error('[cicd][POST /workflow/status] ERROR', err)
         return NextResponse.json(

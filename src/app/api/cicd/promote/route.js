@@ -60,11 +60,11 @@ export async function POST(req) {
         })
 
         // Validate required fields
-        const { source_code, cicd_secret_id, cicd_token, workflow_id, action_id, force = false, dry_run = false } = body
+        const { source_code, cicd_secret_id, hubspot_token, workflow_id, action_id, force = false, dry_run = false } = body
 
-        if (!source_code || !workflow_id || !action_id || (!cicd_secret_id && !cicd_token)) {
+        if (!source_code || !workflow_id || !action_id || (!cicd_secret_id && !hubspot_token)) {
             return NextResponse.json(
-                createErrorResponse(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS(['source_code', 'workflow_id', 'action_id', 'cicd_secret_id or cicd_token']), 400),
+                createErrorResponse(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS(['source_code', 'workflow_id', 'action_id', 'cicd_secret_id or hubspot_token']), 400),
                 { status: 400 }
             )
         }
@@ -74,11 +74,11 @@ export async function POST(req) {
             source_code,
         }
 
-        // Add credential - prefer cicd_secret_id, fallback to cicd_token
+        // Add credential - prefer cicd_secret_id, fallback to hubspot_token
         if (cicd_secret_id) {
             requestBody.cicd_secret_id = cicd_secret_id
-        } else if (cicd_token) {
-            requestBody.cicd_token = cicd_token
+        } else if (hubspot_token) {
+            requestBody.hubspot_token = hubspot_token
         }
 
         // Add query parameters for force and dry_run if needed
@@ -87,24 +87,41 @@ export async function POST(req) {
         if (dry_run) queryParams.append('dry_run', 'true')
         const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ''
 
-        const res = await fetch(`${RUNTIME_URL}/cicd/workflow/${workflow_id}/action/${action_id}/promote${queryString}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${RUNTIME_SECRET}`,
-                'accept': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-        })
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
 
-        const data = await res.json().catch(() => null)
+        try {
+            const res = await fetch(`${RUNTIME_URL}/cicd/workflow/${workflow_id}/action/${action_id}/promote${queryString}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${RUNTIME_SECRET}`,
+                    'accept': 'application/json',
+                },
+                body: JSON.stringify(requestBody),
+                signal: controller.signal,
+            })
+            clearTimeout(timeoutId)
 
-        logger.log('[cicd][POST /promote] ←', {
-            status: res.status,
-            success: res.ok,
-        })
+            const data = await res.json().catch(() => null)
 
-        return NextResponse.json(data, { status: res.status })
+            logger.log('[cicd][POST /promote] ←', {
+                status: res.status,
+                success: res.ok,
+            })
+
+            return NextResponse.json(data, { status: res.status })
+        } catch (fetchError) {
+            clearTimeout(timeoutId)
+            if (fetchError.name === 'AbortError') {
+                logger.error('[cicd][POST /promote] Request timeout')
+                return NextResponse.json(
+                    createErrorResponse('Request timeout. Please try again.', 504),
+                    { status: 504 }
+                )
+            }
+            throw fetchError
+        }
     } catch (err) {
         logger.error('[cicd][POST /promote] ERROR', err)
         return NextResponse.json(

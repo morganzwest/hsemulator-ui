@@ -124,8 +124,8 @@ export async function checkWorkflowStatus({
   actionId,
 }) {
   // Validate required parameters
-  if (!workflowId || !cicdSecretId) {
-    throw new Error(ERROR_MESSAGES.MISSING_PARAMETERS(['workflow_id', 'cicd_secret_id']))
+  if (!workflowId || !cicdSecretId || !actionId) {
+    throw new Error(ERROR_MESSAGES.MISSING_PARAMETERS(['workflow_id', 'cicd_secret_id', 'action_id']))
   }
 
   const requestBody = {

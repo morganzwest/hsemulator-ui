@@ -456,16 +456,16 @@ export function CICDSetupDrawer({
 
   // Debug canPush logic
   useEffect(() => {
-    logger.log('canPush debug:', {
-      canPush,
-      workflowId: workflowId.trim(),
-      selectedActionId: selectedActionId.trim(),
-      hasCicdSecret,
-      hasExistingToken,
-      statusChecked,
-      pushCompleted,
-      workflowStatus,
-    });
+    // logger.log('canPush debug:', {
+    //   canPush,
+    //   workflowId: workflowId.trim(),
+    //   selectedActionId: selectedActionId.trim(),
+    //   hasCicdSecret,
+    //   hasExistingToken,
+    //   statusChecked,
+    //   pushCompleted,
+    //   workflowStatus,
+    // });
   }, [
     canPush,
     workflowId,

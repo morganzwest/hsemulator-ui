@@ -4,6 +4,27 @@ import { logger } from '@/lib/logger';
 import { ERROR_MESSAGES } from '@/lib/errors';
 
 // Retry utility with exponential backoff
+/**
+ * Retry utility function with exponential backoff for handling transient failures
+ * 
+ * @param {Function} fn - The async function to retry
+ * @param {number} [maxRetries=3] - Maximum number of retry attempts
+ * @param {number} [baseDelay=1000] - Base delay in milliseconds for exponential backoff
+ * @returns {Promise<any>} Result of the function execution
+ * 
+ * @throws {Error} The last error encountered after all retries are exhausted
+ * 
+ * @example
+ * try {
+ *   const result = await retryWithBackoff(
+ *     () => fetch('/api/data'),
+ *     3,
+ *     1000
+ *   );
+ * } catch (error) {
+ *   console.error('All retries failed:', error);
+ * }
+ */
 async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
   let lastError;
 
@@ -32,6 +53,42 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
   throw lastError;
 }
 
+/**
+ * Custom hook for managing workflow status checking with rate limiting and retry logic
+ * 
+ * @param {Object} config - Hook configuration object
+ * @param {string} config.workflowId - The workflow ID to check status for
+ * @param {string} config.secretName - The secret name for authentication (legacy)
+ * @param {string} config.cicdSecretId - The CICD secret ID for authentication
+ * @param {string} config.sourceCode - The source code to compare against
+ * @param {string} config.actionId - The action ID to check status for
+ * @param {boolean} config.isEditing - Whether the configuration is being edited
+ * @param {number} config.manualTrigger - Manual trigger value for forcing status checks
+ * @param {number} [config.debounceMs=1500] - Debounce delay in milliseconds
+ * 
+ * @returns {Object} Hook state and control functions
+ * @returns {Object|null} returns.workflowStatus - Current workflow status data
+ * @returns {boolean} returns.statusLoading - Whether status check is in progress
+ * @returns {boolean} returns.statusChecked - Whether status has been checked at least once
+ * @returns {Function} returns.resetStatus - Function to reset status state
+ * @returns {Function} returns.triggerStatusCheck - Function to manually trigger status check
+ * 
+ * @example
+ * const {
+ *   workflowStatus,
+ *   statusLoading,
+ *   statusChecked,
+ *   resetStatus,
+ *   triggerStatusCheck
+ * } = useWorkflowStatus({
+ *   workflowId: '123456789',
+ *   cicdSecretId: 'secret-123',
+ *   actionId: 'action-456',
+ *   sourceCode: 'function handler() { return "Hello"; }',
+ *   isEditing: false,
+ *   manualTrigger: 0
+ * });
+ */
 export function useWorkflowStatus({
   workflowId,
   secretName,
@@ -52,6 +109,18 @@ export function useWorkflowStatus({
   const forceNextCheckRef = useRef(false);
   const [triggerKey, setTriggerKey] = useState(0); // Add trigger key to force re-runs
 
+  /**
+ * Checks workflow status with rate limiting and retry logic
+ * 
+ * @param {AbortSignal} signal - Abort signal to cancel the status check
+ * @returns {Promise<Object|null>} Error object if check fails, null otherwise
+ * 
+ * @example
+ * const error = await checkStatus(controller.signal);
+ * if (error) {
+ *   console.error('Status check failed:', error.message);
+ * }
+ */
   const checkStatus = useCallback(async (signal) => {
     if (!workflowId.trim() || !secretName.trim() || !cicdSecretId || !actionId || isEditing) {
       return;
@@ -110,6 +179,16 @@ export function useWorkflowStatus({
     return null;
   }, [workflowId, secretName, cicdSecretId, actionId, sourceCode, isEditing, manualTrigger]);
 
+  /**
+ * Generates user-friendly error messages based on error type and status
+ * 
+ * @param {Error} err - The error object to generate message for
+ * @returns {string} User-friendly error message
+ * 
+ * @example
+ * const message = getErrorMessage(error);
+ * // Returns: 'Network error. Please check your connection and try again.'
+ */
   const getErrorMessage = (err) => {
     let errorMessage = ERROR_MESSAGES.FAILED_TO_CHECK_STATUS;
     if (err.message.includes('Missing required parameters')) {
@@ -156,6 +235,14 @@ export function useWorkflowStatus({
     }
   }, [workflowId, secretName, cicdSecretId, actionId, isEditing]);
 
+  /**
+ * Resets the workflow status state and allows immediate next check
+ * 
+ * @returns {void}
+ * 
+ * @example
+ * resetStatus();
+ */
   const resetStatus = useCallback(() => {
     setWorkflowStatus(null);
     setStatusChecked(false);
@@ -164,6 +251,14 @@ export function useWorkflowStatus({
     lastCheckTimeRef.current = 0;
   }, []);
 
+  /**
+ * Triggers a manual status check by incrementing the trigger key
+ * 
+ * @returns {void}
+ * 
+ * @example
+ * triggerStatusCheck();
+ */
   const triggerStatusCheck = useCallback(() => {
     // This will trigger the useEffect to run again by incrementing the trigger key
     setTriggerKey(prev => prev + 1);

@@ -63,6 +63,27 @@ import {
    Retry Utility with Exponential Backoff
 -------------------------------- */
 
+/**
+ * Retry utility function with exponential backoff for handling transient failures
+ *
+ * @param {Function} fn - The async function to retry
+ * @param {number} [maxRetries=3] - Maximum number of retry attempts
+ * @param {number} [baseDelay=1000] - Base delay in milliseconds for exponential backoff
+ * @returns {Promise<any>} Result of the function execution
+ *
+ * @throws {Error} The last error encountered after all retries are exhausted
+ *
+ * @example
+ * try {
+ *   const result = await retryWithBackoff(
+ *     () => fetch('/api/data'),
+ *     3,
+ *     1000
+ *   );
+ * } catch (error) {
+ *   console.error('All retries failed:', error);
+ * }
+ */
 async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
   let lastError;
 
@@ -91,6 +112,27 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
   throw lastError;
 }
 
+/**
+ * CI/CD Setup Drawer component for configuring workflow deployments
+ *
+ * @param {Object} props - Component props
+ * @param {boolean} props.open - Whether the drawer is open
+ * @param {Function} props.onOpenChange - Callback function to handle drawer open/close state
+ * @param {string} props.actionId - The ID of the current action
+ * @param {string} props.portalId - The ID of the current portal
+ * @param {string} props.sourceCode - The source code to be deployed
+ *
+ * @returns {JSX.Element} The rendered CI/CD setup drawer component
+ *
+ * @example
+ * <CICDSetupDrawer
+ *   open={isOpen}
+ *   onOpenChange={setIsOpen}
+ *   actionId="action-123"
+ *   portalId="portal-456"
+ *   sourceCode="function handler() { return 'Hello'; }"
+ * />
+ */
 export function CICDSetupDrawer({
   open,
   onOpenChange,
@@ -207,6 +249,19 @@ export function CICDSetupDrawer({
      Validation Functions
   -------------------------------- */
 
+  /**
+   * Validates workflow ID input for format and length requirements
+   *
+   * @param {string} value - The workflow ID value to validate
+   * @returns {boolean} True if valid, false otherwise
+   *
+   * @example
+   * if (validateWorkflowId('123456789')) {
+   *   // Valid workflow ID
+   * } else {
+   *   // Invalid workflow ID
+   * }
+   */
   const validateWorkflowId = (value) => {
     if (!value.trim()) {
       setWorkflowIdError('Workflow ID is required');
@@ -224,6 +279,19 @@ export function CICDSetupDrawer({
     return true;
   };
 
+  /**
+   * Validates secret name input for format and length requirements
+   *
+   * @param {string} value - The secret name value to validate
+   * @returns {boolean} True if valid, false otherwise
+   *
+   * @example
+   * if (validateSecretName('my-secret-123')) {
+   *   // Valid secret name
+   * } else {
+   *   // Invalid secret name
+   * }
+   */
   const validateSecretName = (value) => {
     if (!value.trim()) {
       setSecretNameError('Secret name is required');
@@ -370,6 +438,14 @@ export function CICDSetupDrawer({
      Workflow Fetching
   -------------------------------- */
 
+  /**
+   * Fetches workflow details from the runtime service and handles action selection
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handleFetchWorkflow();
+   */
   async function handleFetchWorkflow() {
     console.log('[CICD] Fetch workflow clicked:', {
       workflowId,
@@ -434,6 +510,16 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns the appropriate icon component for a given runtime environment
+   *
+   * @param {string} runtime - The runtime environment identifier
+   * @returns {JSX.Element} Icon component for the runtime
+   *
+   * @example
+   * const icon = getLanguageIcon('NODE20X'); // Returns Code icon
+   * const icon = getLanguageIcon('PYTHON39'); // Returns Terminal icon
+   */
   function getLanguageIcon(runtime) {
     switch (runtime) {
       case 'NODE20X':
@@ -445,6 +531,16 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns the human-readable name for a given runtime environment
+   *
+   * @param {string} runtime - The runtime environment identifier
+   * @returns {string} Human-readable runtime name
+   *
+   * @example
+   * const name = getLanguageName('NODE20X'); // Returns 'Node.js'
+   * const name = getLanguageName('PYTHON39'); // Returns 'Python'
+   */
   function getLanguageName(runtime) {
     switch (runtime) {
       case 'NODE20X':
@@ -456,6 +552,15 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Handles action selection from workflow actions and saves the configuration
+   *
+   * @param {string} newSelectedActionId - The ID of the selected action
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handleActionSelection('action-123');
+   */
   async function handleActionSelection(newSelectedActionId) {
     setSelectedActionId(newSelectedActionId);
     setShowActionSelection(false);
@@ -479,6 +584,14 @@ export function CICDSetupDrawer({
      Actions
   -------------------------------- */
 
+  /**
+   * Saves the current CI/CD configuration to the database
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handleSave();
+   */
   async function handleSave() {
     // Validate inputs before saving
     const isWorkflowIdValid = validateWorkflowId(workflowId);
@@ -511,6 +624,14 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Initiates the push/deployment process, handling force confirmation if needed
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handlePush();
+   */
   async function handlePush() {
     // Check if this is first-time setup and needs force
     if (
@@ -524,6 +645,14 @@ export function CICDSetupDrawer({
     await performPush();
   }
 
+  /**
+   * Performs the actual deployment to HubSpot with retry logic
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await performPush();
+   */
   async function performPush() {
     setPushing(true);
     logger.log('Starting deployment process');
@@ -651,6 +780,16 @@ export function CICDSetupDrawer({
     }
   }, [pushCompleted]);
 
+  /**
+   * Returns CSS class names for styling workflow status indicators
+   *
+   * @param {string} status - The workflow status value
+   * @returns {string} CSS class names for status styling
+   *
+   * @example
+   * const classes = getStatusColor('in_sync'); // Returns green color classes
+   * const classes = getStatusColor('out_of_sync'); // Returns yellow color classes
+   */
   function getStatusColor(status) {
     switch (status) {
       case 'in_sync':
@@ -667,6 +806,16 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns the appropriate icon component for a given workflow status
+   *
+   * @param {string} status - The workflow status value
+   * @returns {JSX.Element} Icon component for the status
+   *
+   * @example
+   * const icon = getStatusIcon('in_sync'); // Returns CheckCircle icon
+   * const icon = getStatusIcon('deploying'); // Returns Loader2 icon with animation
+   */
   function getStatusIcon(status) {
     switch (status) {
       case 'in_sync':
@@ -683,6 +832,14 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns the appropriate button text based on current deployment state
+   *
+   * @returns {string} Button text for the deploy action
+   *
+   * @example
+   * const text = getButtonText(); // Returns 'Deploying...', 'Deploy to HubSpot', etc.
+   */
   function getButtonText() {
     if (pushing) {
       return 'Deploying...';
@@ -706,6 +863,16 @@ export function CICDSetupDrawer({
     return 'Deploy to HubSpot';
   }
 
+  /**
+   * Returns human-readable text description for workflow status
+   *
+   * @param {string} status - The workflow status value
+   * @returns {string} Human-readable status description
+   *
+   * @example
+   * const text = getStatusText('in_sync'); // Returns 'Action is in sync with source code'
+   * const text = getStatusText('unmanaged'); // Returns 'Action is not managed'
+   */
   function getStatusText(status) {
     switch (status) {
       case 'in_sync':
@@ -725,6 +892,18 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns recommendation text based on workflow status and context
+   *
+   * @param {string} status - The workflow status value
+   * @param {boolean} actionFound - Whether the action was found in the workflow
+   * @param {boolean} hasHashMarker - Whether the action has a hash marker (unused)
+   * @returns {string} Recommendation text for the user
+   *
+   * @example
+   * const recommendation = getRecommendation('out_of_sync', true, false);
+   * // Returns 'Action is out of sync with source code. Deploy to update.'
+   */
   function getRecommendation(status, actionFound, hasHashMarker) {
     switch (status) {
       case 'in_sync':

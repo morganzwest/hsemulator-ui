@@ -6,6 +6,22 @@ import { ERROR_MESSAGES } from '@/lib/errors'
    Fetch existing CI/CD config
 ---------------------------------------- */
 
+/**
+ * Fetches existing CI/CD configuration from the database for a given action and portal
+ * 
+ * @param {string} actionId - The ID of the action to fetch configuration for
+ * @param {string} portalId - The ID of the portal to fetch configuration for
+ * @returns {Promise<Object>} Configuration object containing workflow settings
+ * @returns {string} returns.workflowId - The configured workflow ID
+ * @returns {string} returns.actionId - The configured action ID
+ * @returns {string|null} returns.token - The masked CI/CD token (never exposed raw)
+ * @returns {Object|null} returns.cicdSecret - The CICD secret object if found
+ * 
+ * @example
+ * const config = await fetchCICDConfig('action-123', 'portal-456');
+ * console.log(config.workflowId); // '123456789'
+ * console.log(config.cicdSecret); // { id: 'secret-789', name: 'my-secret', scope: 'cicd' }
+ */
 export async function fetchCICDConfig(actionId, portalId) {
   const supabase = createSupabaseBrowserClient()
 
@@ -61,6 +77,31 @@ export async function fetchCICDConfig(actionId, portalId) {
    Persist CI/CD config
 ---------------------------------------- */
 
+/**
+ * Persists CI/CD configuration to the database for a given action and portal
+ * 
+ * @param {Object} config - Configuration object to save
+ * @param {string} config.actionId - The ID of the action to save configuration for
+ * @param {string} config.portalId - The ID of the portal to save configuration for
+ * @param {string} config.workflowId - The workflow ID to save
+ * @param {string} config.secretName - The secret name (legacy, typically empty)
+ * @param {string} config.selectedActionId - The selected action ID to save
+ * @param {string} [config.token] - Optional new CI/CD token to save
+ * 
+ * @returns {Promise<void>}
+ * 
+ * @throws {Error} When database update fails
+ * 
+ * @example
+ * await saveCICDConfig({
+ *   actionId: 'action-123',
+ *   portalId: 'portal-456',
+ *   workflowId: '123456789',
+ *   secretName: '',
+ *   selectedActionId: 'action-789',
+ *   token: 'new-token-123'
+ * });
+ */
 export async function saveCICDConfig({
   actionId,
   portalId,
@@ -98,6 +139,19 @@ export async function saveCICDConfig({
   if (error) throw error
 }
 
+/**
+ * Infers the runtime environment from source code patterns
+ * 
+ * @param {string} sourceCode - The source code to analyze
+ * @returns {string} The inferred runtime environment ('PYTHON39' or 'NODE20X')
+ * 
+ * @example
+ * const runtime = inferRuntimeFromSource('def handler(): return "Hello"');
+ * // Returns 'PYTHON39'
+ * 
+ * const runtime = inferRuntimeFromSource('function handler() { return "Hello"; }');
+ * // Returns 'NODE20X'
+ */
 function inferRuntimeFromSource(sourceCode) {
   // Very explicit Python signals
   if (
@@ -117,6 +171,29 @@ function inferRuntimeFromSource(sourceCode) {
 /* ----------------------------------------
    Promote to runtime
 ---------------------------------------- */
+/**
+ * Checks the status of a workflow action by comparing source code with deployed version
+ * 
+ * @param {Object} params - Status check parameters
+ * @param {string} params.workflowId - The workflow ID to check
+ * @param {string} params.cicdSecretId - The CICD secret ID for authentication
+ * @param {string} params.actionId - The action ID to check status for
+ * @param {string} [params.sourceCode] - Optional source code to compare against
+ * 
+ * @returns {Promise<Object>} Status response object with workflow state information
+ * 
+ * @throws {Error} When required parameters are missing
+ * @throws {Error} When API request fails
+ * 
+ * @example
+ * const status = await checkWorkflowStatus({
+ *   workflowId: '123456789',
+ *   cicdSecretId: 'secret-123',
+ *   actionId: 'action-456',
+ *   sourceCode: 'function handler() { return "Hello"; }'
+ * });
+ * console.log(status.status); // 'in_sync', 'out_of_sync', etc.
+ */
 export async function checkWorkflowStatus({
   workflowId,
   cicdSecretId,
@@ -155,6 +232,26 @@ export async function checkWorkflowStatus({
   return json
 }
 
+/**
+ * Fetches detailed workflow information including available actions from the runtime service
+ * 
+ * @param {string} workflowId - The workflow ID to fetch details for
+ * @param {string} [cicdSecretId] - Optional CICD secret ID for authentication
+ * 
+ * @returns {Promise<Object>} Workflow details object containing actions and metadata
+ * @returns {Array} returns.actions - Array of available actions in the workflow
+ * 
+ * @throws {Error} When workflow is not found (404)
+ * @throws {Error} When access is denied (403)
+ * @throws {Error} When authentication is required (401)
+ * @throws {Error} When API endpoint is not available (404)
+ * @throws {Error} When request fails for other reasons
+ * 
+ * @example
+ * const workflow = await fetchWorkflowDetails('123456789', 'secret-123');
+ * console.log(workflow.actions.length); // Number of actions in workflow
+ * console.log(workflow.actions[0].action_id); // ID of first action
+ */
 export async function fetchWorkflowDetails(workflowId, cicdSecretId) {
   try {
     // Build URL with cicd_secret_id parameter
@@ -198,6 +295,35 @@ export async function fetchWorkflowDetails(workflowId, cicdSecretId) {
   }
 }
 
+/**
+ * Promotes/deployes an action to a HubSpot workflow with optional force and dry-run modes
+ * 
+ * @param {Object} params - Promotion parameters
+ * @param {string} params.workflowId - The workflow ID to promote to
+ * @param {string} params.actionId - The action ID to promote
+ * @param {string|null} params.hubspotToken - HubSpot authentication token (null if using CICD secret)
+ * @param {string} params.sourceCode - The source code to deploy
+ * @param {string} [params.cicdSecretId] - Optional CICD secret ID for authentication
+ * @param {string} [params.runtime] - Optional runtime environment override
+ * @param {boolean} [params.force=false] - Whether to force deployment even if unmanaged
+ * @param {boolean} [params.dryRun=false] - Whether to perform a dry run without actual deployment
+ * 
+ * @returns {Promise<Object>} Promotion response object with deployment status
+ * 
+ * @throws {Error} When promotion request fails
+ * 
+ * @example
+ * const result = await promoteAction({
+ *   workflowId: '123456789',
+ *   actionId: 'action-456',
+ *   hubspotToken: null,
+ *   sourceCode: 'function handler() { return "Hello"; }',
+ *   cicdSecretId: 'secret-123',
+ *   force: false,
+ *   dryRun: false
+ * });
+ * console.log(result.status); // 'success', 'noop', etc.
+ */
 export async function promoteAction({
   workflowId,
   actionId,

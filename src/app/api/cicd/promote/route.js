@@ -16,6 +16,27 @@ if (!RUNTIME_SECRET) {
 // Request size limit (1MB)
 const MAX_REQUEST_SIZE = 1024 * 1024
 
+/**
+ * Handles POST requests to promote an action to HubSpot workflow
+ * 
+ * @param {Request} req - The incoming HTTP request object
+ * @returns {Promise<NextResponse>} JSON response with promotion result or error
+ * 
+ * @throws {Error} When required environment variables are missing
+ * @throws {Error} When request size exceeds 1MB limit
+ * @throws {Error} When required fields are missing or invalid
+ * 
+ * @example
+ * // Request body:
+ * {
+ *   "source_code": "function handler() { return 'Hello'; }",
+ *   "cicd_secret_id": "secret-123",
+ *   "workflow_id": "123456789",
+ *   "action_id": "action-456",
+ *   "force": false,
+ *   "dry_run": false
+ * }
+ */
 export async function POST(req) {
     try {
         // Check request size

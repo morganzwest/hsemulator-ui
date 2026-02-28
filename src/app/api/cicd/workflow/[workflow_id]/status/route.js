@@ -20,6 +20,24 @@ logger.log('[cicd][POST /workflow/status] Environment check:', {
     runtimeSecretLength: RUNTIME_SECRET?.length || 0
 })
 
+/**
+ * Handles POST requests to check the status of a workflow action
+ * 
+ * @param {Request} req - The incoming HTTP request object
+ * @param {Object} params - Route parameters containing workflow_id
+ * @returns {Promise<NextResponse>} JSON response with workflow status or error
+ * 
+ * @throws {Error} When required environment variables are missing
+ * @throws {Error} When required parameters are missing or invalid
+ * 
+ * @example
+ * // Request body:
+ * {
+ *   "cicd_secret_id": "secret-123",
+ *   "source_code": "function handler() { return 'Hello'; }",
+ *   "action_id": "action-456"
+ * }
+ */
 export async function POST(req, { params }) {
     try {
         const { workflow_id } = await params

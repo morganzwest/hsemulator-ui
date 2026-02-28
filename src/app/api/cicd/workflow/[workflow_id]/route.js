@@ -14,6 +14,21 @@ if (!RUNTIME_SECRET) {
     throw new Error(ERROR_MESSAGES.MISSING_ENV_VAR('RUNTIME_SECRET'))
 }
 
+/**
+ * Handles GET requests to fetch workflow details from the runtime service
+ * 
+ * @param {Request} req - The incoming HTTP request object
+ * @param {Object} params - Route parameters containing workflow_id
+ * @returns {Promise<NextResponse>} JSON response with workflow details or error
+ * 
+ * @throws {Error} When required environment variables are missing
+ * @throws {Error} When required parameters are missing or invalid
+ * @throws {Error} When runtime service is unavailable
+ * 
+ * @example
+ * // Query parameters:
+ * // ?cicd_secret_id=secret-123
+ */
 export async function GET(req, { params }) {
     try {
         const { workflow_id } = await params

@@ -44,6 +44,8 @@ import {
   Unlock,
   ExternalLink,
   HelpCircle,
+  Code,
+  Terminal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -54,12 +56,34 @@ import {
   saveCICDConfig,
   promoteAction,
   checkWorkflowStatus,
+  fetchWorkflowDetails,
 } from '@/lib/cicd/cicd';
 
 /* --------------------------------
    Retry Utility with Exponential Backoff
 -------------------------------- */
 
+/**
+ * Retry utility function with exponential backoff for handling transient failures
+ *
+ * @param {Function} fn - The async function to retry
+ * @param {number} [maxRetries=3] - Maximum number of retry attempts
+ * @param {number} [baseDelay=1000] - Base delay in milliseconds for exponential backoff
+ * @returns {Promise<any>} Result of the function execution
+ *
+ * @throws {Error} The last error encountered after all retries are exhausted
+ *
+ * @example
+ * try {
+ *   const result = await retryWithBackoff(
+ *     () => fetch('/api/data'),
+ *     3,
+ *     1000
+ *   );
+ * } catch (error) {
+ *   console.error('All retries failed:', error);
+ * }
+ */
 async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
   let lastError;
 
@@ -88,6 +112,27 @@ async function retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
   throw lastError;
 }
 
+/**
+ * CI/CD Setup Drawer component for configuring workflow deployments
+ *
+ * @param {Object} props - Component props
+ * @param {boolean} props.open - Whether the drawer is open
+ * @param {Function} props.onOpenChange - Callback function to handle drawer open/close state
+ * @param {string} props.actionId - The ID of the current action
+ * @param {string} props.portalId - The ID of the current portal
+ * @param {string} props.sourceCode - The source code to be deployed
+ *
+ * @returns {JSX.Element} The rendered CI/CD setup drawer component
+ *
+ * @example
+ * <CICDSetupDrawer
+ *   open={isOpen}
+ *   onOpenChange={setIsOpen}
+ *   actionId="action-123"
+ *   portalId="portal-456"
+ *   sourceCode="function handler() { return 'Hello'; }"
+ * />
+ */
 export function CICDSetupDrawer({
   open,
   onOpenChange,
@@ -96,6 +141,8 @@ export function CICDSetupDrawer({
   sourceCode,
 }) {
   const [workflowId, setWorkflowId] = useState('');
+  const [debouncedWorkflowId, setDebouncedWorkflowId] = useState('');
+  const [selectedActionId, setSelectedActionId] = useState('');
   const [secretName, setSecretName] = useState('');
   const [token, setToken] = useState('');
   const [maskedToken, setMaskedToken] = useState('');
@@ -107,6 +154,24 @@ export function CICDSetupDrawer({
   const [pushCompleted, setPushCompleted] = useState(false);
   const pushCompletedTimeoutRef = useRef(null);
 
+  // Track if user has made manual input to prevent config overwrites
+  const hasUserInputRef = useRef(false);
+
+  // Debounce workflow ID to prevent rapid state changes while typing
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedWorkflowId(workflowId);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [workflowId]);
+
+  // Workflow fetching states
+  const [workflowData, setWorkflowData] = useState(null);
+  const [fetchingWorkflow, setFetchingWorkflow] = useState(false);
+  const [showActionSelection, setShowActionSelection] = useState(false);
+  const [workflowActions, setWorkflowActions] = useState([]);
+
   // Get portal data for URL generation
   const [portalData, setPortalData] = useState(null);
 
@@ -117,11 +182,13 @@ export function CICDSetupDrawer({
     statusChecked,
     resetStatus,
     triggerStatusCheck,
+    // secretName is the legacy prop for secret identification, actionId is the new intent-driven prop
   } = useWorkflowStatus({
-    workflowId,
-    secretName,
+    workflowId: debouncedWorkflowId,
+    secretName: cicdSecret?.name,
     cicdSecretId: cicdSecret?.id,
     sourceCode,
+    actionId: selectedActionId,
     isEditing,
     manualTrigger: manualStatusTrigger,
     debounceMs: 1500, // Use improved debouncing
@@ -188,16 +255,26 @@ export function CICDSetupDrawer({
   const hasExistingToken = Boolean(maskedToken);
   const hasCicdSecret = Boolean(cicdSecret);
   const hasAllFields =
-    workflowId.trim() &&
-    secretName.trim() &&
-    !workflowIdError &&
-    !secretNameError;
+    workflowId.trim() && selectedActionId.trim() && !workflowIdError;
   const isReadonly = hasAllFields && !isEditing;
 
   /* --------------------------------
      Validation Functions
   -------------------------------- */
 
+  /**
+   * Validates workflow ID input for format and length requirements
+   *
+   * @param {string} value - The workflow ID value to validate
+   * @returns {boolean} True if valid, false otherwise
+   *
+   * @example
+   * if (validateWorkflowId('123456789')) {
+   *   // Valid workflow ID
+   * } else {
+   *   // Invalid workflow ID
+   * }
+   */
   const validateWorkflowId = (value) => {
     if (!value.trim()) {
       setWorkflowIdError('Workflow ID is required');
@@ -215,6 +292,65 @@ export function CICDSetupDrawer({
     return true;
   };
 
+  /**
+   * Determines if the selected action ID should be cleared based on workflow ID changes
+   *
+   * @param {string} newWorkflowId - The new workflow ID value
+   * @param {string} previousWorkflowId - The previous workflow ID value
+   * @returns {boolean} True if action ID should be cleared
+   */
+  const shouldClearActionId = (newWorkflowId, previousWorkflowId) => {
+    // Clear if workflow ID becomes empty
+    if (!newWorkflowId.trim()) {
+      return true;
+    }
+
+    // Clear if workflow ID becomes too short (likely incomplete typing)
+    if (newWorkflowId.length < 6) {
+      return true;
+    }
+
+    // Clear if workflow ID format becomes invalid (non-numeric)
+    if (!/^\d+$/.test(newWorkflowId)) {
+      return true;
+    }
+
+    // Clear if the workflow ID fundamentally changes (not just typing more digits)
+    // This prevents clearing when user is just adding more digits to an existing valid ID
+    if (
+      previousWorkflowId &&
+      newWorkflowId.startsWith(previousWorkflowId) &&
+      newWorkflowId.length > previousWorkflowId.length
+    ) {
+      return false;
+    }
+
+    // Clear if workflow ID changes to a completely different value
+    if (
+      previousWorkflowId &&
+      previousWorkflowId.length >= 6 &&
+      newWorkflowId.length >= 6 &&
+      newWorkflowId !== previousWorkflowId
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  /**
+   * Validates secret name input for format and length requirements
+   *
+   * @param {string} value - The secret name value to validate
+   * @returns {boolean} True if valid, false otherwise
+   *
+   * @example
+   * if (validateSecretName('my-secret-123')) {
+   *   // Valid secret name
+   * } else {
+   *   // Invalid secret name
+   * }
+   */
   const validateSecretName = (value) => {
     if (!value.trim()) {
       setSecretNameError('Secret name is required');
@@ -236,30 +372,44 @@ export function CICDSetupDrawer({
   };
 
   /* --------------------------------
-     Load config on open
+     Load config on open (ONLY ONCE)
   -------------------------------- */
 
+  // Reset user input flag when drawer closes
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      hasUserInputRef.current = false;
+    }
+  }, [open]);
+
+  // Load config ONLY when drawer opens and user hasn't made input yet
+  useEffect(() => {
+    if (!open || hasUserInputRef.current) return;
 
     setLoading(true);
 
     // Get portal data for URL generation
     try {
       const portal = getActivePortal();
-      console.log('Portal data retrieved:', portal);
       setPortalData(portal);
     } catch (err) {
       console.warn('Failed to get portal data:', err);
-      // Fallback: try to use the portalId prop if available
-      console.log('Using portalId prop as fallback:', portalId);
       setPortalData({ id: portalId });
     }
 
     fetchCICDConfig(actionId, portalId)
       .then((config) => {
-        setWorkflowId(config.workflowId || '');
-        setSecretName(config.secretName || '');
+        // ONLY set workflow ID if user hasn't typed anything yet
+        if (!hasUserInputRef.current) {
+          setWorkflowId(config.workflowId || '');
+          setSelectedActionId(config.actionId || '');
+          console.log(
+            '[CICD] Auto-pull config loaded, workflowId:',
+            config.workflowId,
+          );
+        }
+
+        setSecretName('');
         setMaskedToken(
           config.token ? `${config.token.slice(0, 8)}•••••••` : '',
         );
@@ -267,16 +417,25 @@ export function CICDSetupDrawer({
         setToken('');
         setReplaceToken(false);
         setIsEditing(false);
-        resetStatus(); // Use hook's reset function
+
         // Clear validation errors on load
         setWorkflowIdError('');
         setSecretNameError('');
+
+        // Set up action selection UI based on config
+        if (config.workflowId && config.actionId) {
+          setShowActionSelection(false);
+        } else if (config.workflowId && !config.actionId) {
+          setShowActionSelection(false);
+        } else {
+          setShowActionSelection(false);
+        }
       })
       .catch(() => {
         toast.error(ERROR_MESSAGES.FAILED_TO_LOAD_CONFIG);
       })
       .finally(() => setLoading(false));
-  }, [open, actionId, portalId, resetStatus]);
+  }, [open, actionId, portalId]); // Remove all hook dependencies
 
   /* --------------------------------
      Derived state
@@ -284,33 +443,33 @@ export function CICDSetupDrawer({
 
   const canSave =
     workflowId.trim() &&
-    secretName.trim() &&
+    selectedActionId.trim() &&
     (hasCicdSecret || replaceToken || token.length) &&
     (!replaceToken || token.length);
 
   const canPush =
     workflowId.trim() &&
-    secretName.trim() &&
+    selectedActionId.trim() &&
     (hasCicdSecret || hasExistingToken) &&
     statusChecked &&
     !pushCompleted; // Disable when push was just completed
 
   // Debug canPush logic
   useEffect(() => {
-    logger.log('canPush debug:', {
-      canPush,
-      workflowId: workflowId.trim(),
-      secretName: secretName.trim(),
-      hasCicdSecret,
-      hasExistingToken,
-      statusChecked,
-      pushCompleted,
-      workflowStatus,
-    });
+    // logger.log('canPush debug:', {
+    //   canPush,
+    //   workflowId: workflowId.trim(),
+    //   selectedActionId: selectedActionId.trim(),
+    //   hasCicdSecret,
+    //   hasExistingToken,
+    //   statusChecked,
+    //   pushCompleted,
+    //   workflowStatus,
+    // });
   }, [
     canPush,
     workflowId,
-    secretName,
+    selectedActionId,
     hasCicdSecret,
     hasExistingToken,
     statusChecked,
@@ -319,15 +478,171 @@ export function CICDSetupDrawer({
   ]);
 
   /* --------------------------------
+     Workflow Fetching
+  -------------------------------- */
+
+  /**
+   * Fetches workflow details from the runtime service and handles action selection
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handleFetchWorkflow();
+   */
+  async function handleFetchWorkflow() {
+    console.log('[CICD] Fetch workflow clicked:', {
+      workflowId,
+      workflowIdError,
+    });
+
+    if (!workflowId.trim()) {
+      toast.error('Please enter a workflow ID first');
+      return;
+    }
+
+    if (workflowIdError) {
+      toast.error('Please fix workflow ID errors before fetching');
+      return;
+    }
+
+    setFetchingWorkflow(true);
+    try {
+      console.log('[CICD] Calling fetchWorkflowDetails for:', workflowId);
+      const data = await fetchWorkflowDetails(workflowId, cicdSecret?.id);
+      console.log(
+        '[CICD] Workflow data received, action count:',
+        data.actions?.length || 0,
+      );
+      setWorkflowData(data);
+
+      if (data.actions && data.actions.length > 0) {
+        console.log('[CICD] Actions found:', data.actions.length);
+        setWorkflowActions(data.actions);
+
+        if (data.actions.length === 1) {
+          // Single action - auto-select and proceed
+          const singleAction = data.actions[0];
+          console.log(
+            '[CICD] Auto-selecting single action:',
+            singleAction.action_id,
+          );
+          setSelectedActionId(singleAction.action_id);
+          setShowActionSelection(false);
+
+          // Save the action_id to database
+          await saveCICDConfig({
+            actionId,
+            portalId,
+            workflowId,
+            secretName: '', // Empty since we're not using search tokens anymore
+            selectedActionId: singleAction.action_id,
+          });
+
+          toast.success('Action automatically selected');
+        } else {
+          // Multiple actions - show selection
+          console.log('[CICD] Multiple actions found, showing selection UI');
+          setShowActionSelection(true);
+        }
+      } else {
+        console.log('[CICD] No actions found in workflow');
+        toast.error('No actions found in this workflow');
+      }
+    } catch (err) {
+      console.error('[CICD] Failed to fetch workflow:', err);
+      toast.error(err.message || ERROR_MESSAGES.FAILED_TO_FETCH_WORKFLOW);
+    } finally {
+      setFetchingWorkflow(false);
+    }
+  }
+
+  /**
+   * Returns the appropriate icon component for a given runtime environment
+   *
+   * @param {string} runtime - The runtime environment identifier
+   * @returns {JSX.Element} Icon component for the runtime
+   *
+   * @example
+   * const icon = getLanguageIcon('NODE20X'); // Returns Code icon
+   * const icon = getLanguageIcon('PYTHON39'); // Returns Terminal icon
+   */
+  function getLanguageIcon(runtime) {
+    switch (runtime) {
+      case 'NODE20X':
+        return <Code className='h-4 w-4' />;
+      case 'PYTHON39':
+        return <Terminal className='h-4 w-4' />;
+      default:
+        return <Code className='h-4 w-4' />;
+    }
+  }
+
+  /**
+   * Returns the human-readable name for a given runtime environment
+   *
+   * @param {string} runtime - The runtime environment identifier
+   * @returns {string} Human-readable runtime name
+   *
+   * @example
+   * const name = getLanguageName('NODE20X'); // Returns 'Node.js'
+   * const name = getLanguageName('PYTHON39'); // Returns 'Python'
+   */
+  function getLanguageName(runtime) {
+    switch (runtime) {
+      case 'NODE20X':
+        return 'Node.js';
+      case 'PYTHON39':
+        return 'Python';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  /**
+   * Handles action selection from workflow actions and saves the configuration
+   *
+   * @param {string} newSelectedActionId - The ID of the selected action
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handleActionSelection('action-123');
+   */
+  async function handleActionSelection(newSelectedActionId) {
+    setSelectedActionId(newSelectedActionId);
+    setShowActionSelection(false);
+
+    // Save the selected action_id to database
+    try {
+      await saveCICDConfig({
+        actionId,
+        portalId,
+        workflowId,
+        secretName: '', // Empty since we're not using search tokens anymore
+        selectedActionId: newSelectedActionId,
+      });
+      toast.success('Action selected successfully');
+    } catch (err) {
+      toast.error(ERROR_MESSAGES.FAILED_TO_SAVE_CONFIG);
+    }
+  }
+
+  /* --------------------------------
      Actions
   -------------------------------- */
 
+  /**
+   * Saves the current CI/CD configuration to the database
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handleSave();
+   */
   async function handleSave() {
     // Validate inputs before saving
     const isWorkflowIdValid = validateWorkflowId(workflowId);
-    const isSecretNameValid = validateSecretName(secretName);
 
-    if (!isWorkflowIdValid || !isSecretNameValid) {
+    if (!isWorkflowIdValid) {
       toast.error('Please fix validation errors before saving');
       return;
     }
@@ -339,7 +654,8 @@ export function CICDSetupDrawer({
         actionId,
         portalId,
         workflowId,
-        secretName,
+        secretName: '', // Empty since we're not using search tokens anymore
+        selectedActionId: selectedActionId,
         token: replaceToken ? token : undefined,
       });
 
@@ -354,6 +670,14 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Initiates the push/deployment process, handling force confirmation if needed
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await handlePush();
+   */
   async function handlePush() {
     // Check if this is first-time setup and needs force
     if (
@@ -367,6 +691,14 @@ export function CICDSetupDrawer({
     await performPush();
   }
 
+  /**
+   * Performs the actual deployment to HubSpot with retry logic
+   *
+   * @returns {Promise<void>}
+   *
+   * @example
+   * await performPush();
+   */
   async function performPush() {
     setPushing(true);
     logger.log('Starting deployment process');
@@ -376,7 +708,7 @@ export function CICDSetupDrawer({
         async () => {
           return await promoteAction({
             workflowId,
-            secretName,
+            actionId: selectedActionId,
             hubspotToken: hasCicdSecret ? null : token,
             sourceCode,
             cicdSecretId: cicdSecret?.id,
@@ -494,6 +826,16 @@ export function CICDSetupDrawer({
     }
   }, [pushCompleted]);
 
+  /**
+   * Returns CSS class names for styling workflow status indicators
+   *
+   * @param {string} status - The workflow status value
+   * @returns {string} CSS class names for status styling
+   *
+   * @example
+   * const classes = getStatusColor('in_sync'); // Returns green color classes
+   * const classes = getStatusColor('out_of_sync'); // Returns yellow color classes
+   */
   function getStatusColor(status) {
     switch (status) {
       case 'in_sync':
@@ -510,6 +852,16 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns the appropriate icon component for a given workflow status
+   *
+   * @param {string} status - The workflow status value
+   * @returns {JSX.Element} Icon component for the status
+   *
+   * @example
+   * const icon = getStatusIcon('in_sync'); // Returns CheckCircle icon
+   * const icon = getStatusIcon('deploying'); // Returns Loader2 icon with animation
+   */
   function getStatusIcon(status) {
     switch (status) {
       case 'in_sync':
@@ -526,6 +878,14 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns the appropriate button text based on current deployment state
+   *
+   * @returns {string} Button text for the deploy action
+   *
+   * @example
+   * const text = getButtonText(); // Returns 'Deploying...', 'Deploy to HubSpot', etc.
+   */
   function getButtonText() {
     if (pushing) {
       return 'Deploying...';
@@ -549,6 +909,16 @@ export function CICDSetupDrawer({
     return 'Deploy to HubSpot';
   }
 
+  /**
+   * Returns human-readable text description for workflow status
+   *
+   * @param {string} status - The workflow status value
+   * @returns {string} Human-readable status description
+   *
+   * @example
+   * const text = getStatusText('in_sync'); // Returns 'Action is in sync with source code'
+   * const text = getStatusText('unmanaged'); // Returns 'Action is not managed'
+   */
   function getStatusText(status) {
     switch (status) {
       case 'in_sync':
@@ -568,6 +938,18 @@ export function CICDSetupDrawer({
     }
   }
 
+  /**
+   * Returns recommendation text based on workflow status and context
+   *
+   * @param {string} status - The workflow status value
+   * @param {boolean} actionFound - Whether the action was found in the workflow
+   * @param {boolean} hasHashMarker - Whether the action has a hash marker (unused)
+   * @returns {string} Recommendation text for the user
+   *
+   * @example
+   * const recommendation = getRecommendation('out_of_sync', true, false);
+   * // Returns 'Action is out of sync with source code. Deploy to update.'
+   */
   function getRecommendation(status, actionFound, hasHashMarker) {
     switch (status) {
       case 'in_sync':
@@ -578,12 +960,12 @@ export function CICDSetupDrawer({
         if (actionFound) {
           return 'Action exists but is not managed by novocode. Force deploy to take control.';
         }
-        return 'No action found with this search key. Force deploy to create new action.';
+        return 'No action found with this action ID. Force deploy to create new action.';
       case 'not_found':
         if (actionFound) {
           return 'Action found but status check failed. Try refreshing or contact support.';
         }
-        return 'No action found in workflow. Check workflow ID and search key, then force deploy.';
+        return 'No action found in workflow. Check workflow ID and action ID, then force deploy.';
       case 'workflow_not_found':
         return 'Workflow not found. Verify the workflow ID is correct and try again.';
       case 'access_denied':
@@ -656,19 +1038,26 @@ export function CICDSetupDrawer({
                           <Input
                             ref={firstFocusableRef}
                             disabled={loading || isReadonly}
-                            className={`h-11 px-4 pr-10 font-mono text-sm transition-all duration-200 ${
+                            className={`h-11 px-4 pr-20 font-mono text-sm transition-all duration-200 ${
                               isReadonly
                                 ? 'bg-muted/50 border-muted-300 text-muted-foreground cursor-not-allowed'
                                 : workflowIdError
                                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                                   : 'bg-background border-input focus:ring-2 focus:ring-primary focus:border-primary'
                             }`}
-                            inputMode='numeric'
                             placeholder='123456789'
                             value={workflowId}
                             onChange={(e) => {
                               const value = e.target.value.replace(/\D/g, '');
+
+                              // Mark that user has made manual input
+                              if (value !== workflowId) {
+                                hasUserInputRef.current = true;
+                              }
+
                               setWorkflowId(value);
+
+                              // NEVER clear selected action ID while typing - only clear on explicit user action
                               if (value) validateWorkflowId(value);
                             }}
                             onBlur={() => validateWorkflowId(workflowId)}
@@ -677,13 +1066,54 @@ export function CICDSetupDrawer({
                               workflowIdError ? 'workflow-id-error' : undefined
                             }
                           />
-                          {workflowId.trim() && !workflowIdError && (
-                            <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+                          <div className='absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-2'>
+                            {workflowId.trim() && !workflowIdError && (
                               <div className='w-5 h-5 rounded-full bg-green-500 flex items-center justify-center'>
                                 <Check className='h-3 w-3 text-white' />
                               </div>
-                            </div>
-                          )}
+                            )}
+                            {selectedActionId.trim() && (
+                              <Button
+                                type='button'
+                                variant='outline'
+                                size='sm'
+                                onClick={() => setSelectedActionId('')}
+                                className='h-7 px-2 text-xs'
+                                title='Clear selected action'
+                              >
+                                <RefreshCcw className='h-3 w-3' />
+                              </Button>
+                            )}
+                            {!(
+                              workflowId.trim() &&
+                              !workflowIdError &&
+                              selectedActionId.trim()
+                            ) && (
+                              <Button
+                                type='button'
+                                variant=''
+                                size='sm'
+                                disabled={
+                                  !workflowId.trim() ||
+                                  workflowIdError ||
+                                  fetchingWorkflow ||
+                                  loading ||
+                                  isReadonly
+                                }
+                                onClick={handleFetchWorkflow}
+                                className='h-7 px-2 text-xs'
+                              >
+                                {fetchingWorkflow ? (
+                                  <>
+                                    <Loader2 className='h-3 w-3 animate-spin mr-1' />
+                                    Searching...
+                                  </>
+                                ) : (
+                                  'Search for Actions'
+                                )}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         {workflowIdError && (
                           <p
@@ -698,159 +1128,67 @@ export function CICDSetupDrawer({
                           Numeric HubSpot workflow identifier
                         </p>
                       </div>
-
-                      {/* Search Secret Field */}
-                      <div className='space-y-3'>
-                        <div className='flex items-center justify-between'>
-                          <div className='flex items-center gap-2'>
-                            <Label className='text-sm font-medium text-foreground'>
-                              Search Secret Name
-                            </Label>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className='h-4 w-4 text-muted-foreground cursor-help' />
-                              </TooltipTrigger>
-                              <TooltipContent className='max-w-xs'>
-                                <p className='text-sm'>
-                                  Create a secret with the exact name above and
-                                  and a blank value (single space) in your
-                                  custom code action. This allows novocode to
-                                  locate and manage your action.
-                                </p>
-                                <div className='mt-2 pt-2 border-t border-border'>
-                                  <p className='text-xs text-muted-foreground mb-1'>
-                                    Example workflow link:
-                                  </p>
-                                  {/* {(() => {
-                                    const url = `https://app-eu1.hubspot.com/workflows/${portalData?.id || '[portalID]'}/platform/flow/${workflowId || '[flowID]'}/edit`;
-                                    console.log('Tooltip URL:', url, {
-                                      portalData,
-                                      workflowId,
-                                    });
-                                    return url;
-                                  })()}
-                                  <a
-                                    href={`https://app-eu1.hubspot.com/workflows/${portalData?.id || '[portalID]'}/platform/flow/${workflowId || '[flowID]'}/edit`}
-                                    target='_blank'
-                                    rel='noopener noreferrer'
-                                    className='text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1'
-                                  >
-                                    <ExternalLink className='h-3 w-3' />
-                                    Open workflow in HubSpot
-                                  </a> */}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
-                          {isReadonly && (
-                            <Button
-                              type='button'
-                              variant='outline'
-                              size='sm'
-                              onClick={() => setIsEditing(true)}
-                              className='h-8 px-3'
-                            >
-                              <Edit3 className='h-4 w-4 mr-2' />
-                              Edit
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* Persistent guide for actions that need attention */}
-                        {secretName.trim() &&
-                          workflowStatus &&
-                          ['out_of_sync', 'unmanaged', 'not_found'].includes(
-                            workflowStatus.status,
-                          ) && (
-                            <div className='bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 space-y-2'>
-                              <div className='flex items-start gap-2'>
-                                <Info className='h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0' />
-                                <div className='flex-1 space-y-2'>
-                                  <p className='text-sm text-blue-800 dark:text-blue-200 font-medium'>
-                                    Action Setup Required
-                                  </p>
-                                  <p className='text-xs text-blue-700 dark:text-blue-300'>
-                                    Create a secret with the exact name{' '}
-                                    <span className='font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded'>
-                                      {secretName}
-                                    </span>{' '}
-                                    and a blank value (single space) in your
-                                    custom code action. This allows novocode to
-                                    locate and manage your action.
-                                  </p>
-                                  <div className='pt-2 border-t border-blue-200 dark:border-blue-700'>
-                                    {/* <p className='text-xs text-blue-600 dark:text-blue-400 mb-1'>
-                                      Quick access to workflow:
-                                    </p> */}
-                                    {/* {(() => {
-                                      const url = `https://app-eu1.hubspot.com/workflows/${portalData?.id || '[portalID]'}/platform/flow/${workflowId || '[flowID]'}/edit`;
-                                      console.log(
-                                        'Persistent guide URL:',
-                                        url,
-                                        { portalData, workflowId },
-                                      );
-                                      return url;
-                                    })()}
-                                    <a
-                                      href={`https://app-eu1.hubspot.com/workflows/${portalData?.id || '[portalID]'}/platform/flow/${workflowId || '[flowID]'}/edit`}
-                                      target='_blank'
-                                      rel='noopener noreferrer'
-                                      className='text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1'
-                                    >
-                                      <ExternalLink className='h-3 w-3' />
-                                      Open workflow in HubSpot
-                                    </a> */}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        <div className='relative'>
-                          <Input
-                            disabled={loading || isReadonly}
-                            className={`h-11 px-4 pr-10 font-mono text-sm transition-all duration-200 ${
-                              isReadonly
-                                ? 'bg-muted/50 border-muted-300 text-muted-foreground cursor-not-allowed'
-                                : secretNameError
-                                  ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
-                                  : 'bg-background border-input focus:ring-2 focus:ring-primary focus:border-primary'
-                            }`}
-                            placeholder='HUBSPOT_PRIVATE_APP_TOKEN'
-                            value={secretName}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setSecretName(value);
-                              if (value) validateSecretName(value);
-                            }}
-                            onBlur={() => validateSecretName(secretName)}
-                            aria-invalid={!!secretNameError}
-                            aria-describedby={
-                              secretNameError ? 'secret-name-error' : undefined
-                            }
-                          />
-                          {secretName.trim() && !secretNameError && (
-                            <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
-                              <div className='w-5 h-5 rounded-full bg-green-500 flex items-center justify-center'>
-                                <Check className='h-3 w-3 text-white' />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        {secretNameError && (
-                          <p
-                            id='secret-name-error'
-                            className='text-xs text-red-600 dark:text-red-400 ml-1 flex items-center gap-1'
-                          >
-                            <AlertCircle className='h-3 w-3' />
-                            {secretNameError}
-                          </p>
-                        )}
-                        <p className='text-xs text-muted-foreground ml-1'>
-                          Secret name to locate the target action
-                        </p>
-                      </div>
                     </div>
                   </div>
+
+                  {/* Action Selection Section */}
+                  {showActionSelection && workflowActions.length > 1 && (
+                    <div className='bg-card rounded-xl p-6 border shadow-sm'>
+                      <h3 className='text-lg font-semibold flex items-center gap-2 mb-4'>
+                        <Settings className='h-5 w-5 text-muted-foreground' />
+                        Select Action
+                      </h3>
+                      <p className='text-sm text-muted-foreground mb-4'>
+                        Multiple actions found in this workflow. Please select
+                        the action you want to manage.
+                      </p>
+                      <div className='space-y-3'>
+                        {workflowActions.map((action) => (
+                          <div
+                            key={action.action_id}
+                            className={`relative p-4 border rounded-lg cursor-pointer transition-all ${
+                              selectedActionId === action.action_id
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:bg-muted/50'
+                            }`}
+                            onClick={() =>
+                              handleActionSelection(action.action_id)
+                            }
+                          >
+                            <div className='flex items-center gap-3'>
+                              <div
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                  selectedActionId === action.action_id
+                                    ? 'border-primary bg-primary'
+                                    : 'border-muted-foreground'
+                                }`}
+                              >
+                                {selectedActionId === action.action_id && (
+                                  <div className='w-2 h-2 rounded-full bg-white' />
+                                )}
+                              </div>
+                              <div className='flex-1'>
+                                <div className='flex items-center gap-2 mb-1'>
+                                  <span className='font-mono text-sm font-medium'>
+                                    Action ID: {action.action_id}
+                                  </span>
+                                  <div className='flex items-center gap-1 text-muted-foreground'>
+                                    {getLanguageIcon(action.runtime)}
+                                    <span className='text-xs'>
+                                      {getLanguageName(action.runtime)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className='text-xs text-muted-foreground'>
+                                  Type: {action.type}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Authentication Section */}
                   <div className='bg-card rounded-xl p-6 border shadow-sm'>
@@ -1083,7 +1421,7 @@ export function CICDSetupDrawer({
                 <div className='flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg'>
                   <div className='w-2 h-2 bg-gray-500 rounded-full' />
                   <span className='text-sm text-muted-foreground'>
-                    Make sure your workflow ID and search key are correct
+                    Make sure your workflow ID and action ID are correct
                   </span>
                 </div>
               </div>

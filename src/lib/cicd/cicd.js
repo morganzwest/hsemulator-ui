@@ -155,9 +155,14 @@ export async function checkWorkflowStatus({
   return json
 }
 
-export async function fetchWorkflowDetails(workflowId) {
+export async function fetchWorkflowDetails(workflowId, cicdSecretId) {
   try {
-    const res = await fetch(`/api/cicd/workflow/${workflowId}`, {
+    // Build URL with cicd_secret_id parameter
+    const url = cicdSecretId
+      ? `/api/cicd/workflow/${workflowId}?cicd_secret_id=${cicdSecretId}`
+      : `/api/cicd/workflow/${workflowId}`
+
+    const res = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

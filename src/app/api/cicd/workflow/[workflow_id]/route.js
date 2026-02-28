@@ -5,6 +5,7 @@ import { ERROR_MESSAGES, createErrorResponse } from '@/lib/errors'
 const RUNTIME_URL = process.env.NEXT_PUBLIC_RUNTIME_URL
 const RUNTIME_SECRET = process.env.RUNTIME_SECRET
 
+// TODO: This is temporary for a mock implementation and must be revisited when the real external API call is implemented
 // Environment variable validation
 if (!RUNTIME_URL) {
     throw new Error(ERROR_MESSAGES.MISSING_ENV_VAR('NEXT_PUBLIC_RUNTIME_URL'))

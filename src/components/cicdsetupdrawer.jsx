@@ -389,7 +389,7 @@ export function CICDSetupDrawer({
     setFetchingWorkflow(true);
     try {
       console.log('[CICD] Calling fetchWorkflowDetails for:', workflowId);
-      const data = await fetchWorkflowDetails(workflowId);
+      const data = await fetchWorkflowDetails(workflowId, cicdSecret?.id);
       console.log('[CICD] Workflow data received:', data);
       setWorkflowData(data);
 

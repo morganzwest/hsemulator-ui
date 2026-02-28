@@ -195,7 +195,7 @@ export async function fetchWorkflowDetails(workflowId) {
 
 export async function promoteAction({
   workflowId,
-  secretName,
+  actionId,
   hubspotToken,
   sourceCode,
   cicdSecretId,
@@ -213,6 +213,7 @@ export async function promoteAction({
       source_code: sourceCode,
       cicd_secret_id: cicdSecretId,
       workflow_id: workflowId,
+      action_id: actionId,
       force,
       dry_run: dryRun,
     }),

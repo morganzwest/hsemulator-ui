@@ -532,7 +532,7 @@ export function CICDSetupDrawer({
         async () => {
           return await promoteAction({
             workflowId,
-            secretName: selectedActionId, // Use selectedActionId as search key
+            actionId: selectedActionId,
             hubspotToken: hasCicdSecret ? null : token,
             sourceCode,
             cicdSecretId: cicdSecret?.id,

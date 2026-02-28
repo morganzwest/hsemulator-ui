@@ -33,17 +33,17 @@ export async function POST(req) {
             source_code_length: body.source_code?.length || 0,
             has_cicd_secret_id: !!body.cicd_secret_id,
             workflow_id: body.workflow_id,
-            search_key: body.search_key,
+            action_id: body.action_id,
             force: body.force,
             dry_run: body.dry_run
         })
 
         // Validate required fields
-        const { source_code, cicd_secret_id, workflow_id, search_key, force = false, dry_run = false } = body
+        const { source_code, cicd_secret_id, workflow_id, action_id, force = false, dry_run = false } = body
 
-        if (!source_code || !cicd_secret_id || !workflow_id || !search_key) {
+        if (!source_code || !cicd_secret_id || !workflow_id || !action_id) {
             return NextResponse.json(
-                createErrorResponse(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS(['source_code', 'cicd_secret_id', 'workflow_id', 'search_key']), 400),
+                createErrorResponse(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS(['source_code', 'cicd_secret_id', 'workflow_id', 'action_id']), 400),
                 { status: 400 }
             )
         }
@@ -52,18 +52,15 @@ export async function POST(req) {
         const requestBody = {
             source_code,
             cicd_secret_id,
-            workflow_id,
-            search_key,
         }
 
-        // Add optional parameters if provided
-        if (force) requestBody.force = true
-        if (dry_run) requestBody.dry_run = true
+        // Add query parameters for force and dry_run if needed
+        const queryParams = new URLSearchParams()
+        if (force) queryParams.append('force', 'true')
+        if (dry_run) queryParams.append('dry_run', 'true')
+        const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ''
 
-        // Add query parameters for force if needed
-        const queryParams = force ? '?force=true' : ''
-
-        const res = await fetch(`${RUNTIME_URL}/cicd/promote${queryParams}`, {
+        const res = await fetch(`${RUNTIME_URL}/cicd/workflow/${workflow_id}/action/${action_id}/promote${queryString}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

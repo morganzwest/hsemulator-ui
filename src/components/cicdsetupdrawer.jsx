@@ -914,12 +914,12 @@ export function CICDSetupDrawer({
         if (actionFound) {
           return 'Action exists but is not managed by novocode. Force deploy to take control.';
         }
-        return 'No action found with this search key. Force deploy to create new action.';
+        return 'No action found with this action ID. Force deploy to create new action.';
       case 'not_found':
         if (actionFound) {
           return 'Action found but status check failed. Try refreshing or contact support.';
         }
-        return 'No action found in workflow. Check workflow ID and search key, then force deploy.';
+        return 'No action found in workflow. Check workflow ID and action ID, then force deploy.';
       case 'workflow_not_found':
         return 'Workflow not found. Verify the workflow ID is correct and try again.';
       case 'access_denied':
@@ -1005,6 +1005,7 @@ export function CICDSetupDrawer({
                             onChange={(e) => {
                               const value = e.target.value.replace(/\D/g, '');
                               setWorkflowId(value);
+                              setSelectedActionId('');
                               if (value) validateWorkflowId(value);
                             }}
                             onBlur={() => validateWorkflowId(workflowId)}
@@ -1356,7 +1357,7 @@ export function CICDSetupDrawer({
                 <div className='flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg'>
                   <div className='w-2 h-2 bg-gray-500 rounded-full' />
                   <span className='text-sm text-muted-foreground'>
-                    Make sure your workflow ID and search key are correct
+                    Make sure your workflow ID and action ID are correct
                   </span>
                 </div>
               </div>

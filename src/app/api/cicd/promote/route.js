@@ -60,11 +60,11 @@ export async function POST(req) {
         })
 
         // Validate required fields
-        const { source_code, cicd_secret_id, workflow_id, action_id, force = false, dry_run = false } = body
+        const { source_code, cicd_secret_id, cicd_token, workflow_id, action_id, force = false, dry_run = false } = body
 
-        if (!source_code || !cicd_secret_id || !workflow_id || !action_id) {
+        if (!source_code || !workflow_id || !action_id || (!cicd_secret_id && !cicd_token)) {
             return NextResponse.json(
-                createErrorResponse(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS(['source_code', 'cicd_secret_id', 'workflow_id', 'action_id']), 400),
+                createErrorResponse(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS(['source_code', 'workflow_id', 'action_id', 'cicd_secret_id or cicd_token']), 400),
                 { status: 400 }
             )
         }
@@ -72,7 +72,13 @@ export async function POST(req) {
         // Construct the new API request format
         const requestBody = {
             source_code,
-            cicd_secret_id,
+        }
+
+        // Add credential - prefer cicd_secret_id, fallback to cicd_token
+        if (cicd_secret_id) {
+            requestBody.cicd_secret_id = cicd_secret_id
+        } else if (cicd_token) {
+            requestBody.cicd_token = cicd_token
         }
 
         // Add query parameters for force and dry_run if needed

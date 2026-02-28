@@ -145,7 +145,8 @@ export function captureException(error, context = {}) {
 export function captureMessage(message, level = 'info', context = {}) {
   // Import Sentry dynamically to avoid SSR issues
   import('@sentry/nextjs').then(Sentry => {
-    Sentry.captureMessage(message, level, {
+    Sentry.captureMessage(message, {
+      level,
       contexts: {
         custom: context
       }

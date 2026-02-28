@@ -226,7 +226,9 @@ export async function checkWorkflowStatus({
   const json = await res.json()
 
   if (!res.ok) {
-    throw new Error(json.error || ERROR_MESSAGES.FAILED_TO_CHECK_STATUS)
+    const error = new Error(json.error || ERROR_MESSAGES.FAILED_TO_CHECK_STATUS)
+    error.status = res.status
+    throw error
   }
 
   return json
@@ -347,13 +349,17 @@ export async function promoteAction({
       action_id: actionId,
       force,
       dry_run: dryRun,
+      ...(hubspotToken && { hubspot_token: hubspotToken }),
+      ...(runtime && { runtime }),
     }),
   })
 
   const json = await res.json()
 
   if (!res.ok) {
-    throw new Error(json.error || ERROR_MESSAGES.PROMOTION_FAILED)
+    const error = new Error(json.error || ERROR_MESSAGES.PROMOTION_FAILED)
+    error.status = res.status
+    throw error
   }
 
   return json

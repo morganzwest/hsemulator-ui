@@ -84,7 +84,11 @@ export async function POST(req, { params }) {
 
         const responseText = await res.text()
         logger.debug('[cicd][POST /workflow/status] ← Runtime response status:', res.status)
-        logger.debug('[cicd][POST /workflow/status] ← Runtime response:', responseText)
+        // Log truncated response to avoid exposing sensitive data
+        const truncatedResponse = responseText.length > 200
+            ? responseText.substring(0, 200) + '...(truncated)'
+            : responseText
+        logger.debug('[cicd][POST /workflow/status] ← Runtime response (truncated):', truncatedResponse)
 
         let data
         try {

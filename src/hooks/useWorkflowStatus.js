@@ -122,7 +122,7 @@ export function useWorkflowStatus({
  * }
  */
   const checkStatus = useCallback(async (signal) => {
-    if (!workflowId.trim() || !secretName.trim() || !cicdSecretId || !actionId || isEditing) {
+    if (!workflowId.trim() || (!secretName?.trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
       return;
     }
 
@@ -229,7 +229,7 @@ export function useWorkflowStatus({
 
   // Clear status when fields are incomplete or we're editing
   useEffect(() => {
-    if (!workflowId.trim() || !secretName.trim() || !cicdSecretId || !actionId || isEditing) {
+    if (!workflowId.trim() || (!secretName?.trim() && !actionId) || !cicdSecretId || !actionId || isEditing) {
       setWorkflowStatus(null);
       setStatusChecked(false);
     }
@@ -263,7 +263,10 @@ export function useWorkflowStatus({
     // This will trigger the useEffect to run again by incrementing the trigger key
     setTriggerKey(prev => prev + 1);
     setStatusChecked(false);
-  }, []);
+    // Force immediate check by calling checkStatus directly
+    const controller = new AbortController();
+    checkStatus(controller.signal);
+  }, [checkStatus]);
 
   return {
     workflowStatus,

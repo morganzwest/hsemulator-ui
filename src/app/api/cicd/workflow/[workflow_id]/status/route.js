@@ -17,7 +17,6 @@ if (!RUNTIME_SECRET) {
 logger.log('[cicd][POST /workflow/status] Environment check:', {
     hasRuntimeUrl: !!RUNTIME_URL,
     hasRuntimeSecret: !!RUNTIME_SECRET,
-    runtimeUrlPrefix: RUNTIME_URL?.substring(0, 20) + '...',
     runtimeSecretLength: RUNTIME_SECRET?.length || 0
 })
 
@@ -55,7 +54,6 @@ export async function POST(req, { params }) {
 
         const runtimeUrl = `${RUNTIME_URL}/cicd/workflow/${workflow_id}/status?${queryParams}`
         logger.debug('[cicd][POST /workflow/status] → Runtime URL:', runtimeUrl)
-        logger.debug('[cicd][POST /workflow/status] Using RUNTIME_SECRET (first 10 chars):', RUNTIME_SECRET?.substring(0, 10))
 
         const res = await fetch(runtimeUrl, {
             method: 'GET',

@@ -8,6 +8,7 @@ export const ERROR_MESSAGES = {
   FAILED_TO_LOAD_CONFIG: 'Failed to load CI/CD configuration',
   FAILED_TO_SAVE_CONFIG: 'Failed to save CI/CD configuration',
   FAILED_TO_CHECK_STATUS: 'Failed to check workflow status',
+  FAILED_TO_FETCH_WORKFLOW: 'Failed to fetch workflow details',
   PROMOTION_FAILED: 'Promotion failed',
   WORKFLOW_ALREADY_UP_TO_DATE: 'Workflow already up to date',
   ACTION_PROMOTED_SUCCESSFULLY: 'Action promoted to HubSpot',

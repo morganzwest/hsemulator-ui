@@ -37,6 +37,7 @@ export function useWorkflowStatus({
   secretName,
   cicdSecretId,
   sourceCode,
+  actionId,
   isEditing,
   manualTrigger,
   debounceMs = 1500, // Increased from 1000ms for better performance
@@ -48,9 +49,11 @@ export function useWorkflowStatus({
   const lastCheckTimeRef = useRef(0);
   const rateLimitMs = 2000; // Minimum 2 seconds between status checks
   const previousManualTriggerRef = useRef(0);
+  const forceNextCheckRef = useRef(false);
+  const [triggerKey, setTriggerKey] = useState(0); // Add trigger key to force re-runs
 
   const checkStatus = useCallback(async (signal) => {
-    if (!workflowId.trim() || !secretName.trim() || !cicdSecretId || isEditing) {
+    if (!workflowId.trim() || !secretName.trim() || !cicdSecretId || !actionId || isEditing) {
       return;
     }
 
@@ -59,11 +62,14 @@ export function useWorkflowStatus({
     const timeSinceLastCheck = now - lastCheckTimeRef.current;
     const isManualTrigger = manualTrigger !== previousManualTriggerRef.current;
 
-    // Bypass rate limit for manual triggers (like after push)
-    if (!isManualTrigger && timeSinceLastCheck < rateLimitMs && !signal.aborted) {
-      // If not enough time has passed and this isn't a manual trigger, skip this check
+    // Bypass rate limit for manual triggers (like after push) or when forced
+    if (!isManualTrigger && !forceNextCheckRef.current && timeSinceLastCheck < rateLimitMs && !signal.aborted) {
+      // If not enough time has passed and this isn't a manual trigger or forced check, skip this check
       return;
     }
+
+    // Reset force flag after using it
+    forceNextCheckRef.current = false;
 
     previousManualTriggerRef.current = manualTrigger;
     lastCheckTimeRef.current = now;
@@ -73,7 +79,7 @@ export function useWorkflowStatus({
         return await checkWorkflowStatus({
           workflowId,
           cicdSecretId,
-          searchKey: secretName,
+          actionId,
           sourceCode,
         });
       }, 2, 800); // 2 retries with 800ms base delay
@@ -102,7 +108,7 @@ export function useWorkflowStatus({
     }
 
     return null;
-  }, [workflowId, secretName, cicdSecretId, sourceCode, isEditing, manualTrigger]);
+  }, [workflowId, secretName, cicdSecretId, actionId, sourceCode, isEditing, manualTrigger]);
 
   const getErrorMessage = (err) => {
     let errorMessage = ERROR_MESSAGES.FAILED_TO_CHECK_STATUS;
@@ -140,23 +146,27 @@ export function useWorkflowStatus({
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [workflowId, secretName, cicdSecretId, sourceCode, isEditing, manualTrigger, debounceMs, checkStatus]);
+  }, [workflowId, secretName, cicdSecretId, actionId, sourceCode, isEditing, manualTrigger, debounceMs, checkStatus, triggerKey]);
 
   // Clear status when fields are incomplete or we're editing
   useEffect(() => {
-    if (!workflowId.trim() || !secretName.trim() || !cicdSecretId || isEditing) {
+    if (!workflowId.trim() || !secretName.trim() || !cicdSecretId || !actionId || isEditing) {
       setWorkflowStatus(null);
       setStatusChecked(false);
     }
-  }, [workflowId, secretName, cicdSecretId, isEditing]);
+  }, [workflowId, secretName, cicdSecretId, actionId, isEditing]);
 
   const resetStatus = useCallback(() => {
     setWorkflowStatus(null);
     setStatusChecked(false);
+    // Reset rate limiting to allow immediate next check
+    forceNextCheckRef.current = true;
+    lastCheckTimeRef.current = 0;
   }, []);
 
   const triggerStatusCheck = useCallback(() => {
-    // This will trigger the useEffect to run again
+    // This will trigger the useEffect to run again by incrementing the trigger key
+    setTriggerKey(prev => prev + 1);
     setStatusChecked(false);
   }, []);
 

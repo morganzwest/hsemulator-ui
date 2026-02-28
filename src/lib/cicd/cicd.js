@@ -12,7 +12,7 @@ export async function fetchCICDConfig(actionId, portalId) {
   const [{ data: action, error: actionError }, { data: portal, error: portalError }, { data: secrets, error: secretsError }] = await Promise.all([
     supabase
       .from('actions')
-      .select('workflow_id, cicd_search_token')
+      .select('workflow_id, action_id')
       .eq('id', actionId)
       .single(),
 
@@ -51,7 +51,7 @@ export async function fetchCICDConfig(actionId, portalId) {
 
   return {
     workflowId: action?.workflow_id || '',
-    secretName: action?.cicd_search_token || '',
+    actionId: action?.action_id || '',
     token: portal?.cicd_token || null, // never expose raw value
     cicdSecret: cicdSecret || null,
   }
@@ -66,6 +66,7 @@ export async function saveCICDConfig({
   portalId,
   workflowId,
   secretName,
+  selectedActionId,
   token,
 }) {
   const supabase = createSupabaseBrowserClient()
@@ -77,7 +78,7 @@ export async function saveCICDConfig({
       .from('actions')
       .update({
         workflow_id: workflowId,
-        cicd_search_token: secretName,
+        action_id: selectedActionId,
       })
       .eq('id', actionId)
   )
@@ -119,18 +120,18 @@ function inferRuntimeFromSource(sourceCode) {
 export async function checkWorkflowStatus({
   workflowId,
   cicdSecretId,
-  searchKey,
   sourceCode,
+  actionId,
 }) {
   // Validate required parameters
-  if (!workflowId || !cicdSecretId || !searchKey) {
-    throw new Error(ERROR_MESSAGES.MISSING_PARAMETERS(['workflow_id', 'cicd_secret_id', 'search_key']))
+  if (!workflowId || !cicdSecretId) {
+    throw new Error(ERROR_MESSAGES.MISSING_PARAMETERS(['workflow_id', 'cicd_secret_id']))
   }
 
   const requestBody = {
     cicd_secret_id: cicdSecretId,
-    search_key: searchKey,
     workflow_id: workflowId,
+    action_id: actionId,
   }
 
   if (sourceCode) {
@@ -154,6 +155,44 @@ export async function checkWorkflowStatus({
   return json
 }
 
+export async function fetchWorkflowDetails(workflowId) {
+  try {
+    const res = await fetch(`/api/cicd/workflow/${workflowId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      logger.error('[fetchWorkflowDetails] API Error:', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText: errorText,
+        workflowId
+      })
+
+      if (res.status === 403) {
+        throw new Error('Access denied. You may not have permission to access this resource.')
+      } else if (res.status === 401) {
+        throw new Error('Authentication required. Please log in and try again.')
+      } else if (res.status === 404) {
+        throw new Error('Workflow endpoint not found. The feature may not be available yet.')
+      } else {
+        throw new Error(`Failed to fetch workflow: ${res.status} ${res.statusText}`)
+      }
+    }
+
+    const json = await res.json()
+    logger.log('[fetchWorkflowDetails] Success:', { workflowId, actionCount: json.actions?.length })
+    return json
+  } catch (err) {
+    logger.error('[fetchWorkflowDetails] Error:', err)
+    throw err
+  }
+}
+
 export async function promoteAction({
   workflowId,
   secretName,
@@ -174,7 +213,6 @@ export async function promoteAction({
       source_code: sourceCode,
       cicd_secret_id: cicdSecretId,
       workflow_id: workflowId,
-      search_key: secretName,
       force,
       dry_run: dryRun,
     }),

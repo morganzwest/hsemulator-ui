@@ -8,6 +8,7 @@ export const ERROR_MESSAGES = {
   FAILED_TO_LOAD_CONFIG: 'Failed to load CI/CD configuration',
   FAILED_TO_SAVE_CONFIG: 'Failed to save CI/CD configuration',
   FAILED_TO_CHECK_STATUS: 'Failed to check workflow status',
+  FAILED_TO_FETCH_WORKFLOW: 'Failed to fetch workflow details',
   PROMOTION_FAILED: 'Promotion failed',
   WORKFLOW_ALREADY_UP_TO_DATE: 'Workflow already up to date',
   ACTION_PROMOTED_SUCCESSFULLY: 'Action promoted to HubSpot',
@@ -31,6 +32,26 @@ export const ERROR_MESSAGES = {
 }
 
 // Standard error response format
+/**
+ * Creates a standardized error response object with consistent format
+ * 
+ * @param {string} message - The error message to include in the response
+ * @param {number} [statusCode=500] - HTTP status code for the error
+ * @param {any} [details=null] - Additional error details or context
+ * 
+ * @returns {Object} Standardized error response object
+ * @returns {string} returns.error - The error message
+ * @returns {number} returns.status - The HTTP status code
+ * @returns {any} returns.details - Additional error details
+ * @returns {string} returns.timestamp - ISO timestamp of when the error occurred
+ * 
+ * @example
+ * const errorResponse = createErrorResponse(
+ *   'Validation failed',
+ *   400,
+ *   { field: 'email', reason: 'invalid format' }
+ * );
+ */
 export function createErrorResponse(message, statusCode = 500, details = null) {
   return {
     error: message,
@@ -41,6 +62,24 @@ export function createErrorResponse(message, statusCode = 500, details = null) {
 }
 
 // Standard success response format
+/**
+ * Creates a standardized success response object with consistent format
+ * 
+ * @param {any} data - The data to include in the success response
+ * @param {string|null} [message=null] - Optional success message
+ * 
+ * @returns {Object} Standardized success response object
+ * @returns {boolean} returns.success - Always true for success responses
+ * @returns {any} returns.data - The response data
+ * @returns {string|null} returns.message - Optional success message
+ * @returns {string} returns.timestamp - ISO timestamp of when the response was created
+ * 
+ * @example
+ * const successResponse = createSuccessResponse(
+ *   { id: 123, name: 'John Doe' },
+ *   'User created successfully'
+ * );
+ */
 export function createSuccessResponse(data, message = null) {
   return {
     success: true,
@@ -51,6 +90,25 @@ export function createSuccessResponse(data, message = null) {
 }
 
 // Sentry integration utilities
+/**
+ * Captures and reports exceptions to Sentry for error tracking and monitoring
+ * 
+ * @param {Error} error - The error object to capture
+ * @param {Object} [context={}] - Additional context information to include with the error
+ * 
+ * @returns {void}
+ * 
+ * @example
+ * try {
+ *   await riskyOperation();
+ * } catch (error) {
+ *   captureException(error, {
+ *     userId: 'user-123',
+ *     action: 'data-import',
+ *     timestamp: new Date().toISOString()
+ *   });
+ * }
+ */
 export function captureException(error, context = {}) {
   // Import Sentry dynamically to avoid SSR issues
   import('@sentry/nextjs').then(Sentry => {
@@ -64,10 +122,31 @@ export function captureException(error, context = {}) {
   });
 }
 
+/**
+ * Captures and reports messages to Sentry for logging and monitoring
+ * 
+ * @param {string} message - The message to capture
+ * @param {string} [level='info'] - Sentry severity level ('info', 'warning', 'error', etc.)
+ * @param {Object} [context={}] - Additional context information to include with the message
+ * 
+ * @returns {void}
+ * 
+ * @example
+ * captureMessage('User logged in successfully', 'info', {
+ *   userId: 'user-123',
+ *   loginMethod: 'oauth'
+ * });
+ * 
+ * captureMessage('Payment processing failed', 'error', {
+ *   orderId: 'order-456',
+ *   amount: 99.99
+ * });
+ */
 export function captureMessage(message, level = 'info', context = {}) {
   // Import Sentry dynamically to avoid SSR issues
   import('@sentry/nextjs').then(Sentry => {
-    Sentry.captureMessage(message, level, {
+    Sentry.captureMessage(message, {
+      level,
       contexts: {
         custom: context
       }
@@ -77,6 +156,24 @@ export function captureMessage(message, level = 'info', context = {}) {
   });
 }
 
+/**
+ * Sets user context in Sentry for better error tracking and user-specific monitoring
+ * 
+ * @param {Object} user - User object with identification information
+ * @param {string} user.id - Unique user identifier
+ * @param {string} user.email - User email address
+ * @param {string} [user.username] - Optional username or display name
+ * @param {string} [user.name] - Optional display name (fallback for username)
+ * 
+ * @returns {void}
+ * 
+ * @example
+ * setUserContext({
+ *   id: 'user-123',
+ *   email: 'john.doe@example.com',
+ *   username: 'johndoe'
+ * });
+ */
 export function setUserContext(user) {
   // Import Sentry dynamically to avoid SSR issues
   import('@sentry/nextjs').then(Sentry => {
@@ -90,6 +187,15 @@ export function setUserContext(user) {
   });
 }
 
+/**
+ * Clears the user context in Sentry, ending user-specific error tracking session
+ * 
+ * @returns {void}
+ * 
+ * @example
+ * // When user logs out
+ * clearUserContext();
+ */
 export function clearUserContext() {
   // Import Sentry dynamically to avoid SSR issues
   import('@sentry/nextjs').then(Sentry => {
@@ -100,6 +206,25 @@ export function clearUserContext() {
 }
 
 // Enhanced error handler that logs to console and Sentry
+/**
+ * Enhanced error handler that logs to console in development and sends to Sentry in production
+ * 
+ * @param {Error} error - The error object to handle
+ * @param {Object} [context={}] - Additional context information for debugging
+ * 
+ * @returns {void}
+ * 
+ * @example
+ * try {
+ *   await riskyOperation();
+ * } catch (error) {
+ *   handleError(error, {
+ *     component: 'UserProfile',
+ *     action: 'update-profile',
+ *     userId: 'user-123'
+ *   });
+ * }
+ */
 export function handleError(error, context = {}) {
   // Always log to console for development
   console.error('Application Error:', error, context);
@@ -111,6 +236,30 @@ export function handleError(error, context = {}) {
 }
 
 // Utility to create error boundaries for React components
+/**
+ * Creates an error boundary configuration for React components with standardized error handling
+ * 
+ * @param {React.Component} fallback - The fallback component to render when an error occurs
+ * @param {Function} [onError] - Optional callback function to handle errors when they occur
+ * 
+ * @returns {Object} Error boundary configuration object
+ * @returns {React.Component} returns.fallback - The fallback component
+ * @returns {Function} returns.onError - The error handler function
+ * 
+ * @example
+ * const errorBoundary = createErrorBoundary(
+ *   <ErrorFallback />,
+ *   (error, errorInfo) => {
+ *     console.error('Component error:', error);
+ *     // Additional error handling logic
+ *   }
+ * );
+ * 
+ * // Usage in React component:
+ * <ErrorBoundary {...errorBoundary}>
+ *   <MyComponent />
+ * </ErrorBoundary>
+ */
 export function createErrorBoundary(fallback, onError) {
   return {
     fallback,

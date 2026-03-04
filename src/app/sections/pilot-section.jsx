@@ -3,104 +3,213 @@
 import * as React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { Sparkles, Users, Zap, MessageSquare, ArrowRight } from 'lucide-react';
+import {
+  Rocket,
+  Users,
+  Zap,
+  MessageSquare,
+  ArrowRight,
+  Star,
+  Gift,
+  Clock,
+  CheckCircle2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { SectionWrapper } from '../home-components/section-wrapper';
+import { WavePattern } from '../home-components/section-patterns';
 
-const benefits = [
+const pilotBenefits = [
   {
-    icon: Zap,
-    title: 'Early Access',
-    description: 'Be among the first to use Novocode. Get full platform access during the pilot.',
+    icon: Rocket,
+    title: 'Founder Status',
+    description:
+      'Forever marked as an early adopter. Special badge and priority treatment.',
+    highlight: true,
+  },
+  {
+    icon: Gift,
+    title: '100% Free',
+    description:
+      'No charges during the entire pilot period. Full platform access.',
   },
   {
     icon: MessageSquare,
-    title: 'Shape the Product',
-    description: 'Your feedback directly influences our roadmap. Help us build what you need.',
+    title: 'Direct Line to Founders',
+    description:
+      'Slack channel access. Your feedback shapes the product roadmap.',
+  },
+  {
+    icon: Zap,
+    title: 'White-Glove Setup',
+    description:
+      'We help migrate your existing code. Personal onboarding session.',
+  },
+  {
+    icon: Clock,
+    title: 'Lifetime Pricing',
+    description:
+      'Early adopters lock in special pricing forever. Never pay full price.',
+    highlight: true,
   },
   {
     icon: Users,
-    title: 'Direct Support',
-    description: 'Get white-glove onboarding and priority support from our team.',
+    title: 'Unlimited Seats',
+    description:
+      'Bring your whole team during the pilot. No per-seat restrictions.',
   },
 ];
 
 export function PilotSection() {
   return (
-    <SectionWrapper id="pilot" className="bg-muted/30">
-      <div className="max-w-3xl mx-auto text-center">
-        {/* Badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-        >
-          <Badge variant="secondary" className="mb-6 px-4 py-1.5">
-            <Sparkles className="mr-2 h-3.5 w-3.5" />
-            Early Access
-          </Badge>
-        </motion.div>
+    <SectionWrapper id='pilot' className='relative overflow-hidden'>
+      {/* Wave pattern background */}
+      <WavePattern className='opacity-50' />
 
-        {/* Title */}
-        <motion.h2
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.1 }}
-          className="text-3xl sm:text-4xl font-bold tracking-tight mb-4"
-        >
-          Novocode Pilot Programme
-        </motion.h2>
+      {/* Glow effects */}
+      <div className='absolute top-0 left-1/4 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none' />
+      <div className='absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none' />
 
-        {/* Description */}
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.2 }}
-          className="text-lg text-muted-foreground mb-12"
-        >
-          We are working with a limited number of early users while actively developing the platform. 
-          Join now and help shape the future of HubSpot development.
-        </motion.p>
+      <div className='relative z-10 max-w-5xl mx-auto'>
+        {/* Header */}
+        <div className='text-center mb-16'>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 mb-6'
+          >
+            <Star className='h-4 w-4 text-amber-500 fill-amber-500' />
+            <span className='text-sm font-medium text-amber-500'>
+              Limited Availability
+            </span>
+          </motion.div>
 
-        {/* Benefits */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
-          {benefits.map((benefit, index) => (
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className='text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6'
+          >
+            Join the Pilot
+            <span className='block text-amber-500'>Be a Founder</span>
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.2 }}
+            className='text-lg text-muted-foreground max-w-2xl mx-auto'
+          >
+            We are accepting a small group of forward-thinking teams to help
+            shape the future of HubSpot development. Special perks for early
+            adopters.
+          </motion.p>
+        </div>
+
+        {/* Benefits Grid */}
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12'>
+          {pilotBenefits.map((benefit, index) => (
             <motion.div
               key={benefit.title}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: 0.1 + index * 0.1 }}
-              className="flex flex-col items-center text-center p-4"
+              transition={{ delay: 0.1 + index * 0.05 }}
+              className={`relative p-6 rounded-2xl border transition-all duration-300 ${
+                benefit.highlight
+                  ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40'
+                  : 'bg-card/50 border-border hover:border-primary/30'
+              }`}
             >
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
-                <benefit.icon className="h-6 w-6 text-primary" />
+              {benefit.highlight && (
+                <div className='absolute -top-3 left-4 px-2 py-0.5 bg-amber-500 text-amber-950 text-[10px] font-bold uppercase tracking-wider rounded'>
+                  Best Value
+                </div>
+              )}
+
+              <div
+                className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
+                  benefit.highlight ? 'bg-amber-500/10' : 'bg-primary/10'
+                }`}
+              >
+                <benefit.icon
+                  className={`h-6 w-6 ${
+                    benefit.highlight ? 'text-amber-500' : 'text-primary'
+                  }`}
+                />
               </div>
-              <h3 className="font-semibold mb-2">{benefit.title}</h3>
-              <p className="text-sm text-muted-foreground">{benefit.description}</p>
+
+              <h3 className='font-semibold mb-2'>{benefit.title}</h3>
+              <p className='text-sm text-muted-foreground'>
+                {benefit.description}
+              </p>
             </motion.div>
           ))}
         </div>
+
+        {/* Spots counter */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.5 }}
+          className='flex items-center justify-center gap-8 mb-12'
+        >
+          <div className='flex items-center gap-3 px-6 py-3 rounded-full bg-muted'>
+            <div className='flex -space-x-2'>
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className='w-8 h-8 rounded-full bg-primary/20 border-2 border-background flex items-center justify-center'
+                >
+                  <Users className='h-4 w-4 text-primary' />
+                </div>
+              ))}
+            </div>
+            <span className='text-sm font-medium'>47 teams already joined</span>
+          </div>
+
+          <div className='text-sm text-muted-foreground'>
+            <span className='text-amber-500 font-semibold'>13 spots</span>{' '}
+            remaining this month
+          </div>
+        </motion.div>
 
         {/* CTA */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.6 }}
+          className='text-center'
         >
-          <Button size="lg" className="h-12 px-8" asChild>
-            <Link href="/get-started">
-              Apply for Pilot Access
-              <ArrowRight className="ml-2 h-4 w-4" />
+          <Button
+            size='lg'
+            className='h-14 px-10 text-base bg-amber-500 hover:bg-amber-600 text-amber-950 font-semibold'
+            asChild
+          >
+            <Link href='/get-started'>
+              Claim Your Founder Spot
+              <ArrowRight className='ml-2 h-5 w-5' />
             </Link>
           </Button>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Limited spots available • Free during pilot period
-          </p>
+
+          <div className='mt-6 flex items-center justify-center gap-6 text-sm text-muted-foreground'>
+            <div className='flex items-center gap-2'>
+              <CheckCircle2 className='h-4 w-4 text-green-500' />
+              <span>No credit card required</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <CheckCircle2 className='h-4 w-4 text-green-500' />
+              <span>Cancel anytime</span>
+            </div>
+            <div className='flex items-center gap-2'>
+              <CheckCircle2 className='h-4 w-4 text-green-500' />
+              <span>Free forever during pilot</span>
+            </div>
+          </div>
         </motion.div>
       </div>
     </SectionWrapper>

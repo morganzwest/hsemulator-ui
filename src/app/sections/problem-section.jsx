@@ -51,7 +51,7 @@ export function ProblemSection() {
           >
             <AlertTriangle className='h-4 w-4 text-red-500' />
             <span className='text-sm font-medium text-red-400'>
-              The Reality Check
+              The Challenge
             </span>
           </motion.div>
 
@@ -62,8 +62,8 @@ export function ProblemSection() {
             transition={{ delay: 0.1 }}
             className='text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight'
           >
-            HubSpot development
-            <span className='block text-red-400'>is broken</span>
+            Custom code deserves
+            <span className='block text-red-400'>better tooling</span>
           </motion.h2>
 
           <motion.p

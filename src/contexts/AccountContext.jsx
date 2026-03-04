@@ -1,8 +1,19 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from 'react';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
-import { initAccountState, getActiveAccount, getAvailableAccounts, setActiveAccount } from '@/lib/account-state';
+import {
+  initAccountState,
+  getActiveAccount,
+  getAvailableAccounts,
+  setActiveAccount,
+} from '@/lib/account-state';
 
 const supabase = createSupabaseBrowserClient();
 
@@ -33,7 +44,7 @@ export function AccountProvider({ children }) {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        
+
         if (!user) {
           throw new Error('User not authenticated');
         }
@@ -41,7 +52,8 @@ export function AccountProvider({ children }) {
         // Get accounts where user is a member
         const { data: accountUsers } = await supabase
           .from('account_users')
-          .select(`
+          .select(
+            `
             account_id,
             role,
             account:accounts (
@@ -49,23 +61,26 @@ export function AccountProvider({ children }) {
               name,
               plan
             )
-          `)
+          `,
+          )
           .eq('user_id', user.id);
 
         if (accountUsers && accountUsers.length > 0) {
           const userAccounts = accountUsers.map((au) => au.account);
           console.log('[AccountProvider] Found accounts:', userAccounts);
           setAccounts(userAccounts);
-          
+
           // Initialize the account state module
           const activeAccountId = initAccountState(userAccounts);
-          const active = userAccounts.find(a => a.id === activeAccountId);
+          const active = userAccounts.find((a) => a.id === activeAccountId);
           setActiveAccountState(active);
-          
+
           setInitialized(true);
         } else {
           // No accounts found - create default account
-          console.log('[AccountProvider] No accounts found, creating default account');
+          console.log(
+            '[AccountProvider] No accounts found, creating default account',
+          );
           const { data: newAccount } = await supabase
             .from('accounts')
             .insert({
@@ -93,7 +108,10 @@ export function AccountProvider({ children }) {
           }
         }
       } catch (error) {
-        console.error('[AccountProvider] Failed to initialize accounts:', error);
+        console.error(
+          '[AccountProvider] Failed to initialize accounts:',
+          error,
+        );
         setError(error.message);
       } finally {
         setLoading(false);
@@ -103,19 +121,22 @@ export function AccountProvider({ children }) {
     initializeAccounts();
   }, []);
 
-  const switchAccount = useCallback(async (accountId) => {
-    try {
-      await setActiveAccount(accountId);
-      const newActiveAccount = accounts.find(a => a.id === accountId);
-      setActiveAccountState(newActiveAccount);
-      
-      // Reload to refresh all data
-      window.location.reload();
-    } catch (error) {
-      console.error('[AccountProvider] Failed to switch account:', error);
-      setError(error.message);
-    }
-  }, [accounts]);
+  const switchAccount = useCallback(
+    async (accountId) => {
+      try {
+        await setActiveAccount(accountId);
+        const newActiveAccount = accounts.find((a) => a.id === accountId);
+        setActiveAccountState(newActiveAccount);
+
+        // Reload to refresh all data
+        window.location.reload();
+      } catch (error) {
+        console.error('[AccountProvider] Failed to switch account:', error);
+        setError(error.message);
+      }
+    },
+    [accounts],
+  );
 
   const value = {
     accounts,
@@ -131,8 +152,6 @@ export function AccountProvider({ children }) {
   };
 
   return (
-    <AccountContext.Provider value={value}>
-      {children}
-    </AccountContext.Provider>
+    <AccountContext.Provider value={value}>{children}</AccountContext.Provider>
   );
 }

@@ -7,55 +7,35 @@ import {
   Rocket,
   Users,
   Zap,
-  MessageSquare,
   ArrowRight,
   Star,
   Gift,
-  Clock,
   CheckCircle2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../../components/ui/button';
 import { SectionWrapper } from '../home-components/section-wrapper';
 import { WavePattern } from '../home-components/section-patterns';
 
 const pilotBenefits = [
   {
-    icon: Rocket,
-    title: 'Founder Status',
+    icon: Zap,
+    title: 'White-Glove Setup',
     description:
-      'Forever marked as an early adopter. Special badge and priority treatment.',
+      'We help migrate your existing code. Personal onboarding session with our team.',
     highlight: true,
   },
   {
     icon: Gift,
     title: '100% Free',
     description:
-      'No charges during the entire pilot period. Full platform access.',
-  },
-  {
-    icon: MessageSquare,
-    title: 'Direct Line to Founders',
-    description:
-      'Slack channel access. Your feedback shapes the product roadmap.',
-  },
-  {
-    icon: Zap,
-    title: 'White-Glove Setup',
-    description:
-      'We help migrate your existing code. Personal onboarding session.',
-  },
-  {
-    icon: Clock,
-    title: 'Lifetime Pricing',
-    description:
-      'Early adopters lock in special pricing forever. Never pay full price.',
+      'No charges during the entire pilot period. Full platform access included.',
     highlight: true,
   },
   {
-    icon: Users,
-    title: 'Unlimited Seats',
+    icon: Rocket,
+    title: 'Unlimited Actions',
     description:
-      'Bring your whole team during the pilot. No per-seat restrictions.',
+      'Run as many actions as you need. No usage limits during the pilot.',
   },
 ];
 
@@ -66,7 +46,7 @@ export function PilotSection() {
       <WavePattern className='opacity-50' />
 
       {/* Glow effects */}
-      <div className='absolute top-0 left-1/4 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none' />
+      <div className='absolute top-0 left-1/4 w-[500px] h-[500px] bg-yellow-500/5 rounded-full blur-[120px] pointer-events-none' />
       <div className='absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none' />
 
       <div className='relative z-10 max-w-5xl mx-auto'>
@@ -76,10 +56,10 @@ export function PilotSection() {
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 mb-6'
+            className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/20 mb-6'
           >
-            <Star className='h-4 w-4 text-amber-500 fill-amber-500' />
-            <span className='text-sm font-medium text-amber-500'>
+            <Star className='h-4 w-4 text-yellow-500 fill-yellow-500' />
+            <span className='text-sm font-medium text-yellow-500'>
               Limited Availability
             </span>
           </motion.div>
@@ -92,7 +72,7 @@ export function PilotSection() {
             className='text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6'
           >
             Join the Pilot
-            <span className='block text-amber-500'>Be a Founder</span>
+            <span className='block text-yellow-500'>Early Access</span>
           </motion.h2>
 
           <motion.p
@@ -109,34 +89,34 @@ export function PilotSection() {
         </div>
 
         {/* Benefits Grid */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12'>
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-12'>
           {pilotBenefits.map((benefit, index) => (
             <motion.div
               key={benefit.title}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: 0.1 + index * 0.05 }}
+              transition={{ delay: 0.1 + index * 0.1 }}
               className={`relative p-6 rounded-2xl border transition-all duration-300 ${
                 benefit.highlight
-                  ? 'bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40'
+                  ? 'bg-yellow-500/5 border-yellow-500/20 hover:border-yellow-500/40'
                   : 'bg-card/50 border-border hover:border-primary/30'
               }`}
             >
               {benefit.highlight && (
-                <div className='absolute -top-3 left-4 px-2 py-0.5 bg-amber-500 text-amber-950 text-[10px] font-bold uppercase tracking-wider rounded'>
-                  Best Value
+                <div className='absolute -top-3 left-4 px-2 py-0.5 bg-yellow-500 text-yellow-950 text-[10px] font-bold uppercase tracking-wider rounded'>
+                  Included
                 </div>
               )}
 
               <div
                 className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${
-                  benefit.highlight ? 'bg-amber-500/10' : 'bg-primary/10'
+                  benefit.highlight ? 'bg-yellow-500/10' : 'bg-primary/10'
                 }`}
               >
                 <benefit.icon
                   className={`h-6 w-6 ${
-                    benefit.highlight ? 'text-amber-500' : 'text-primary'
+                    benefit.highlight ? 'text-yellow-500' : 'text-primary'
                   }`}
                 />
               </div>
@@ -172,7 +152,7 @@ export function PilotSection() {
           </div>
 
           <div className='text-sm text-muted-foreground'>
-            <span className='text-amber-500 font-semibold'>13 spots</span>{' '}
+            <span className='text-yellow-500 font-semibold'>13 spots</span>{' '}
             remaining this month
           </div>
         </motion.div>
@@ -187,11 +167,11 @@ export function PilotSection() {
         >
           <Button
             size='lg'
-            className='h-14 px-10 text-base bg-amber-500 hover:bg-amber-600 text-amber-950 font-semibold'
+            className='h-14 px-10 text-base bg-yellow-500 hover:bg-yellow-600 text-yellow-950 font-semibold'
             asChild
           >
             <Link href='/get-started'>
-              Claim Your Founder Spot
+              Join the Pilot
               <ArrowRight className='ml-2 h-5 w-5' />
             </Link>
           </Button>

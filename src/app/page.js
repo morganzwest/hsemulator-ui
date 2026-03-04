@@ -2,9 +2,8 @@
 
 import { useEffect } from "react"
 import { createSupabaseBrowserClient } from "~/lib/supabase/browser"
-import { PageHeader } from "@/components/page-header"
+import { PageHeader } from "../components/page-header"
 import { AnimatedGrid } from "./home-components/animated-grid"
-import { GradientOrbGroup } from "./home-components/gradient-orb"
 import { HeroSection } from "./sections/hero-section"
 import { ProblemSection } from "./sections/problem-section"
 import { SolutionSection } from "./sections/solution-section"
@@ -15,6 +14,7 @@ import { VisibilitySection } from "./sections/visibility-section"
 import { TeamsSection } from "./sections/teams-section"
 import { PilotSection } from "./sections/pilot-section"
 import { CTASection } from "./sections/cta-section"
+import { Footer } from "./sections/footer"
 
 export default function LandingPage() {
   useEffect(() => {
@@ -49,7 +49,6 @@ export default function LandingPage() {
     <main className="relative min-h-screen bg-background overflow-x-hidden">
       {/* Background effects */}
       <AnimatedGrid />
-      <GradientOrbGroup />
 
       {/* Header */}
       <PageHeader />
@@ -66,6 +65,7 @@ export default function LandingPage() {
         <TeamsSection />
         <PilotSection />
         <CTASection />
+        <Footer />
       </div>
     </main>
   )

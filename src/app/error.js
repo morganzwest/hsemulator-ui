@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
-import { handleError } from '@/lib/errors';
+import { handleError } from '../lib/errors';
 import Link from 'next/link';
 
 export default function Error({ error, reset }) {

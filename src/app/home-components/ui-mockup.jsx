@@ -145,7 +145,7 @@ export function UIMockup() {
 
       {/* Floating deploy button card */}
       <motion.div
-        className='absolute -top-4 -left-4 lg:left-8 rounded-lg border bg-primary text-primary-foreground shadow-xl overflow-hidden px-4 py-2'
+        className='absolute -top-4 -left-20 lg:left-8 rounded-lg border bg-primary text-primary-foreground shadow-xl overflow-hidden px-4 py-2'
         initial={{ opacity: 0, x: -20 }}
         animate={{
           opacity: 1,

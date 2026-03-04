@@ -64,7 +64,7 @@ async function apiRequest(path, { method, body }) {
   let data = null;
   try {
     data = await res.json();
-  } catch {}
+  } catch { }
 
   if (!res.ok) {
     // Create structured error object
@@ -108,8 +108,6 @@ async function apiRequest(path, { method, body }) {
 ------------------------------------------------- */
 
 function validateCreateSecret(input) {
-  console.log("[secrets][validateCreateSecret] input:", input);
-
   if (!input) throw new Error("Payload is required");
 
   const { scope, portal_id, action_id = null, name, value } = input;
@@ -143,15 +141,15 @@ function validateCreateSecret(input) {
   };
 }
 
-function validateUpdateSecret(input) {
-  console.log("[secrets][validateUpdateSecret] input:", input);
-
-  if (!input?.value || typeof input.value !== "string") {
+function validateUpdateSecret(secret) {
+  // Validates Secret
+  // Takes Secret as input
+  if (!secret?.value || typeof secret.value !== "string") {
     throw new Error("New secret value is required");
   }
 
   return {
-    value: input.value,
+    value: secret.value,
   };
 }
 
@@ -212,12 +210,6 @@ export async function fetchPortalSecrets(portalId) {
       ...secret,
       usage_count: usageCounts[secret.id] || 0,
     })) || [];
-
-  console.log(
-    "[secrets][fetchPortalSecrets] rows with usage:",
-    secretsWithUsage,
-  );
-
   return secretsWithUsage;
 }
 

@@ -64,7 +64,7 @@ async function apiRequest(path, { method, body }) {
   let data = null;
   try {
     data = await res.json();
-  } catch { }
+  } catch {}
 
   if (!res.ok) {
     // Create structured error object
@@ -192,14 +192,13 @@ export async function fetchPortalSecrets(portalId) {
       .from("action_secrets")
       .select("secret_id, count:count()")
       .eq("portal_id", portalId)
-      .in("secret_id", secretIds)
-      .group("secret_id");
+      .in("secret_id", secretIds);
 
     if (error) {
       console.error("[secrets][fetchPortalSecrets] Usage count error:", error);
     } else {
       data?.forEach((row) => {
-        usageCounts[row.secret_id] = Number(row.count);
+        usageCounts[row.secret_id] = Number(row.count) || 0;
       });
     }
   }

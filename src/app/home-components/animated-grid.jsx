@@ -1,13 +1,18 @@
 'use client';
 
 import * as React from 'react';
+import { AuroraBackground } from './aurora-background';
 
 export function AnimatedGrid({ className }) {
   return (
     <div
       className={`fixed inset-0 z-0 pointer-events-none overflow-hidden ${className || ''}`}
-      aria-hidden="true"
+      aria-hidden='true'
     >
+      {/* Aurora background */}
+      <AuroraBackground />
+
+      {/* Original grid pattern overlay */}
       <style>{`
         @keyframes grid-drift {
           0% { transform: translateX(0); }
@@ -25,10 +30,11 @@ export function AnimatedGrid({ className }) {
           animation: grid-drift 20s linear infinite, grid-pulse 8s ease-in-out infinite;
         }
       `}</style>
-      <div className="absolute inset-0 animated-grid-pattern" />
+      <div className='absolute inset-0 animated-grid-pattern' />
+
       {/* Fade edges */}
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background" />
-      <div className="absolute inset-0 bg-gradient-to-r from-background via-transparent to-background" />
+      <div className='absolute inset-0 bg-gradient-to-b from-background via-transparent to-background' />
+      <div className='absolute inset-0 bg-gradient-to-r from-background via-transparent to-background' />
     </div>
   );
 }

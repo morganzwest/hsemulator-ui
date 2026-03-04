@@ -72,7 +72,10 @@ export function PageHeader() {
     return () => subscription.unsubscribe();
   }, []);
   return (
-    <header className='sticky top-0 z-50 border-b bg-background/80 backdrop-blur transition-all duration-300'>
+    <header
+      className='sticky top-0 z-50 mx-auto max-w-4xl rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl backdrop-saturate-150 transition-all duration-300 shadow-xl shadow-black/10'
+      style={{ marginTop: '1.5rem' }}
+    >
       <div className='mx-auto flex h-18 max-w-7xl items-center justify-between px-6'>
         <div className='flex items-center py-2'>
           <Link

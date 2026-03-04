@@ -4,6 +4,14 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Terminal, Play, FileCode, Logs } from 'lucide-react';
 
+// Stable random number generator for firework positions
+const generateRandomOffset = (index) => {
+  const seed = index * 1234; // Deterministic seed based on index
+  const x = Math.sin(seed) * 50;
+  const y = Math.cos(seed) * 50;
+  return { x, y };
+};
+
 const floatAnimation = {
   y: [0, -12, 0],
   transition: {
@@ -157,8 +165,42 @@ export function UIMockup() {
           x: { duration: 0.6, delay: 1 },
           y: { duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1.5 },
         }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
       >
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-2 relative'>
+          {/* Firework effect */}
+          <motion.div
+            className='absolute inset-0 pointer-events-auto'
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: [0, 1, 0], scale: [0, 1.5, 0] }}
+            transition={{ duration: 0.8, delay: 0.3 }}
+          >
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className='absolute w-1 h-1 bg-yellow-400 rounded-full'
+                initial={{
+                  opacity: 0,
+                  scale: 0,
+                  x: 0,
+                  y: 0,
+                }}
+                animate={{
+                  opacity: [0, 1, 0],
+                  scale: [0, 1, 0],
+                  x: [0, generateRandomOffset(i).x * 100, 0],
+                  y: [0, generateRandomOffset(i).y * 100, 0],
+                }}
+                transition={{
+                  duration: 1.5,
+                  delay: i * 0.1,
+                  ease: 'easeOut',
+                }}
+              />
+            ))}
+          </motion.div>
+
           <Play className='h-3.5 w-3.5' />
           <span className='text-xs font-medium'>Deploy to HubSpot</span>
         </div>

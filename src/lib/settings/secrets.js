@@ -64,7 +64,7 @@ async function apiRequest(path, { method, body }) {
   let data = null;
   try {
     data = await res.json();
-  } catch {}
+  } catch { }
 
   if (!res.ok) {
     // Create structured error object
@@ -187,23 +187,28 @@ export async function fetchPortalSecrets(portalId) {
   const secretIds = secrets?.map((s) => s.id) || [];
   let usageCounts = {};
 
+  // Fetch usage counts for each secret from the action_secrets function table
+  // This tells us how many actions are using each secret
   if (secretIds.length > 0) {
-    const { data, error } = await supabase
-      .from("action_secrets")
-      .select("secret_id, count:count()")
-      .eq("portal_id", portalId)
-      .in("secret_id", secretIds);
+    const { data: usageData, error: usageError } = await supabase
+      .from('action_secrets')
+      .select('secret_id')
+      .eq('portal_id', portalId)
+      .in('secret_id', secretIds);
 
-    if (error) {
-      console.error("[secrets][fetchPortalSecrets] Usage count error:", error);
+    if (usageError) {
+      console.error('[secrets][fetchPortalSecrets] Usage count error:', usageError)
     } else {
-      data?.forEach((row) => {
-        usageCounts[row.secret_id] = Number(row.count) || 0;
-      });
+      // Count occurrences by secret_id
+      usageCounts = {}
+      usageData?.forEach(row => {
+        usageCounts[row.secret_id] = (usageCounts[row.secret_id] || 0) + 1
+      })
     }
   }
 
-  // Combine secrets with usage counts
+  // Merge the original secrets with their usage counts
+  // Each secret gets a usage_count property showing how many actions use it
   const secretsWithUsage =
     secrets?.map((secret) => ({
       ...secret,

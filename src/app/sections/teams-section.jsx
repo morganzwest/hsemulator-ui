@@ -205,10 +205,6 @@ export function TeamsSection() {
           className='flex items-center justify-center gap-8 text-sm text-muted-foreground'
         >
           <div className='flex items-center gap-2'>
-            <Shield className='h-4 w-4' />
-            <span>SOC 2 Type II</span>
-          </div>
-          <div className='flex items-center gap-2'>
             <Lock className='h-4 w-4' />
             <span>End-to-end encryption</span>
           </div>

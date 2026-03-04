@@ -10,7 +10,7 @@ import { UIMockup } from '../home-components/ui-mockup';
 
 export function HeroSection() {
   return (
-    <section className='relative pt-32 pb-24 overflow-hidden'>
+    <section className='relative pt-16 lg:pt-32 pb-24 overflow-hidden'>
       <div className='max-w-6xl mx-auto px-6'>
         <div className='max-w-4xl mx-auto text-center'>
           {/* Badge */}

@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { createSupabaseBrowserClient } from '~/lib/supabase/browser';
 import { Button } from '@/components/ui/button';
 import {
   NavigationMenu,
@@ -41,6 +43,34 @@ import {
 } from 'lucide-react';
 
 export function PageHeader() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setIsLoggedIn(!!session);
+      } catch (error) {
+        console.error('Error checking session:', error);
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkSession();
+
+    // Listen for auth changes
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
   return (
     <header className='sticky top-0 z-50 border-b bg-background/80 backdrop-blur transition-all duration-300'>
       <div className='mx-auto flex h-18 max-w-7xl items-center justify-between px-6'>
@@ -53,17 +83,18 @@ export function PageHeader() {
           </Link>
         </div>
 
-        <NavigationMenu className='flex-1 justify-center'>
+        {/* NavigationMenu commented out */}
+        {/* <NavigationMenu className='flex-1 justify-center'>
           <NavigationMenuList className='gap-8'>
             {/* Features Mega Menu */}
-            <NavigationMenuItem>
+        {/* <NavigationMenuItem>
               <NavigationMenuTrigger className='text-sm font-medium'>
                 Features
               </NavigationMenuTrigger>
               <NavigationMenuContent>
                 <div className='space-y-6 p-6 w-[600px]'>
                   {/* Development Row */}
-                  <div>
+        {/* <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       Development
                     </h3>
@@ -126,7 +157,7 @@ export function PageHeader() {
                   </div>
 
                   {/* CI/CD Row */}
-                  <div>
+        {/* <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       CI/CD
                     </h3>
@@ -186,10 +217,10 @@ export function PageHeader() {
                         </Link>
                       </NavigationMenuLink>
                     </div>
-                  </div>
+                  </div> */}
 
-                  {/* Monitoring Row */}
-                  <div>
+        {/* Monitoring Row */}
+        {/* <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       Monitoring
                     </h3>
@@ -252,16 +283,15 @@ export function PageHeader() {
                   </div>
                 </div>
               </NavigationMenuContent>
-            </NavigationMenuItem>
+            </NavigationMenuItem> */}
 
-            {/* Use Cases Mega Menu */}
-            <NavigationMenuItem>
+        {/* Use Cases Mega Menu */}
+        {/* <NavigationMenuItem>
               <NavigationMenuTrigger className='text-sm font-medium'>
                 Use Cases
               </NavigationMenuTrigger>
               <NavigationMenuContent>
                 <div className='space-y-6 p-6 w-[600px]'>
-                  {/* Developers Row */}
                   <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       Developers
@@ -324,7 +354,6 @@ export function PageHeader() {
                     </div>
                   </div>
 
-                  {/* CRM Teams Row */}
                   <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       CRM Teams
@@ -387,7 +416,6 @@ export function PageHeader() {
                     </div>
                   </div>
 
-                  {/* Operations Row */}
                   <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       Operations
@@ -451,16 +479,15 @@ export function PageHeader() {
                   </div>
                 </div>
               </NavigationMenuContent>
-            </NavigationMenuItem>
+            </NavigationMenuItem> */}
 
-            {/* Pricing Dropdown */}
-            <NavigationMenuItem>
+        {/* Pricing Dropdown */}
+        {/* <NavigationMenuItem>
               <NavigationMenuTrigger className='text-sm font-medium'>
                 Pricing
               </NavigationMenuTrigger>
               <NavigationMenuContent>
-                <div className='grid w-[600px] gap-6 p-8'>
-                  {/* Professional Plan */}
+                <div className='grid w-[600px] gap-6 p-6'>
                   <div className='space-y-6'>
                     <div>
                       <div className='flex items-center gap-2 mb-2'>
@@ -515,7 +542,6 @@ export function PageHeader() {
                     </Button>
                   </div>
 
-                  {/* Enterprise Plan */}
                   <div className='space-y-6'>
                     <div>
                       <div className='flex items-center gap-2 mb-2'>
@@ -571,16 +597,15 @@ export function PageHeader() {
                   </div>
                 </div>
               </NavigationMenuContent>
-            </NavigationMenuItem>
+            </NavigationMenuItem> */}
 
-            {/* Resources Mega Menu */}
-            <NavigationMenuItem>
+        {/* Resources Mega Menu */}
+        {/* <NavigationMenuItem>
               <NavigationMenuTrigger className='text-sm font-medium'>
                 Resources
               </NavigationMenuTrigger>
               <NavigationMenuContent>
                 <div className='space-y-6 p-6 w-[600px]'>
-                  {/* Learning Row */}
                   <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       Learning
@@ -643,7 +668,6 @@ export function PageHeader() {
                     </div>
                   </div>
 
-                  {/* Product Row */}
                   <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       Product
@@ -706,7 +730,6 @@ export function PageHeader() {
                     </div>
                   </div>
 
-                  {/* Company Row */}
                   <div>
                     <h3 className='text-sm font-semibold text-foreground uppercase tracking-wide mb-3'>
                       Company
@@ -770,18 +793,33 @@ export function PageHeader() {
                   </div>
                 </div>
               </NavigationMenuContent>
-            </NavigationMenuItem>
           </NavigationMenuList>
-        </NavigationMenu>
+        </NavigationMenu> */}
 
         {/* Right Side Actions */}
         <div className='flex items-center gap-4'>
-          <Button variant='ghost' asChild className='text-sm'>
-            <Link href='/login'>Login</Link>
-          </Button>
-          <Button asChild className='bg-primary hover:bg-primary/90'>
-            <Link href='/get-started'>Get Started</Link>
-          </Button>
+          {isLoggedIn ? (
+            <>
+              <Button variant='outline' asChild className='text-sm'>
+                <Link href='/demo'>Demo</Link>
+              </Button>
+              <Button variant='' asChild className='text-sm'>
+                <Link href='/dashboard'>Dashboard</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant='ghost' asChild className='text-sm'>
+                <Link href='/demo'>Demo</Link>
+              </Button>
+              <Button variant='outline' asChild className='text-sm'>
+                <Link href='/login'>Login</Link>
+              </Button>
+              <Button asChild className='bg-primary hover:bg-primary/90'>
+                <Link href='/get-started'>Get Started</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

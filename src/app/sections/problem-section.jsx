@@ -138,15 +138,6 @@ export function ProblemSection() {
               Of teams affected
             </div>
           </div>
-          <div className='h-12 w-px bg-border hidden md:block' />
-          <div className='text-center'>
-            <div className='text-3xl md:text-4xl font-bold text-red-400'>
-              $0
-            </div>
-            <div className='text-sm text-muted-foreground mt-1'>
-              Spent on solutions
-            </div>
-          </div>
         </motion.div>
       </div>
     </SectionWrapper>

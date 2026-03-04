@@ -231,7 +231,7 @@ export function NavUser({ user }) {
               <DropdownMenuItem
                 onClick={() => {
                   // Open status page in new tab
-                  window.open('https://novocode.betteruptime.com/', '_blank');
+                  window.open('https://status.novocode.novocy.com/', '_blank');
                 }}
               >
                 <ActivityIcon />

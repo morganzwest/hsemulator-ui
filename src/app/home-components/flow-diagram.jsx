@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HubSpotLogo } from './hubspot-logo';
+import { Ripple } from '../sections/solution-section';
 
 const nodeVariants = {
   hidden: { opacity: 0, scale: 0.9 },
@@ -57,10 +58,34 @@ export function SolutionFlow() {
         {/* Novocode Node */}
         <motion.div
           variants={nodeVariants}
-          className='flex flex-col items-center gap-3'
+          className='flex flex-col items-center gap-3 relative'
+          style={{ overflow: 'visible' }}
         >
-          <div className='w-24 h-24 rounded-2xl bg-primary border border-primary/30 flex items-center justify-center shadow-lg shadow-primary/20'>
-            <FileCode className='h-10 w-10 text-primary-foreground' />
+          <div
+            className='relative'
+            style={{ width: '96px', height: '96px', overflow: 'visible' }}
+          >
+            <div
+              className='absolute inset-0'
+              style={{
+                width: '250px',
+                height: '250px',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                overflow: 'visible',
+              }}
+            >
+              <Ripple
+                className='absolute inset-0'
+                mainCircleSize={160}
+                numCircles={5}
+                showMask={true}
+              />
+              <div className='absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-2xl bg-primary border border-primary/30 flex items-center justify-center shadow-lg shadow-primary/20 z-20'>
+                <FileCode className='h-10 w-10 text-primary-foreground' />
+              </div>
+            </div>
           </div>
           <span className='text-sm font-semibold text-primary'>Novocode</span>
         </motion.div>

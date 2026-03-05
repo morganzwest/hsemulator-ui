@@ -15,6 +15,7 @@ export function Ripple({
   mainCircleOpacity = 0.24,
   numCircles = 6,
   color = 'rgba(255, 255, 255, 0.8)',
+  showMask = false,
 }) {
   return (
     <div className={cn('relative inset-0 overflow-hidden', className)}>
@@ -30,14 +31,16 @@ export function Ripple({
         }
       `}</style>
 
-      {/* Ripple container with radial fade mask */}
+      {/* Ripple container with optional radial fade mask */}
       <div
-        className='pointer-events-none absolute inset-0 select-none'
+        className='pointer-events-none absolute inset-0 select-none z-0'
         style={{
-          maskImage:
-            'radial-gradient(ellipse at center, white 0%, white 30%, transparent 70%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse at center, white 0%, white 30%, transparent 70%)',
+          maskImage: showMask
+            ? 'radial-gradient(ellipse at center, white 0%, white 30%, transparent 70%)'
+            : 'none',
+          WebkitMaskImage: showMask
+            ? 'radial-gradient(ellipse at center, white 0%, white 30%, transparent 70%)'
+            : 'none',
         }}
       >
         {Array.from({ length: numCircles }, (_, i) => {
@@ -68,7 +71,7 @@ export function Ripple({
 
       {/* Content layer */}
       {children && (
-        <div className='relative z-10 h-full w-full'>{children}</div>
+        <div className='relative z-20 h-full w-full'>{children}</div>
       )}
     </div>
   );
@@ -108,30 +111,28 @@ const capabilities = [
 export function SolutionSection() {
   return (
     <SectionWrapper id='solution' className='bg-muted/30'>
-      <Ripple className=''>
-        <div className='text-center mb-12'>
-          <motion.span
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className='text-sm font-medium text-primary uppercase tracking-wider'
-          >
-            The Solution
-          </motion.span>
-          <motion.h2
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className='mt-4 text-3xl sm:text-4xl font-bold tracking-tight'
-          >
-            Novocode adds software engineering
-            <span className='block text-primary'>
-              discipline to HubSpot automation
-            </span>
-          </motion.h2>
-        </div>
-      </Ripple>
+      <div className='text-center mb-12'>
+        <motion.span
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          className='text-sm font-medium text-primary uppercase tracking-wider'
+        >
+          The Solution
+        </motion.span>
+        <motion.h2
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.1 }}
+          className='mt-4 text-3xl sm:text-4xl font-bold tracking-tight'
+        >
+          Novocode adds software engineering
+          <span className='block text-primary'>
+            discipline to HubSpot automation
+          </span>
+        </motion.h2>
+      </div>
 
       {/* Architecture Diagram */}
       <motion.div

@@ -29,7 +29,7 @@ export async function POST(req) {
 
         const body = await req.json()
 
-        logger.log('[migration][POST /workflows] →', {
+        logger.log('[migration][POST /workflows]', {
             secret_id: body.secret_id,
             portal_id: body.portal_id,
             owner_id: body.owner_id,
@@ -56,7 +56,7 @@ export async function POST(req) {
             process_actions
         }
 
-        const res = await fetch(`${RUNTIME_URL}/workflows/discover`, {
+        const res = await fetch(`${RUNTIME_URL}/workflows/workflows`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
